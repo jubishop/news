@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "collections": {
+    "memory": {
+      "path": "memory",
+      "pattern": "**/*.md",
+      "ignore": ["archive/**", "pr_reviews/**"],
+      "context": {"/": "Durable News project guidance, corrections, and validated lessons. Read the source page before applying a search result."}
+    },
+    "docs": {
+      "path": "docs",
+      "pattern": "**/*.md",
+      "ignore": ["archive/**"],
+      "context": {"/": "News concept, newsroom designs, decisions, and development guides. A current document does not imply implementation or user approval."}
+    }
+  },
+  "checks": {"exclude": ["memory/pr_reviews/**"]}
+}
