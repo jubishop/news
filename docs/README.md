@@ -59,5 +59,19 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
 ## Active pages
 
 - [Concept](concept.md): the draft idea for a personal AI news agency.
+- [Product design](product-design.md): accepted product decisions and open
+  questions for the first useful version.
+- [Implementation design](implementation-design.md): server-first implementation
+  sequence, selected stack, deployment context, and remaining technical choices.
+- [Backups](backups.md): encrypted recovery snapshots, retention, restore
+  checks, and email warnings when backup storage exceeds 1 GB.
+- [Server contract](server-contract.md): proposed records, Markdown article
+  payloads, browser routes, worker API, and submission validation.
+- [Database schema](database-schema.md): accepted table and field baseline,
+  relationships, and worker-supplied article coverage metadata.
+- [Reporting worker](reporting-worker.md): newsroom API boundary, model engine
+  candidates, run outcomes, and overdue-work detection.
+- [Reporting examples](reporting-examples.md): concrete assignments and proposed
+  evaluation cases for the reporting engine.
 - [Development workflow](development-workflow.md): setup, search, hooks,
   worktrees, diagnostics, dependency choices, testing, and checks.

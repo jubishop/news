@@ -2,11 +2,14 @@
 
 A personal news agency staffed by AI reporters. The owner acts as editor in
 chief: hire reporters, assign their beats, and choose how often they report.
-Read their articles on a news site with a front page and topic sections.
+Read their articles on a public news site with a newest-first feed and a
+reporter filter. The newsroom is owner-only, and the API requires authentication.
 
-This project starts with a [rough concept](docs/concept.md) and development
-tools. The application stack and product design are still open. There is no
-runnable news site yet.
+The [product design](docs/product-design.md) develops the
+[concept](docs/concept.md). The [implementation design](docs/implementation-design.md)
+selects Python, Flask, SQLite, and a separate reporting worker. Detailed design
+is still in progress. Build and validate the VPS server first, then implement
+the worker on a local machine. There is no runnable news site yet.
 
 Use [GitHub Issues](https://github.com/jubishop/news/issues) for work items
 and implementation progress.

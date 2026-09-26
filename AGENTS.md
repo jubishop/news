@@ -1,7 +1,8 @@
 # News project instructions
 
-Read the [concept](docs/concept.md) for the project's draft direction. The
-application stack has not been selected.
+Read the [concept](docs/concept.md) for the project's direction and the
+[implementation design](docs/implementation-design.md) for the selected
+Python, Flask, and SQLite stack. The application is not implemented yet.
 
 The user is in Pacific Time. Use PST/PDT unless asked otherwise. The user's
 default shell is fish. Use short, direct sentences and ASD-STE100 Simplified
