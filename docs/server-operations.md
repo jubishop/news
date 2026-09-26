@@ -5,8 +5,8 @@ status: current
 # Server setup and operations
 
 This is the runbook for server v1. The server is reviewable locally without an
-AI worker. Production provisioning and deployment are separate steps after
-PR review; the PR does not change the VPS, DNS, or Access applications.
+AI worker. After one-time provisioning, the [deployment workflow](deployment.md)
+releases validated pushes to `main`, including migrations and maintenance.
 
 ## Runtime and local setup
 
@@ -109,14 +109,17 @@ Only deploy a reviewed revision with successful full validation. Export that
 revision (for example with `git archive`) into `/opt/news/releases/REVISION` on
 the VPS. Do not copy `.venv`, caches, local `.env` files, or preview databases.
 Run the uploaded `ops/install-server /opt/news/releases/REVISION` as root.
+The [automatic workflow](deployment.md) performs this sequence for pushes to
+`main`; use manual installation only for operator-led recovery or setup.
 
 The installer builds the production environment before stopping any service.
 It uses a dedicated unprivileged `news` account and root-owned release code.
 It stops all News writers, makes a consistent local pre-release SQLite backup
 when a database exists, switches the release link, applies migrations, starts
-the web service, and checks loopback health. Migration or health failure leaves
-services stopped for explicit recovery. It does not automatically downgrade
-the database or change the Caddy configuration.
+the web service, checks loopback health, and runs maintenance once. It then
+enables the regular timers. A failure after shutdown starts leaves services
+stopped for explicit recovery. It does not automatically downgrade the database
+or change the Caddy configuration. A host lock prevents overlapping installs.
 
 After origin health passes, add the [Caddy fragment](../ops/Caddyfile.fragment)
 without replacing unrelated sites. Validate Caddy, then reload it. Verify:

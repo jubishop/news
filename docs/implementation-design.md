@@ -22,9 +22,13 @@ the VPS first. Bring that server to a v1 the owner is happy with before
 separately implementing the reporting worker on one of the owner's local
 machines. The specific local host and model engine remain undecided.
 
-The owner later narrowed the current implementation task: use a worktree under
+The owner narrowed the initial implementation task: use a worktree under
 `worktrees/`, open a PR, and stop before merge or deployment. This does not
 change the server-before-worker product sequence.
+
+After server v1 merged, the owner requested [automatic deployment](deployment.md)
+from `main`, including migrations and required maintenance. That release work
+supersedes the earlier PR-only task boundary.
 
 The owner requested this sequence; no further reason was stated. It allows
 the reading experience, reporter management, storage, and API to be evaluated
@@ -317,8 +321,8 @@ do not select the research worker's model or tools.
 
 Remaining production work is provisioning Cloudflare Access, origin TLS, DNS,
 private credentials, the R2 repository, and real email delivery verification,
-then rollout of a reviewed revision. This work is deliberately separate from
-the current PR-only implementation scope.
+then rollout of a validated revision. The [deployment workflow](deployment.md)
+now automates releases after those one-time prerequisites are complete.
 
 The shared model, local execution host, provider integration, research tools,
 and persistent local result storage remain worker-phase decisions. Server

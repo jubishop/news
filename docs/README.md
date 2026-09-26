@@ -69,6 +69,8 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   payloads, browser routes, worker API, and submission validation.
 - [Server operations](server-operations.md): local setup, validation, release
   prerequisites, monitoring, backups, and recovery.
+- [Automatic deployment](deployment.md): main-branch releases, deployment
+  credentials, migrations, maintenance, and failure handling.
 - [Database schema](database-schema.md): accepted table and field baseline,
   relationships, and worker-supplied article coverage metadata.
 - [Reporting worker](reporting-worker.md): newsroom API boundary, model engine

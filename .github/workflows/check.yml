@@ -4,13 +4,14 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: checks-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
@@ -35,3 +36,39 @@ jobs:
           .venv/bin/python -m playwright install --with-deps chromium
       - name: Check repository
         run: bin/check --full
+
+  deploy:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment:
+      name: production
+      url: https://news.jubishop.com
+    concurrency:
+      group: news-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Install deploy identity
+        env:
+          DEPLOY_KEY: ${{ secrets.NEWS_DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.NEWS_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          umask 077
+          test -n "$DEPLOY_KEY"
+          test -n "$KNOWN_HOSTS"
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/news-deploy-key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/news-known-hosts"
+      - name: Deploy validated main revision
+        env:
+          NEWS_DEPLOY_HOST: ${{ vars.NEWS_DEPLOY_HOST }}
+          NEWS_DEPLOY_KEY: ${{ runner.temp }}/news-deploy-key
+          NEWS_DEPLOY_KNOWN_HOSTS: ${{ runner.temp }}/news-known-hosts
+          REVISION: ${{ github.sha }}
+        run: ops/deploy-main "$REVISION"
+      - name: Remove deploy identity
+        if: always()
+        run: rm -f "$RUNNER_TEMP/news-deploy-key" "$RUNNER_TEMP/news-known-hosts"

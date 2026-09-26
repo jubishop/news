@@ -7,8 +7,8 @@ status: current
 This repository keeps knowledge as Markdown and uses optional QMD search.
 Each checkout has its own index. Git hooks refresh it in the background.
 
-News currently contains its draft concept and this foundation. There is no
-application runtime, package manager, server, or deployment configuration yet.
+News uses Python, Flask, and SQLite. See [server operations](server-operations.md)
+for application setup and [automatic deployment](deployment.md) for releases.
 Use [GitHub Issues](https://github.com/jubishop/news/issues) for actionable work.
 
 ## First setup

@@ -1,0 +1,28 @@
+#!/bin/sh
+# Called only after full validation of this exact main commit.
+set -eu
+umask 077
+[ "$#" -eq 1 ] || { echo 'Usage: ops/deploy-main COMMIT_SHA' >&2; exit 1; }
+revision=$1
+case "$revision" in ''|*[!0-9a-f]*) echo 'Expected a full commit SHA.' >&2; exit 1 ;; esac
+[ "${#revision}" -eq 40 ] || { echo 'Expected a full commit SHA.' >&2; exit 1; }
+: "${NEWS_DEPLOY_HOST:?Set NEWS_DEPLOY_HOST}"
+: "${NEWS_DEPLOY_KEY:?Set NEWS_DEPLOY_KEY to the private key path}"
+: "${NEWS_DEPLOY_KNOWN_HOSTS:?Set NEWS_DEPLOY_KNOWN_HOSTS to the pinned host key file}"
+
+latest=$(git ls-remote --exit-code origin refs/heads/main)
+latest=${latest%%[[:space:]]*}
+if [ "$latest" != "$revision" ]; then
+    echo "Skipping superseded revision $revision; main is $latest."
+    exit 0
+fi
+archive=$(mktemp)
+trap 'rm -f "$archive"' EXIT HUP INT TERM
+git archive --format=tar --output="$archive" "$revision" news ops requirements.txt
+ssh -T -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+    -o UserKnownHostsFile="$NEWS_DEPLOY_KNOWN_HOSTS" -o ConnectTimeout=15 \
+    -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+    -i "$NEWS_DEPLOY_KEY" "root@$NEWS_DEPLOY_HOST" "deploy $revision" < "$archive"
+curl --fail --silent --show-error --connect-timeout 10 --max-time 30 \
+    --retry 5 --retry-delay 2 --retry-connrefused https://news.jubishop.com/health
+echo "Deployed $revision to https://news.jubishop.com."

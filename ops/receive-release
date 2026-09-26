@@ -1,0 +1,63 @@
+#!/usr/bin/python3.12
+"""Restricted SSH entry point. Install at /usr/local/sbin/news-receive-release."""
+
+import io
+import os
+from pathlib import Path, PurePosixPath
+import re
+import subprocess
+import sys
+import tarfile
+import tempfile
+import uuid
+
+
+def main():
+    if not (3, 12) <= sys.version_info[:2] < (3, 15):
+        raise ValueError("News requires Python 3.12–3.14.")
+    if os.geteuid() != 0:
+        raise ValueError("Run as root through the restricted deploy key.")
+    match = re.fullmatch(r"deploy ([0-9a-f]{40})", os.environ.get("SSH_ORIGINAL_COMMAND", ""))
+    if not match:
+        raise ValueError("Only 'deploy COMMIT_SHA' is accepted.")
+    revision = match[1]
+    limit = 25 * 1024 * 1024
+    data = sys.stdin.buffer.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError("Release archive exceeds 25 MiB.")
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as archive:
+        members = archive.getmembers()
+        for member in members:
+            path = PurePosixPath(member.name)
+            if (
+                path.is_absolute()
+                or ".." in path.parts
+                or not path.parts
+                or path.parts[0] not in {"news", "ops", "requirements.txt"}
+                or not (member.isfile() or member.isdir())
+                or member.mode & 0o7000
+            ):
+                raise ValueError("Release archive contains an unsupported path or file type.")
+        required = {"ops/install-server", "news/schema.sql", "requirements.txt"}
+        if not required.issubset({m.name for m in members if m.isfile()}):
+            raise ValueError("Release archive is incomplete.")
+        release = Path(tempfile.mkdtemp(prefix=revision + "-", dir="/opt/news/releases"))
+        archive.extractall(release, filter="data")
+    (release / "REVISION").write_text(revision + "\n")
+    unit = "news-deploy-" + uuid.uuid4().hex
+    # No --pipe: systemd owns the installer even if SSH or Actions disconnects.
+    result = subprocess.run([
+        "systemd-run", "--wait", "--collect", "--unit=" + unit,
+        "--property=Type=exec", "--property=RuntimeMaxSec=15min",
+        "--property=UMask=0077", "/bin/sh", str(release / "ops/install-server"), str(release),
+    ])
+    subprocess.run(["journalctl", "--no-pager", "--unit=" + unit])
+    return result.returncode
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except (OSError, ValueError, tarfile.TarError) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)
