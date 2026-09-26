@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+    <section class="section-heading">
+        <div>
+            <p class="eyebrow">The latest dispatches</p>
+            <h1>Your daily perspective.</h1>
+            <p class="muted">Stories worth your time, from reporters on your beat.</p>
+        </div>
+        <span class="edition-count">{{ total }} {% if total == 1 %}story{% else %}stories{% endif %}</span></section>
+    <form method="get" class="filter-bar" aria-label="Filter stories">
+        <label for="reporter-filter">From the desk of</label><select id="reporter-filter" name="reporter_id">
+            <option value="">All reporters</option>
+            {% for byline in bylines %}<option value="{{ byline.id }}"
+        {% if request.args.get('reporter_id') == byline.id %}selected{% endif %}>{{ byline.name }}</option>
+{% endfor %}</select><label class="sr-only" for="search">Search stories</label><input id="search"
+       name="q"
+       type="search"
+       placeholder="Search the archive"
+       value="{{ request.args.get('q', '') }}"><button class="button quiet" type="submit">Apply</button>
+{% if request.args.get("q") or request.args.get("reporter_id") %}<a href="/">Clear</a>
+{% endif %}
+</form>
+{% if overdue %}
+    <p class="status-line"><span class="status-dot warning"></span>{{ overdue }} {% if overdue == 1 %}scheduled report is{% else %}scheduled reports are{% endif %} late. The edition will update when reporting arrives.</p>
+{% endif %}
+{% if articles %}
+    <div class="story-grid">
+        {% for article in articles %}
+            <article class="story {% if loop.first and page == 1 %}lead-story{% endif %}">
+                <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a><span>{{ article.article_date }}</span></div>
+                <h2><a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a></h2>
+                <p>{{ article.summary }}</p>
+                <a class="read-story"
+                   href="{{ url_for('pages.article',identity=article.id) }}">Read the story <span aria-hidden="true">→</span></a></article>
+        {% endfor %}
+    </div>
+    <nav class="pagination" aria-label="Archive pages">
+        {% if page > 1 %}<a href="{{ url_for('pages.feed',page=page-1,reporter_id=request.args.get('reporter_id',''),q=request.args.get('q','')) }}">← Newer stories</a>
+        {% endif %}<span>Page {{ page }}</span>
+        {% if has_more %}<a href="{{ url_for('pages.feed',page=page+1,reporter_id=request.args.get('reporter_id',''),q=request.args.get('q','')) }}">Older stories →</a>
+{% endif %}
+</nav>
+{% else %}
+<section class="empty-edition">
+    <div class="empty-ornament" aria-hidden="true"><span>N.</span><i></i><i></i><i></i></div>
+    <p class="eyebrow">
+    {% if request.args.get("q") or request.args.get("reporter_id") %}No matching stories{% else %}The first edition{% endif %}</p>
+    <h2>
+    {% if request.args.get("q") or request.args.get("reporter_id") %}Try a different angle.{% else %}A good story starts<br>with a little curiosity.{% endif %}</h2>
+    <p>
+    {% if request.args.get("q") or request.args.get("reporter_id") %}Broaden your search or choose another reporter.{% else %}The next dispatches will appear here.<br>Every beat brings a new perspective.{% endif %}</p>
+    {% if request.args.get("q") or request.args.get("reporter_id") %}<a class="text-link" href="/">See all stories →</a>
+{% else %}<a class="text-link" href="/newsroom">Visit the newsroom →</a>
+{% endif %}
+</section>
+{% endif %}
+{% endblock %}

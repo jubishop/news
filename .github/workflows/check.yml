@@ -15,12 +15,23 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
+    strategy:
+      matrix:
+        python: ['3.12', '3.13', '3.14']
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Install ShellCheck
-        run: sudo apt-get update && sudo apt-get install --yes shellcheck
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install ShellCheck and Restic
+        run: sudo apt-get update && sudo apt-get install --yes shellcheck restic
+      - name: Set up application and browser
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install --require-hashes -r requirements.txt -r requirements-dev.txt
+          .venv/bin/python -m playwright install --with-deps chromium
       - name: Check repository
         run: bin/check --full

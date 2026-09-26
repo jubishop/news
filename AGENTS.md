@@ -2,7 +2,9 @@
 
 Read the [concept](docs/concept.md) for the project's direction and the
 [implementation design](docs/implementation-design.md) for the selected
-Python, Flask, and SQLite stack. The application is not implemented yet.
+Python, Flask, and SQLite stack. Read the [server contract](docs/server-contract.md)
+and [operations guide](docs/server-operations.md) for server v1. The external
+research worker remains a separate phase.
 
 The user is in Pacific Time. Use PST/PDT unless asked otherwise. The user's
 default shell is fish. Use short, direct sentences and ASD-STE100 Simplified

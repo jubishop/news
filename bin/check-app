@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+.venv/bin/python -B -c 'import news'
+.venv/bin/python -B -m unittest discover -s tests/app -v
+.venv/bin/python -B tests/test_browser.py
+shellcheck --shell=sh ops/install-server

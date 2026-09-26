@@ -434,7 +434,9 @@ index coverage, local file links, and ordinary heading anchors.
 (Bash for `.envrc`, POSIX shell for the bundled hooks), and Git whitespace
 checks. It does not run the disposable-repository tests.
 
-`bin/check --full` adds all copied foundation behavior tests. They use
+`bin/check --full` adds all copied foundation behavior tests, followed by
+`bin/check-app`. Application setup, supported Python versions, and test
+requirements are in the [operations guide](server-operations.md). Foundation tests use
 disposable repositories and simulated QMD/direnv, with no model downloads or
 network access. Remote URLs are not fetched by foundation checks.
 
@@ -458,7 +460,8 @@ hand-written project knowledge.
 
 The [GitHub Actions workflow](../.github/workflows/check.yml) runs
 `bin/check --full` on Ubuntu 24.04 for pull requests and pushes to `main`.
-It installs ShellCheck, uses read-only repository permissions, and does not
+It installs ShellCheck, Restic, locked Python dependencies, and Chromium; it
+checks Python 3.12–3.14, uses read-only repository permissions, and does not
 persist checkout credentials. This initial setup does not enforce branch
 protection, so full local validation is required before delivery. Verify the
 workflow result for the exact pushed commit.

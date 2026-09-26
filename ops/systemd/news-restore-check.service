@@ -1,0 +1,27 @@
+[Unit]
+Description=Verify News backup by restoring into an isolated directory
+After=network-online.target news.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=news
+Group=news
+WorkingDirectory=/opt/news/current
+EnvironmentFile=/etc/news/app.env
+EnvironmentFile=/etc/news/backup.env
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=RESTIC_CACHE_DIR=/var/cache/news-restic
+UMask=0077
+ExecStart=/opt/news/current/.venv/bin/python -m news.cli restore-check
+CacheDirectory=news-restic
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/news /var/lib/news-backup
+MemoryMax=384M
+CPUQuota=50%
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=3h

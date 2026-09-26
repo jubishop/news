@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ article.title }} · News{% endblock %}
+{% block content %}
+    <article class="article-page"><a class="back-link" href="/">← Latest edition</a>
+        <header class="article-header">
+            <p class="eyebrow">{{ article.reporter_name }} <span class="meta-divider">/</span> {{ article.article_date }}</p>
+            <h1>{{ article.title }}</h1>
+            <p class="standfirst">{{ article.summary }}</p>
+            <div class="article-dateline"><span>Published {{ article.published_at|event_time }}</span><span>Coverage {{ article.coverage_start }} – {{ article.coverage_end }}</span></div>
+        </header>
+        <div class="prose">{{ article_html }}</div>
+        {% if article.sources %}
+            <aside class="sources">
+                <p class="eyebrow">Sources & further reading</p>
+                <ul>
+                    {% for source in article.sources %}
+                        <li><a href="{{ source.url }}"
+   rel="noreferrer">{{ source.title }} <span aria-hidden="true">↗</span></a></li>
+                    {% endfor %}
+                </ul>
+            </aside>
+        {% endif %}
+        <div class="article-end" aria-hidden="true">N.</div>
+    </article>
+{% endblock %}

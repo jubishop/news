@@ -20,7 +20,7 @@ class KnowledgeTests(unittest.TestCase):
         self.base = Path(self.temp.name).resolve()
         self.repo = self.base / "main checkout"
         self.repo.mkdir()
-        for name in ("bin", "docs", "memory", "tests"):
+        for name in ("bin", "docs", "memory", "tests", "news", "ops"):
             shutil.copytree(SOURCE / name, self.repo / name, ignore=shutil.ignore_patterns("__pycache__"))
         # Adopted docs can link to the optional GitHub workflow.
         if (SOURCE / ".github").is_dir():
@@ -28,7 +28,8 @@ class KnowledgeTests(unittest.TestCase):
         (self.repo / ".config").mkdir()
         shutil.copy2(SOURCE / ".config/knowledge.json", self.repo / ".config/knowledge.json")
         for name in ("README.md", "AGENTS.md", ".gitignore", ".project-starter.json",
-                     "LICENSE", "LICENSE.project-starter"):
+                     "LICENSE", "LICENSE.project-starter", "pyproject.toml", "requirements.txt",
+                     "requirements-dev.txt", "uv.lock", ".env.example"):
             shutil.copy2(SOURCE / name, self.repo / name)
         if (SOURCE / ".envrc").exists():
             shutil.copy2(SOURCE / ".envrc", self.repo / ".envrc")
@@ -586,14 +587,22 @@ fcntl.flock = flock
         suite.write_text("import unittest\nclass Probe(unittest.TestCase):\n"
                          "    def test_probe(self):\n"
                          "        self.fail('behavior suite executed')\n")
+        app_probe = self.repo / "bin/check-app"
+        app_probe.write_text("#!/usr/bin/env python3\nfrom pathlib import Path\n"
+                             "Path('app-started').touch()\n")
         fast = self.run_command("bin/check")
         self.assertIn("Fast foundation checks passed", fast.stdout)
         self.run_command("bin/check", "--documents-only")
+        self.assertFalse((self.repo / "app-started").exists())
         full = self.run_command("bin/check", "--full", check=False)
         self.assertNotEqual(full.returncode, 0)
         self.assertIn("behavior suite executed", full.stderr)
         suite.write_text(suite.read_text().replace("self.fail('behavior suite executed')", "pass"))
-        self.assertIn("Full repository foundation checks passed", self.run_command("bin/check", "--full").stdout)
+        self.assertFalse((self.repo / "app-started").exists())
+        self.assertIn("Full foundation and application checks passed", self.run_command("bin/check", "--full").stdout)
+        self.assertTrue((self.repo / "app-started").exists())
+        app_probe.write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(23)\n")
+        self.assertNotEqual(self.run_command("bin/check", "--full", check=False).returncode, 0)
         suite.unlink()
         missing = self.run_command("bin/check", "--full", check=False)
         self.assertNotEqual(missing.returncode, 0)

@@ -192,6 +192,13 @@ local-model and Codex Pro candidates without selecting either.
 
 ### Recurring reporters and one-time contractors
 
+Accepted on September 25, 2026: once a contractor's assignment is due, keep
+its original date fixed. The owner can still change its instructions, pause
+or resume it, and remove it. This preserves one assignment and its history.
+Before the due day, its scheduled date can still change under the normal
+schedule activation rule.
+
+
 Accepted on September 24, 2026: most reporters run on a repeating schedule.
 The owner can also create a contractor with a one-time assignment and schedule.
 The contractor performs the assignment once and then disappears from the

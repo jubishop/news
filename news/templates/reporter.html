@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ reporter.name if reporter else 'New reporter' }} · Newsroom{% endblock %}
+{% block content %}
+    <a class="back-link" href="/newsroom">← Newsroom</a>
+    <section class="section-heading">
+        <div>
+            <p class="eyebrow">{{ 'Reporter file' if reporter else 'A new perspective' }}</p>
+            <h1>{{ reporter.name if reporter else 'Hire a reporter.' }}</h1>
+            <p class="muted">{{ 'Instructions guide future work. Published articles stay as they are.' if reporter else 'Choose a beat and let the reporting begin.' }}</p>
+        </div>
+        {% if reporter %}<span class="badge">{{ 'Removed' if reporter.deleted_at else 'Completed' if reporter.completed_at else 'Paused' if reporter.paused else 'Active' }}</span>
+{% endif %}
+</section>
+{% set retired = reporter and (reporter.deleted_at or reporter.completed_at) %}
+<div class="editor-layout">
+    <form method="post"
+          class="editor-form"
+          action="{{ url_for('pages.save_reporter',identity=reporter.id) if reporter else url_for('pages.save_reporter') }}"
+          data-schedule-form
+          {% if retired or (reporter and reporter.schedule.cadence == 'once' and reporter.schedule.date <= pacific_today().isoformat()) %}data-fixed-schedule{% endif %}>
+        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        <fieldset {% if retired %}disabled{% endif %}>
+            <legend class="eyebrow">The assignment</legend>
+            <label for="name">Reporter name</label><input id="name"
+       name="name"
+       required
+       maxlength="120"
+       placeholder="e.g. The weekend desk"
+       value="{{ reporter.name if reporter else '' }}"><label for="prompt">Beat & instructions</label>
+            <p class="field-help" id="prompt-help">Describe what to research, the coverage period, useful sources, and what a good report should include.</p>
+            <textarea id="prompt"
+                      name="prompt"
+                      rows="13"
+                      required
+                      maxlength="64000"
+                      aria-describedby="prompt-help"
+                      placeholder="Report on…">{{ reporter.prompt if reporter else '' }}</textarea>
+        </fieldset>
+        <fieldset {% if retired %}disabled{% endif %}>
+            <legend class="eyebrow">The schedule</legend>
+            <label for="cadence">How often</label><select id="cadence" name="cadence"><option value="daily"
+        {% if not reporter or reporter.schedule.cadence == 'daily' %}selected{% endif %}
+        {% if reporter and reporter.schedule.cadence == 'once' %}disabled{% endif %}>Daily</option><option value="weekly"
+        {% if reporter and reporter.schedule.cadence == 'weekly' %}selected{% endif %}
+        {% if reporter and reporter.schedule.cadence == 'once' %}disabled{% endif %}>Weekly on selected days</option><option value="monthly"
+        {% if reporter and reporter.schedule.cadence == 'monthly' %}selected{% endif %}
+        {% if reporter and reporter.schedule.cadence == 'once' %}disabled{% endif %}>Monthly</option><option value="once"
+        {% if reporter and reporter.schedule.cadence == 'once' %}selected{% endif %}
+        {% if reporter and reporter.schedule.cadence != 'once' %}disabled{% endif %}>One-time contractor</option></select>
+            <div data-cadence="weekly">
+                <p class="field-label">Reporting days</p>
+                <div class="weekday-options">
+                    {% for day in weekdays %}<label><input type="checkbox"
+       name="weekdays"
+       value="{{ day }}"
+       {% if reporter and reporter.schedule.cadence == 'weekly' and day in reporter.schedule.weekdays %}checked{% endif %}>{{ day|title }}</label>
+                {% endfor %}
+            </div>
+        </div>
+        <div data-cadence="monthly">
+            <label for="day_of_month">Day of the month</label><input id="day_of_month"
+       type="number"
+       name="day_of_month"
+       min="1"
+       max="31"
+       value="{{ reporter.schedule.day_of_month if reporter and reporter.schedule.cadence == 'monthly' else 1 }}">
+            <p class="field-help">Short months use their last day.</p>
+        </div>
+        <div data-cadence="once"><label for="date">Assignment date</label><input id="date"
+       type="date"
+       name="date"
+       {% if reporter and reporter.schedule.cadence == 'once' and reporter.schedule.date <= pacific_today().isoformat() %}readonly{% endif %}
+       value="{{ reporter.schedule.date if reporter and reporter.schedule.cadence == 'once' else tomorrow }}"
+       {% if not reporter or reporter.schedule.cadence != 'once' %}min="{{ tomorrow }}"{% endif %}></div>
+        <p class="schedule-preview" data-schedule-preview role="status">
+        {% if reporter and reporter.schedule.cadence == "once" and reporter.schedule.date <= pacific_today().isoformat() %}Original assignment date: {{ reporter.schedule.date }}. Instructions can still change.{% else %}New schedules begin tomorrow. All dates use Pacific Time.{% endif %}</p>
+    </fieldset>
+    {% if not retired %}
+        <div class="form-actions">
+            <button class="button"
+                    type="submit">{{ 'Save changes' if reporter else 'Add reporter' }}</button><a href="/newsroom">Cancel</a>
+        </div>
+    {% endif %}
+</form>
+<aside class="editor-sidebar">
+    <p class="eyebrow">From the editor</p>
+    <h2>
+        Make the beat
+        <br>
+        your own.
+    </h2>
+    <p>Be specific about what matters. A reporter can produce one story, a roundup, several stories, or nothing when there is no useful update.</p>
+    <p>Coverage dates come from the reporting assignment. The schedule only sets the day a result is due.</p>
+    {% if reporter and not retired %}
+        <div class="reporter-actions">
+            <form method="post"
+                  action="{{ url_for('pages.reporter_state',identity=reporter.id,action='resume' if reporter.paused else 'pause') }}">
+                <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}"><button class="button quiet" type="submit">{{ 'Resume reporter' if reporter.paused else 'Pause reporter' }}</button>
+            </form>
+            <form method="post"
+                  action="{{ url_for('pages.reporter_state',identity=reporter.id,action='delete') }}"
+                  data-confirm="Remove this reporter? Its articles and history will remain.">
+                <input type="hidden"
+                       name="csrf_token"
+                       value="{{ session.csrf_token }}"><button class="danger-link" type="submit">Remove reporter</button>
+            </form>
+        </div>
+    {% endif %}
+</aside>
+</div>
+{% if reporter %}
+    <section class="history-section">
+        <div class="section-heading compact">
+            <h2>Published stories</h2>
+            <a href="{{ url_for('pages.feed',reporter_id=reporter.id) }}">Read all →</a>
+        </div>
+        {% for article in articles %}
+            <div class="history-row">
+                <div>
+                    <a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a>
+                    <p class="muted">{{ article.article_date }}</p>
+                </div>
+                <form method="post"
+                      action="{{ url_for('pages.article_state',identity=article.id,action='delete') }}"
+                      data-confirm="Move this article to Trash? You can restore it for 30 days.">
+                    <input type="hidden"
+                           name="csrf_token"
+                           value="{{ session.csrf_token }}"><button type="submit" class="danger-link">Move to Trash</button>
+                </form>
+            </div>
+        {% else %}
+            <p class="muted">No published stories yet.</p>
+        {% endfor %}
+        <nav class="pagination" aria-label="Article history pages">
+            {% if articles_page > 1 %}<a href="{{ url_for('pages.reporter_detail',identity=reporter.id,articles_page=articles_page-1,page=history_page) }}">← Newer stories</a>
+{% endif %}{% if articles_more %}<a href="{{ url_for('pages.reporter_detail',identity=reporter.id,articles_page=articles_page+1,page=history_page) }}">Older stories →</a>
+{% endif %}
+</nav>
+</section>
+<section class="history-section">
+    <p class="eyebrow">Reporting history</p>
+    {% for run in runs %}
+        <details class="run-row">
+            <summary><span>{{ run.expected_date }}</span><span>{{ run.kind|replace('_', ' ') }}</span><span class="badge {% if run.late or run.state == 'failed' %}danger{% endif %}">{{ run.state|replace('_', ' ') }}{{ ' · late' if run.late else '' }}</span></summary>
+            {% if run.closed_reason %}
+                <p>{{ run.closed_reason }}</p>
+            {% endif %}
+            {% for attempt in run.attempts %}
+                <div class="attempt">
+                    <p>
+                        <strong>Attempt {{ attempt.attempt_number }}</strong> · {{ attempt.outcome|replace('_', ' ') if attempt.outcome else 'In progress' }}
+                        <br>
+                        <span class="muted">Started {{ attempt.started_at|event_time }}</span>
+                    </p>
+                    {% if attempt.reason or attempt.error_message %}
+                        <p>{{ attempt.reason or attempt.error_message }}</p>
+                    {% endif %}
+                    <details>
+                        <summary>Instructions used</summary>
+                        <pre class="prompt-history">{{ attempt.snapshot.prompt }}</pre>
+                    </details>
+                </div>
+            {% else %}
+                <p class="muted">No attempt has started.</p>
+            {% endfor %}
+        </details>
+    {% else %}
+        <p class="muted">No reporting assignments are due yet.</p>
+    {% endfor %}
+    <nav class="pagination" aria-label="Run history pages">
+        {% if history_page > 1 %}<a href="{{ url_for('pages.reporter_detail',identity=reporter.id,page=history_page-1) }}">← Newer runs</a>
+    {% endif %}{% if runs|length == 30 %}<a href="{{ url_for('pages.reporter_detail',identity=reporter.id,page=history_page+1) }}">Older runs →</a>
+{% endif %}
+</nav>
+</section>
+{% endif %}
+{% endblock %}

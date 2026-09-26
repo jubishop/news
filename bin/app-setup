@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+python_bin=${NEWS_PYTHON:-python3.12}
+"$python_bin" -c 'import sys; sys.exit(0 if (3,12) <= sys.version_info[:2] < (3,15) else "News requires Python 3.12–3.14.")'
+"$python_bin" -m venv .venv
+.venv/bin/python -m pip install --require-hashes -r requirements.txt -r requirements-dev.txt
+.venv/bin/python -m playwright install chromium

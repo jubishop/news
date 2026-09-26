@@ -1,5 +1,5 @@
 ---
-status: draft
+status: current
 ---
 
 # Database schema
@@ -12,11 +12,10 @@ stated. It separates expected work, attempts, published content, and monitoring
 so retries and reporter removal preserve history. The tradeoff is additional
 operational records alongside the articles.
 
-The schema is not implemented. Detailed SQL constraints and indexes remain
-engineering choices. Approval does not resolve the calendar, claim-expiration,
-retry, and notification rules explicitly left open below. The
-[server contract](server-contract.md) defines the corresponding proposed HTTP
-operations and result payloads.
+The baseline is implemented in [version 1 SQL](../news/schema.sql). Its detailed
+constraints, indexes, and additional operational fields are engineering choices.
+The [server contract](server-contract.md) specifies the implemented calendar,
+claims, retry bounds, HTTP operations, and result payloads.
 
 ## Conventions
 
@@ -171,11 +170,10 @@ continue increasing across generations. The generation fields are engineering
 additions for the accepted instruction-edit recovery rule, not permission for
 the worker to grant itself more retries.
 
-Claim and retry expiration rules remain proposed protocol details. Deletion
-alone must not revoke valid work already underway, and a stale attempt must
-not overwrite a replacement attempt. Resolve those rules before migrations
-and API implementation. No attempt contains a model field or an inferred
-coverage range.
+The [claim protocol](server-contract.md#daily-discovery-and-claims) defines
+ownership, explicit replacement, retry bounds, and late delivery. Deletion
+does not revoke valid work already underway. A replaced attempt cannot
+publish new work. No attempt contains a model field or inferred coverage.
 
 ## 4. Articles
 
@@ -271,9 +269,9 @@ for that outage, and individual exhausted-run alerts while the worker is
 communicating. Keep affected runs visible independently of notification grouping.
 
 Email is sent outside database transactions through the selected
-[Resend delivery](implementation-design.md#email-delivery). Incident resolution,
-recovery notices, and delivery retry mechanics remain to be specified. Its
-bounded idempotency retention must be respected after an ambiguous send.
+[Resend delivery](implementation-design.md#email-delivery). The [operations guide](server-operations.md#monitoring-and-email) specifies
+incident resolution and the bounded retry window after an ambiguous send.
+The SQL includes frozen payloads, first-attempt times, and provider receipts.
 
 ## Relationships and indexes
 
