@@ -227,6 +227,7 @@ def claim(connection, run_id, worker, values):
             "UPDATE runs SET state='failed',finished_at=?,retry_not_before=NULL WHERE id=?",
             (clock.now(), run_id),
         )
+        incidents.resolve(connection, "overdue:" + run_id)
         incidents.observe(
             connection,
             "failed:" + run_id,
@@ -450,6 +451,8 @@ def result(connection, run_id, worker, values):
             )
     if outcome == "skipped_paused" and reporter["schedule"]["cadence"] == "once":
         finished = None
+        if not reporter["paused"] and not reporter["deleted_at"]:
+            state = "pending"
     connection.execute(
         "UPDATE runs SET state=?,retry_not_before=?,finished_at=? WHERE id=?",
         (state, retry_at, finished, run_id),

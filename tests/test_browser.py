@@ -9,6 +9,36 @@ from preview import preview
 
 
 class BrowserJourney(unittest.TestCase):
+    def test_inactive_schedule_fields_do_not_block_submission(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner)
+                page.goto(fixture.base_url + "/newsroom/reporters/new")
+                page.get_by_label("Reporter name").fill("Changed cadence")
+                page.get_by_label("Beat & instructions").fill("A daily report.")
+                page.get_by_label("How often").select_option("monthly")
+                page.get_by_label("Day of the month").fill("32")
+                page.get_by_label("How often").select_option("daily")
+                page.get_by_role("button", name="Add reporter", exact=True).click()
+                expect(
+                    page.get_by_role("heading", name="Changed cadence")
+                ).to_be_visible()
+                page.get_by_label("How often").select_option("monthly")
+                page.get_by_label("Day of the month").fill("32")
+                page.get_by_role("button", name="Save changes", exact=True).click()
+                self.assertFalse(
+                    page.locator("[data-schedule-form]").evaluate(
+                        "form => form.checkValidity()"
+                    )
+                )
+                page.get_by_label("Day of the month").fill("15")
+                page.get_by_role("button", name="Save changes", exact=True).click()
+                expect(page.get_by_label("How often")).to_have_value("monthly")
+                expect(page.get_by_label("Day of the month")).to_have_value("15")
+            finally:
+                browser.close()
+
     def test_owner_lifecycle_and_public_reading(self):
         with (
             preview() as fixture,

@@ -13,6 +13,9 @@ if (editor) {
     const cadence = editor.elements.cadence.value;
     for (const section of editor.querySelectorAll("[data-cadence]")) {
       section.hidden = section.dataset.cadence !== cadence;
+      for (const input of section.querySelectorAll("input, select, textarea")) {
+        input.disabled = section.hidden;
+      }
     }
     if (editor.hasAttribute("data-fixed-schedule")) return;
     pending?.abort();

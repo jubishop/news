@@ -101,13 +101,15 @@ def article(value):
 
 def canonical(value):
     try:
-        return json.dumps(
+        serialized = json.dumps(
             value,
             sort_keys=True,
             separators=(",", ":"),
             ensure_ascii=False,
             allow_nan=False,
         )
+        serialized.encode("utf-8")
+        return serialized
     except (ValueError, TypeError, RecursionError):
         raise Problem("Send a valid, bounded JSON value.") from None
 

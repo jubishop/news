@@ -219,6 +219,48 @@ class ServerTests(ServerFixture):
         ).json["runs"]
         self.assertEqual(sum(r["state"] == "superseded" for r in history), 5)
 
+    def test_contractor_resume_before_pause_acknowledgment_reoffers_assignment(self):
+        reporter, run = self.due(cadence="once", date="2026-09-26")
+        self.form(f"/newsroom/reporters/{reporter}/pause")
+        claim = self.claim(run)
+        self.form(f"/newsroom/reporters/{reporter}/resume")
+        body = self.envelope(
+            claim, outcome="skipped_paused", articles=[], reason="Paused at claim time"
+        )
+        receipt = self.result(run, body)
+        self.assertEqual(receipt.status_code, 200)
+        available = self.work()
+        self.assertEqual([row["id"] for row in available], [run])
+        self.assertEqual(available[0]["expected_date"], "2026-09-26")
+        resumed = self.claim(run)
+        self.assertFalse(resumed["acknowledgment_only"])
+        self.assertEqual(self.result(run, body).json, receipt.json)
+        self.assertEqual(self.result(run, self.envelope(resumed)).status_code, 200)
+        history = self.client.get(
+            f"/api/v1/worker/reporters/{reporter}/runs", headers=self.worker
+        ).json["runs"]
+        self.assertEqual(
+            [attempt["outcome"] for attempt in history[0]["attempts"]],
+            ["skipped_paused", "published"],
+        )
+        self.assertEqual(self.work(), [])
+
+    def test_removed_contractor_is_not_reopened_by_delayed_pause_acknowledgment(self):
+        reporter, run = self.due(cadence="once", date="2026-09-26")
+        self.form(f"/newsroom/reporters/{reporter}/pause")
+        claim = self.claim(run)
+        self.form(f"/newsroom/reporters/{reporter}/resume")
+        self.form(f"/newsroom/reporters/{reporter}/delete")
+        body = self.envelope(
+            claim, outcome="skipped_paused", articles=[], reason="Paused at claim time"
+        )
+        self.assertEqual(self.result(run, body).status_code, 200)
+        self.assertEqual(self.work(), [])
+        history = self.client.get(
+            f"/api/v1/worker/reporters/{reporter}/runs", headers=self.worker
+        ).json["runs"]
+        self.assertEqual(history[0]["state"], "skipped_paused")
+
     def test_claim_retry_replacement_and_late_unreplaced_result(self):
         _, run = self.due()
         first = self.claim(run, request_id="stable-claim", ownership_token="x" * 40)

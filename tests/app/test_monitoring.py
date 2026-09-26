@@ -95,6 +95,13 @@ class MonitoringTests(ServerFixture):
         attempt = self.claim(run)
         for _ in range(2):
             attempt = self.claim(run, replace_attempt_id=attempt["attempt_id"])
+        self.at("2026-09-27T12:00:00-07:00")
+        maintenance = self.app.test_cli_runner().invoke(args=["maintain"])
+        self.assertEqual(maintenance.exit_code, 0, maintenance.output)
+        self.assertIn(
+            "assignment has not returned",
+            self.client.get("/newsroom", headers=self.owner).get_data(as_text=True),
+        )
         response = self.client.post(
             f"/api/v1/worker/runs/{run}/claim",
             headers=self.worker,
@@ -110,6 +117,9 @@ class MonitoringTests(ServerFixture):
         ).json["runs"]
         self.assertEqual(history[0]["state"], "failed")
         self.assertEqual(self.work(), [])
+        html = self.client.get("/newsroom", headers=self.owner).get_data(as_text=True)
+        self.assertNotIn("assignment has not returned", html)
+        self.assertIn("exhausted its attempts", html)
 
     def test_later_recurring_success_resolves_earlier_failure_notice(self):
         reporter, run = self.due()

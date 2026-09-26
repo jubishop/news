@@ -210,6 +210,10 @@ started before a pause may still finish its research. A result cannot change
 its reporter attribution. A completed contractor leaves the active roster only
 after publication or a successful empty result.
 
+If a contractor resumes before its pause acknowledgment arrives, the server
+records that acknowledgment and reoffers the same assignment for research.
+Replaying the acknowledgment returns its receipt without changing the new attempt.
+
 Success returns `run_id`, `submission_id`, `outcome`, and `article_ids`. The
 server saves this receipt and a canonical payload hash in the same transaction.
 Identical delivery retries return it without republishing. Different content

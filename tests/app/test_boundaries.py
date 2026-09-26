@@ -18,6 +18,8 @@ class BoundaryTests(ServerFixture):
             {"outcome": None},
             {"articles": {}},
             {"ownership_token": 17},
+            {"articles": [self.article(title="Broken \ud800")]},
+            {"reason": "Broken \udfff"},
         ):
             with self.subTest(extra=extra):
                 response = self.result(run, self.envelope(claim, **extra))
