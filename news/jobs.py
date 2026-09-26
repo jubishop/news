@@ -327,6 +327,7 @@ def result(connection, run_id, worker, values):
     run = get_run(connection, run_id)
     attempt = authorized_attempt(connection, run_id, worker, values)
     digest = hashlib.sha256(v.canonical(values).encode()).hexdigest()
+    reporter = reporters.get(connection, run["reporter_id"])
     received = one(
         connection,
         "SELECT * FROM run_attempts WHERE worker_id=? AND submission_id=?",
@@ -337,12 +338,13 @@ def result(connection, run_id, worker, values):
             received["payload_hash"], digest
         ):
             return json.loads(received["receipt_json"])
+        if reporter["deleted_at"]:
+            raise removed_problem(run, worker)
         raise Problem(
             "Submission ID was already used with different data.",
             409,
             "submission_conflict",
         )
-    reporter = reporters.get(connection, run["reporter_id"])
     if attempt["outcome"] or run["state"] != "running":
         if reporter["deleted_at"]:
             raise removed_problem(run, worker)

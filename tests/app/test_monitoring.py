@@ -8,6 +8,45 @@ from support import ServerFixture
 
 
 class MonitoringTests(ServerFixture):
+    def test_changed_result_after_removal_alerts_but_identical_retry_does_not(self):
+        self.app.config.update(
+            RESEND_API_KEY="fixture", ALERT_TO="owner@example.com"
+        )
+        reporter, run = self.due()
+        body = self.envelope(self.claim(run))
+        self.form(f"/newsroom/reporters/{reporter}/delete")
+        receipt = self.result(run, body)
+        self.assertEqual(receipt.status_code, 200)
+        messages = []
+
+        def send(request, **kwargs):
+            messages.append(json.loads(request.data))
+            return io.BytesIO(b'{"id":"accepted"}')
+
+        self.http.side_effect = send
+        self.assertEqual(self.result(run, body).json, receipt.json)
+        maintenance = self.app.test_cli_runner().invoke(args=["maintain"])
+        self.assertEqual(maintenance.exit_code, 0, maintenance.output)
+        self.assertEqual(messages, [])
+        for submission_id in (body["submission_id"], "new-report-after-removal"):
+            with self.subTest(submission_id=submission_id):
+                changed = {
+                    **body,
+                    "submission_id": submission_id,
+                    "articles": [self.article(title="New report after removal")],
+                }
+                self.assertEqual(self.result(run, changed).status_code, 409)
+                maintenance = self.app.test_cli_runner().invoke(args=["maintain"])
+                self.assertEqual(maintenance.exit_code, 0, maintenance.output)
+                self.assertEqual(len(messages), 1)
+                self.assertIn("invalid reporting", messages[0]["subject"])
+        archive = self.client.get(
+            "/api/v1/worker/articles/search", headers=self.worker
+        ).json
+        self.assertEqual(archive["total"], 1)
+        self.assertEqual(archive["articles"][0]["id"], receipt.json["article_ids"][0])
+        self.assertEqual(self.result(run, body).json, receipt.json)
+
     def test_outage_groups_reports_and_recovers_without_daily_reminders(self):
         self.app.config.update(
             MONITOR_WORKER=True,
