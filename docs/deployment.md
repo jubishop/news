@@ -83,6 +83,8 @@ Create the GitHub environment `production`, with a custom branch rule for
 Do not use an unchecked `ssh-keyscan` result or disable host verification.
 Application, Resend, and R2 credentials remain in `/etc/news` on the VPS.
 The workflow deletes its temporary SSH credential files when its job finishes.
+The [production hosting reference](../memory/production-hosting.md) records
+the installed host, Cloudflare scope, and private recovery-copy locations.
 
 ## Migrations and other release work
 

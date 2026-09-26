@@ -57,4 +57,5 @@ review records or convert them into ordinary memory pages.
 
 ## Active pages
 
-Add links as durable knowledge is established. Do not seed invented memories.
+- [Production hosting](production-hosting.md): installed infrastructure,
+  private credential and recovery locations, and deployment identity.

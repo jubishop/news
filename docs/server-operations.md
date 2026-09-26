@@ -85,9 +85,12 @@ found port 3070 free; confirm this before rollout.
    and a Restic encryption password. Keep a recoverable copy of that password
    outside the VPS. Initialize the repository once with `restic init` using
    those credentials. Never initialize a replacement over a recovery repository.
-4. Create a dedicated News Resend sending key for the verified sending domain.
+4. Configure the approved Resend sending key for the verified sending domain.
+   The owner authorized reuse of the existing sending-only key on September 25,
+   2026; see the [email decision](implementation-design.md#email-delivery).
    Set the sender to `News <news@jubishop.com>` and put the privately selected
-   owner recipient in configuration. Do not reuse another application's key.
+   owner recipient in configuration. Coordinate rotation with other consumers
+   of the shared key.
 5. Install `python3.12-venv`, `restic`, and `curl` on the server. Create root-owned
    `/etc/news/app.env` and `/etc/news/backup.env`, mode 0600. Copy the shapes from
    [.env.example](../.env.example) and [backup example](../ops/backup.env.example).

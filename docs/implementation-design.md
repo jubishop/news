@@ -277,17 +277,21 @@ change Cloudflare policies.
 ## Email delivery
 
 Accepted on September 25, 2026: use the owner's existing Resend account for
-operational alerts, with a separate News sender and a dedicated sending-only
-API key. Keep the alert recipient and credentials in deployment configuration,
-outside the public repository. The recommended sender is
+operational alerts with a separate News sender. During production provisioning
+on the same date, the owner explicitly authorized reuse of the existing
+sending-only key from `~/.env`. This supersedes the earlier dedicated-key
+requirement. Keep the alert recipient and credentials in deployment configuration,
+outside the public repository. The sender is
 `News <news@jubishop.com>`; confirm its domain configuration during deployment.
 
 The owner accepted the recommendation; no further reason was stated. Screenr's
 `docs/deployment.md` and `.env.example`, reviewed on September 25, 2026, already
-describe Resend with a `jubishop.com` sender. This reuses an existing service
-while separating News credentials. The tradeoff is that alert delivery depends
-on Resend and its account limits. No account settings or credentials have been
-changed, and no News email has been sent.
+describe Resend with a `jubishop.com` sender. This reuses an existing service.
+The tradeoff is that alert delivery depends on Resend and its account limits,
+and key rotation must be coordinated with other consumers. The existing key
+can send email but cannot create a separate key. No further reason for the
+reuse decision was stated. Production configuration contains the approved key;
+a real delivery check is still required before email is treated as commissioned.
 
 Resend's [API-key documentation](https://resend.com/docs/dashboard/api-keys/introduction)
 describes sending-only keys and domain restrictions. Its
@@ -307,8 +311,8 @@ Email originates from the VPS monitoring service. The later research worker
 does not need email credentials. Keep email sending outside article and run
 transactions, and retain visible incidents if sending fails. The
 [operations guide](server-operations.md#monitoring-and-email) defines delivery
-retry rules. Sender verification, private configuration, and a production
-delivery check remain rollout work.
+retry rules. Sender verification and a production delivery check remain
+commissioning work.
 
 ## Implemented server choices and remaining work
 
@@ -319,10 +323,10 @@ packages, Gunicorn/systemd processes, resource limits, backups, and recovery.
 These engineering choices implement the accepted product requirements; they
 do not select the research worker's model or tools.
 
-Remaining production work is provisioning Cloudflare Access, origin TLS, DNS,
-private credentials, the R2 repository, and real email delivery verification,
-then rollout of a validated revision. The [deployment workflow](deployment.md)
-now automates releases after those one-time prerequisites are complete.
+The [deployment workflow](deployment.md) automates releases after one-time
+provisioning. The [production hosting reference](../memory/production-hosting.md)
+records the installed infrastructure and private recovery locations. Track
+remaining live acceptance and email commissioning in the project issue tracker.
 
 The shared model, local execution host, provider integration, research tools,
 and persistent local result storage remain worker-phase decisions. Server
