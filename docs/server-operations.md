@@ -78,6 +78,9 @@ found port 3070 free; confirm this before rollout.
    service token. Do not protect the public reading routes with Access.
    Record distinct application AUD values. Test the exact bare paths as well
    as descendants; avoid a policy that covers only a trailing-slash URL.
+   During the server-only phase, the API application can deny everyone until
+   its dedicated worker service token is available. Keep the separate audience
+   configured; do not substitute an owner token or an authentication bypass.
 3. Create a dedicated private R2 Standard bucket, scoped object credentials,
    and a Restic encryption password. Keep a recoverable copy of that password
    outside the VPS. Initialize the repository once with `restic init` using

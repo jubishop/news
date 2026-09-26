@@ -265,14 +265,14 @@ support automated API access without interactive sign-in. Its
 supports policies on selected paths. These capabilities were checked on
 September 25, 2026.
 
-The provider is selected; exact policies, identity validation, credential
-configuration, and deployment remain implementation work. Cover protected
+Provider configuration is part of first-time provisioning. Cover protected
 paths themselves and their descendants. Verify that direct origin access
 cannot bypass authentication and that worker credentials cannot authorize
 newsroom mutations. Derive application identity from verified authentication,
 not arbitrary client-supplied identity headers. Map worker credentials to a
 stable logical worker identity so credential rotation need not reset history.
-No Cloudflare configuration has been changed for News.
+Verify the live configuration during rollout; the release workflow does not
+change Cloudflare policies.
 
 ## Email delivery
 

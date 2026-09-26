@@ -84,13 +84,15 @@ exit 0
     def install(self, failure=None):
         if failure:
             (self.root / ("fail-" + failure)).touch()
+        # Keep the fixture log readable by the test runner after root writes it.
+        events_path = self.root / "events"
+        events_path.touch(mode=0o600)
         result = subprocess.run(
             self.prefix + ["chroot", str(self.root), "/bin/sh", "/installer", "/opt/news/releases/fixture"],
             env=os.environ | {"PATH": "/bin:/usr/bin:/usr/sbin:/sbin"},
             capture_output=True, text=True,
         )
-        events_path = self.root / "events"
-        events = events_path.read_text() if events_path.exists() else ""
+        events = events_path.read_text()
         return result, events
 
     def test_missing_configuration_fails_before_changing_services(self):
@@ -102,6 +104,7 @@ exit 0
 
     def test_backup_migrate_health_maintenance_and_timers_in_order(self):
         (self.root / "var/lib/news/news.sqlite3").write_text("existing data")
+        (self.root / "var/lib/news-backup/pre-release.sqlite3").touch(mode=0o600)
         result, events = self.install()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "var/lib/news-backup/pre-release.sqlite3").read_text(), "saved")
