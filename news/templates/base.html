@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="color-scheme" content="light">
+        <title>{% block title %}News · Your personal edition{% endblock %}</title>
+        <link rel="stylesheet" href="{{ url_for('static',filename='news.css') }}">
+        <script src="{{ url_for('static',filename='news.js') }}" defer></script>
+    </head>
+    <body>
+        <a class="skip-link" href="#main">Skip to content</a>
+        <div class="page-shell">
+            <header class="masthead">
+                <div class="edition-line"><span>An independent, personal edition</span><time datetime="{{ pacific_today().isoformat() }}">{{ pacific_today().strftime('%A, %B %-d, %Y') }}</time></div>
+                <div class="masthead-main">
+                    <a class="wordmark" href="{{ url_for('pages.feed') }}">News<span class="wordmark-dot">.</span></a>
+                    <p>The world, on your beat.</p>
+                    <nav aria-label="Main navigation"><a href="{{ url_for('pages.feed') }}"
+   {% if request.path == '/' %}aria-current="page"{% endif %}>Latest edition</a><a href="{{ url_for('pages.newsroom') }}"
+   {% if request.path.startswith('/newsroom') %}aria-current="page"{% endif %}>Newsroom <span aria-hidden="true">↗</span></a></nav>
+                </div>
+            </header>
+            {% for message in get_flashed_messages() %}
+                <div class="notice" role="status">{{ message }}</div>
+            {% endfor %}
+            <main id="main">
+                {% block content %}{% endblock %}
+            </main>
+            <footer class="site-footer">
+                <a href="/">News.</a><span>Independent beats. A wider view.</span><span>Dates & schedules in Pacific Time</span>
+            </footer>
+        </div>
+    </body>
+</html>

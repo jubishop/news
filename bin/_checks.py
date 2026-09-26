@@ -281,7 +281,8 @@ def main():
             if not tests.exists():
                 raise RuntimeError("Missing tests/test_knowledge.py; preserve the foundation tests when adapting bin/check")
             subprocess.run([sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-p", "test_knowledge.py", "-v"], cwd=root, check=True)
-            print("Full repository foundation checks passed.", flush=True)
+            subprocess.run([str(root / "bin/check-app")], cwd=root, check=True)
+            print("Full foundation and application checks passed.", flush=True)
         else:
             print("Fast foundation checks passed. Use bin/check --full for behavior tests.", flush=True)
         return 0

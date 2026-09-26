@@ -65,8 +65,10 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   sequence, selected stack, deployment context, and remaining technical choices.
 - [Backups](backups.md): encrypted recovery snapshots, retention, restore
   checks, and email warnings when backup storage exceeds 1 GB.
-- [Server contract](server-contract.md): proposed records, Markdown article
+- [Server contract](server-contract.md): implemented records, Markdown article
   payloads, browser routes, worker API, and submission validation.
+- [Server operations](server-operations.md): local setup, validation, release
+  prerequisites, monitoring, backups, and recovery.
 - [Database schema](database-schema.md): accepted table and field baseline,
   relationships, and worker-supplied article coverage metadata.
 - [Reporting worker](reporting-worker.md): newsroom API boundary, model engine

@@ -1,0 +1,6 @@
+# Add to the VPS-managed Caddy configuration after DNS/Access are configured.
+news.jubishop.com {
+    tls /etc/caddy/certs/news.pem /etc/caddy/certs/news.key
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:3070
+}

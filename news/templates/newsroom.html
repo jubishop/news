@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Newsroom · News{% endblock %}
+{% block content %}
+    <section class="section-heading">
+        <div>
+            <p class="eyebrow">Editor's desk</p>
+            <h1>The newsroom.</h1>
+            <p class="muted">Set the beats. Follow the reporting. Shape your edition.</p>
+        </div>
+        <a class="button" href="{{ url_for('pages.new_reporter') }}">+ Add a reporter</a>
+    </section>
+    <div class="stat-strip">
+        <div><span class="stat-value">{{ reporters|length }}</span><span>{{ 'Retired' if archived else 'Active' }} reporters</span></div>
+        <div><span class="stat-value">{{ counts.articles }}</span><span>Published stories</span></div>
+        <div><span class="stat-value">{{ alerts|length }}</span><span>Open notices</span></div>
+        <div class="worker-stat"><span class="eyebrow">Reporting worker</span><strong>{{ 'Monitoring enabled' if monitoring else 'Not commissioned yet' }}</strong><span>{{ ('Last contact ' ~ (latest.received_at|event_time)) if latest else 'No check-in received' }}</span></div>
+    </div>
+    {% if alerts %}
+        <section class="alerts" aria-label="Operational notices">
+            {% for alert in alerts %}
+                <details class="alert">
+                    <summary>{{ alert.message }}</summary>
+                    <p>First observed {{ alert.first_seen_at|event_time }}{% if alert.run_id %} · Assignment {{ alert.run_id[:8] }}{% endif %}</p>
+                    {% if alert.notification_error %}
+                        <p>Email: {{ alert.notification_error }}</p>
+                    {% elif alert.notification_sent_at %}
+                        <p>Email accepted {{ alert.notification_sent_at|event_time }}</p>
+                    {% endif %}{% if alert.reporter_id %}<a href="{{ url_for('pages.reporter_detail',identity=alert.reporter_id) }}">View reporter →</a>
+            {% endif %}
+        </details>
+    {% endfor %}
+    </section>
+{% endif %}
+<div class="section-nav">
+    <div><a href="/newsroom" {% if not archived %}aria-current="page"{% endif %}>Your reporters</a><a href="/newsroom?view=archive"
+   {% if archived %}aria-current="page"{% endif %}>Retired & completed</a></div>
+    <a href="{{ url_for('pages.trash') }}">Article Trash →</a>
+</div>
+{% if reporters %}
+    <div class="reporter-grid">
+        {% for reporter in reporters %}
+            <article class="reporter-card">
+                <div class="card-top"><span class="eyebrow">{{ 'Contractor' if reporter.schedule.cadence == 'once' else 'Staff reporter' }}</span><span class="badge {% if reporter.late %}danger{% elif reporter.paused %}subtle{% endif %}">{{ 'Removed' if reporter.deleted_at else 'Completed' if reporter.completed_at else 'Paused' if reporter.paused else 'Late' if reporter.late else 'Active' }}</span></div>
+                <h2><a href="{{ url_for('pages.reporter_detail',identity=reporter.id) }}">{{ reporter.name }}</a></h2>
+                <p class="prompt-excerpt">{{ reporter.prompt[:220] }}{% if reporter.prompt|length > 220 %}…{% endif %}</p>
+                <dl class="card-facts">
+                    <div>
+                        <dt>Schedule</dt>
+                        <dd>
+                            {{ reporter.cadence_label }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Next due</dt>
+                        <dd>
+                            {{ reporter.next_date or '—' }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt>Latest run</dt>
+                        <dd>
+                            {{ reporter.last_run.state|replace('_', ' ') if reporter.last_run else 'Awaiting first run' }}
+                        </dd>
+                    </div>
+                </dl>
+                <a class="text-link"
+                   href="{{ url_for('pages.reporter_detail',identity=reporter.id) }}">Open reporter <span aria-hidden="true">↗</span></a></article>
+        {% endfor %}
+    </div>
+{% else %}
+    <section class="empty-panel">
+        <p class="eyebrow">{{ 'The archive' if archived else 'Build your newsroom' }}</p>
+        <h2>{{ 'No retired reporters yet.' if archived else 'Who is on your first beat?' }}</h2>
+        <p>{{ 'Completed contractors and removed reporters keep their history here.' if archived else 'Give a reporter an assignment and a schedule. Their stories will publish automatically when the worker submits them.' }}</p>
+        {% if not archived %}<a class="button" href="{{ url_for('pages.new_reporter') }}">Add your first reporter</a>
+{% endif %}
+</section>
+{% endif %}
+<aside class="operating-note">
+    <div>
+        <p class="eyebrow">About this newsroom</p>
+        <p>Reporters follow Pacific calendar days. A report is late if it has not arrived by the end of its due day. Pausing stops new research; completed work is still accepted.</p>
+    </div>
+    <div>
+        <p class="eyebrow">Backup storage</p>
+        {% if backup %}
+            <p>
+                {{ '%.2f'|format(backup.bytes / 1000000) }} MB · {{ backup.objects }} objects
+                <br>
+                <span class="muted">Checked {{ backup.checked_at|event_time }}</span>
+            </p>
+        {% else %}
+            <p class="muted">No storage measurement yet.</p>
+        {% endif %}
+        <p class="muted">Seven daily & four weekly snapshots. Email warning above 1 GB.</p>
+    </div>
+</aside>
+{% endblock %}

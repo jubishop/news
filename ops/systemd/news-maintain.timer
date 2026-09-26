@@ -1,0 +1,10 @@
+[Unit]
+Description=Check News schedules every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=news-maintain.service
+
+[Install]
+WantedBy=timers.target

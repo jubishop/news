@@ -1,0 +1,49 @@
+#!/bin/sh
+# Run on the VPS with one reviewed, immutable source tree already uploaded.
+set -eu
+umask 077
+[ "$(id -u)" -eq 0 ] || { echo 'Run as root on the VPS.' >&2; exit 1; }
+[ "$#" -eq 1 ] || { echo 'Usage: ops/install-server /opt/news/releases/REVISION' >&2; exit 1; }
+release=$(realpath "$1")
+case "$release" in /opt/news/releases/*) ;; *) echo 'Release must be under /opt/news/releases.' >&2; exit 1 ;; esac
+[ -f "$release/news/schema.sql" ] && [ -f /etc/news/app.env ] && [ -f /etc/news/backup.env ]
+python3.12 -c 'import sys; assert (3,12) <= sys.version_info[:2] < (3,15)'
+command -v restic >/dev/null
+command -v curl >/dev/null
+id news >/dev/null 2>&1 || useradd --system --home /var/lib/news --shell /usr/sbin/nologin news
+install -d -o news -g news -m 0700 /var/lib/news /var/lib/news-backup /var/cache/news-restic
+python3.12 -m venv "$release/.venv"
+"$release/.venv/bin/python" -m pip install --require-hashes -r "$release/requirements.txt"
+chown -R root:root "$release"
+chmod -R go+rX "$release"
+# Stop every writer before migration. Do not silently downgrade data on failure.
+systemctl stop news-maintain.timer news-backup.timer news-restore-check.timer 2>/dev/null || true
+systemctl stop news-maintain.service news-backup.service news-restore-check.service news.service 2>/dev/null || true
+if [ -f /var/lib/news/news.sqlite3 ]; then
+    "$release/.venv/bin/python" - <<'PY'
+from contextlib import closing
+import sqlite3
+with closing(sqlite3.connect('/var/lib/news/news.sqlite3')) as source:
+    with closing(sqlite3.connect('/var/lib/news-backup/pre-release.sqlite3')) as backup:
+        source.backup(backup)
+PY
+fi
+previous=$(readlink /opt/news/current || true)
+ln -s "$release" /opt/news/next
+mv -Tf /opt/news/next /opt/news/current
+install -m 0644 "$release"/ops/systemd/news*.service "$release"/ops/systemd/news*.timer /etc/systemd/system/
+systemctl daemon-reload
+if ! systemd-run --wait --collect --pipe --unit=news-migrate --property=User=news --property=Group=news \
+    --property=WorkingDirectory=/opt/news/current --property=EnvironmentFile=/etc/news/app.env \
+    --property=UMask=0077 /opt/news/current/.venv/bin/python -B -m news.cli init-db; then
+    echo 'Migration failed. Services remain stopped. Inspect the database and pre-release snapshot before recovery.' >&2
+    exit 1
+fi
+systemctl enable --now news.service
+if ! curl --fail --silent --retry 5 --retry-delay 2 --retry-connrefused http://127.0.0.1:3070/health; then
+    systemctl stop news.service
+    echo "Health check failed. Services remain stopped. Previous release: $previous" >&2
+    exit 1
+fi
+systemctl enable --now news-maintain.timer news-backup.timer news-restore-check.timer
+echo 'News started. Verify origin authorization, public TLS, and a backup/restore before finishing rollout.'

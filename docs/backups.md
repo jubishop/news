@@ -4,8 +4,10 @@ status: draft
 
 # Backups and storage warnings
 
-This page records the accepted backup policy for News. The server has not
-been implemented or deployed.
+This page records the accepted backup policy for News. Server backup commands
+are implemented; see [operations](server-operations.md#backups-and-recovery)
+for timers, restore procedures, and rollout verification. Production deployment
+is a separate step after review.
 
 ## Accepted policy
 
@@ -49,9 +51,9 @@ nor this warning imposes a hard spending cap.
   database integrity and representative queries, then remove the temporary
   restored data. Never restore a test over the running database.
 
-These are implementation requirements; exact timer settings, package/runtime
-versions, secret provisioning, and restore-check queries remain engineering
-work. Backups and warnings run on the VPS independently of the AI worker.
+These requirements are implemented in the server commands and systemd units.
+Account provisioning and real delivery verification remain rollout steps.
+Backups and warnings run on the VPS independently of the AI worker.
 
 ## Cost boundary
 

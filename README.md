@@ -7,9 +7,12 @@ reporter filter. The newsroom is owner-only, and the API requires authentication
 
 The [product design](docs/product-design.md) develops the
 [concept](docs/concept.md). The [implementation design](docs/implementation-design.md)
-selects Python, Flask, SQLite, and a separate reporting worker. Detailed design
-is still in progress. Build and validate the VPS server first, then implement
-the worker on a local machine. There is no runnable news site yet.
+selects Python, Flask, SQLite, and a separate reporting worker. Server v1
+implements the public edition, owner newsroom, authenticated worker API,
+monitoring, and backup commands. The AI worker is a later phase. See the
+[server contract](docs/server-contract.md) and
+[operations guide](docs/server-operations.md) for the implemented interface
+and deployment prerequisites.
 
 Use [GitHub Issues](https://github.com/jubishop/news/issues) for work items
 and implementation progress.
@@ -18,6 +21,13 @@ and implementation progress.
 
 Run `bin/setup` after cloning. It requires Git and Python 3.9 or later.
 QMD and direnv are optional; setup reports skipped features.
+
+The application requires Python 3.12–3.14. Install ShellCheck and Restic, then
+run `bin/app-setup` to create the local environment and browser test dependency.
+Run `bin/check-app` for application checks and `bin/preview` for a disposable
+local edition at `http://127.0.0.1:3071`. The preview uses test data and fixture
+Access credentials; it does not contact a production worker. See
+[local setup](docs/server-operations.md#runtime-and-local-setup).
 
 Use `bin/check --documents-only` for Markdown edits and `bin/check` for
 foundation checks only. Use focused local checks for ordinary code changes.
@@ -37,7 +47,7 @@ hook integration, and recovery.
 - [Docs](docs/README.md): designs, decisions, research, and reference guides.
 
 The [GitHub Actions workflow](.github/workflows/check.yml) runs the full
-foundation checks for pull requests and pushes to `main`.
+foundation and application checks for pull requests and pushes to `main`.
 
 The foundation comes from
 [Project Starter](https://github.com/jubishop/project-starter), with its exact

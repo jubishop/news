@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}Article Trash · Newsroom{% endblock %}
+{% block content %}<a class="back-link" href="/newsroom">← Newsroom</a>
+<section class="section-heading">
+    <div>
+        <p class="eyebrow">Room to reconsider</p>
+        <h1>Article Trash.</h1>
+        <p class="muted">Restore an article within 30 days. After that, its content is permanently removed.</p>
+    </div>
+</section>
+{% for article in articles %}
+    <article class="trash-row">
+        <div>
+            <p class="eyebrow">{{ article.reporter_name }}</p>
+            <h2>{{ article.title }}</h2>
+            <p>{{ article.summary }}</p>
+            <p class="muted">Permanently removed {{ article.purge_at|event_time }}</p>
+        </div>
+        <form method="post"
+              action="{{ url_for('pages.article_state',identity=article.id,action='restore') }}">
+            <input type="hidden"
+                   name="csrf_token"
+                   value="{{ session.csrf_token }}"><button class="button quiet"
+        type="submit">Restore article</button>
+        </form>
+    </article>
+{% else %}
+    <div class="empty-panel">
+        <h2>Nothing in Trash.</h2>
+        <p>Deleted articles appear here while they can still be restored.</p>
+    </div>
+{% endfor %}
+<nav class="pagination" aria-label="Trash pages">
+    {% if page > 1 %}<a href="{{ url_for('pages.trash',page=page-1) }}">← Previous</a>
+{% endif %}{% if articles|length == 30 %}<a href="{{ url_for('pages.trash',page=page+1) }}">Next →</a>
+{% endif %}
+</nav>
+{% endblock %}

@@ -1,5 +1,5 @@
 ---
-status: draft
+status: current
 ---
 
 # Implementation design
@@ -7,12 +7,13 @@ status: draft
 This document develops the technical approach for the accepted
 [product requirements](product-design.md). Python, Flask, and SQLite are
 selected. Accepted choices, deployment observations, and recommendations are
-identified separately. The application is not implemented yet.
+identified separately. Server v1 now has an implementation and local validation;
+production rollout and the external worker remain separate milestones.
 
-The proposed [server contract](server-contract.md) defines records, article
+The implemented [server contract](server-contract.md) defines records, article
 payloads, browser routes, and worker API operations for the first phase.
 The [database schema](database-schema.md) is the accepted six-table baseline;
-its remaining behavioral questions do not reopen that structure.
+its implemented SQL and protocol are linked from the contract.
 
 ## Implementation sequence
 
@@ -20,6 +21,10 @@ Accepted on September 25, 2026: implement and deploy the newsroom server on
 the VPS first. Bring that server to a v1 the owner is happy with before
 separately implementing the reporting worker on one of the owner's local
 machines. The specific local host and model engine remain undecided.
+
+The owner later narrowed the current implementation task: use a worktree under
+`worktrees/`, open a PR, and stop before merge or deployment. This does not
+change the server-before-worker product sequence.
 
 The owner requested this sequence; no further reason was stated. It allows
 the reading experience, reporter management, storage, and API to be evaluated
@@ -133,8 +138,9 @@ Automated tests must run real server logic with fakes only at external-system
 boundaries, following the [testing workflow](development-workflow.md#test-driven-development).
 The deployed server and representative fixtures give the owner a concrete v1
 to assess. Worker implementation starts after the owner is satisfied with that
-server milestone. Final API schemas and acceptance cases still need to be
-completed as part of the server design.
+server milestone. The [server contract](server-contract.md) now specifies the
+API, bounds, and recovery choices; the [operations guide](server-operations.md)
+records runtime, validation, and rollout steps.
 
 ## Existing deployment context
 
@@ -295,51 +301,25 @@ private deployment configuration. Use it for the accepted
 
 Email originates from the VPS monitoring service. The later research worker
 does not need email credentials. Keep email sending outside article and run
-transactions, and retain visible incidents if sending fails. Exact delivery
-retry rules, sender verification, provisioning the recipient, and a production
-delivery check remain implementation and deployment work.
+transactions, and retain visible incidents if sending fails. The
+[operations guide](server-operations.md#monitoring-and-email) defines delivery
+retry rules. Sender verification, private configuration, and a production
+delivery check remain rollout work.
 
-## Candidates to evaluate
+## Implemented server choices and remaining work
 
-- Persistent reporting state so work can survive restarts. Concurrency,
-  supervision, and detailed API contracts remain open within the selected
-  process split and worker transport.
-- The model engine and research tools under the
-  [worker boundary](reporting-worker.md#model-engine-candidates). Do not assume
-  a hosted API, Codex, or Ollama is selected.
-- SQLite transaction and connection settings for this single-owner application,
-  with relatively little concurrent writing. SQLite's official
-  [deployment guidance](https://sqlite.org/whentouse.html) supports this usage
-  and explains its single-writer constraint. SQLite is selected; remote workers
-  must use application operations instead of opening the database over a network
-  filesystem.
+The [server contract](server-contract.md) records the implemented transaction,
+schedule, claim, retry, search, validation, and publication rules. The
+[operations guide](server-operations.md) defines supported runtimes, locked
+packages, Gunicorn/systemd processes, resource limits, backups, and recovery.
+These engineering choices implement the accepted product requirements; they
+do not select the research worker's model or tools.
 
-External documentation checked on September 24, 2026. Choose these components
-against News requirements and measured costs. Available integrations or
-neighboring application choices do not establish a decision.
+Remaining production work is provisioning Cloudflare Access, origin TLS, DNS,
+private credentials, the R2 repository, and real email delivery verification,
+then rollout of a reviewed revision. This work is deliberately separate from
+the current PR-only implementation scope.
 
-## Unresolved implementation decisions
-
-- The shared model, provider integration, research APIs, and reporting interface.
-- Supported Python version, package management, and production application server.
-- Implement the accepted [database schema](database-schema.md) with migrations,
-  and finalize [article validation](server-contract.md#article-payload),
-  Markdown rendering, and archive search. Inline images
-  load from external URLs; renderer and URL-validation details remain open.
-- Independent article deletion and reporter removal, enforcing the
-  [no-cascade and recoverable-deletion requirements](product-design.md#independent-article-lifecycle).
-- Retaining original reporter IDs and historical attribution after
-  [reporter removal](product-design.md#reporter-removal-and-stable-identity).
-  Reassignment and inheritance are outside v1.
-- Implement attempt configuration snapshots under the
-  [accepted editorial workflow](product-design.md#editorial-guidance-through-prompt-edits).
-- Durable schedules, run states, retries, publication transactions, and recovery.
-  Run records must distinguish published articles, successful
-  [empty results](product-design.md#runs-with-nothing-to-publish), and failures.
-- Implement the selected [Resend delivery](#email-delivery) for failed-run
-  alerts, including delivery failures and duplicate prevention.
-- Configure the selected Cloudflare Access authentication, origin enforcement,
-  service isolation, credentials, and request protection alongside public reading.
-- Implement the accepted [backup policy](backups.md): encrypted R2 snapshots,
-  seven daily and four weekly recovery points, restore checks, and a 1 GB email
-  warning. Finalize deployment, observability, resource limits, and validation.
+The shared model, local execution host, provider integration, research tools,
+and persistent local result storage remain worker-phase decisions. Server
+acceptance cannot establish research quality or the eventual model behavior.

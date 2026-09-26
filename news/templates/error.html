@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ status }} · News{% endblock %}
+{% block content %}
+    <section class="empty-panel error-panel">
+        <p class="eyebrow">{{ status }}</p>
+        <h1>{{ 'This page is unavailable.' if status == 404 else 'A small interruption.' }}</h1>
+        <p>{{ message }}</p>
+        <a class="button quiet"
+           href="{{ '/newsroom' if request.path.startswith('/newsroom') else '/' }}">{{ 'Back to the newsroom' if request.path.startswith("/newsroom") else 'Read the latest edition' }}</a>
+    </section>
+{% endblock %}
