@@ -51,18 +51,30 @@ without claiming jobs or calling a model. It does not establish that the
 subscription has enough remaining allowance for research.
 
 The worker first acquires an OS file lock. A duplicate start exits without
-claiming work. Research processes inherit the lock so an abruptly killed
-supervisor cannot leave an old agent running alongside a replacement batch.
-Completed pending results are delivered before discovery or replacement
-research. An identical submission returns the original server receipt.
+claiming work. Each research slot starts an independent Python guardian in its
+own process session. The guardian launches Codex in a separate process group
+and enforces the attempt's deadline, measured from guardian startup. Both
+processes inherit the batch lock. The guardian kills the entire research group
+on timeout and when Codex exits. It waits for Codex to stop before releasing its lock.
+This also stops descendants left behind by a completed Codex process. At most
+eight research attempts run at once; guardians do not create extra slots.
 
-The 30-minute deadline currently depends on the supervisor staying alive.
-After an abrupt supervisor death, a surviving Codex process retains the lock
-until it exits. If it stalls, later starts skip the batch. Inspect the process
-and its private attempt directory, stop that attempt's process group, then
-restart the worker. Do not remove the lock file or pending results to recover.
-[Issue #6](https://github.com/jubishop/news/issues/6) tracks an independent deadline
-for this crash case.
+If the batch supervisor dies, including from SIGKILL, each guardian keeps its
+original deadline. Research can finish within the remaining time, but cannot
+hold the lock indefinitely because the batch supervisor is gone. A replacement
+batch skips while the inherited lock remains held. After all guardians and
+research groups stop, the next start can acquire the lock. This protects
+against batch supervisor death; it does not supervise a guardian that is itself
+forcibly killed or suspended.
+
+The batch supervisor still validates and saves complete results before delivery.
+Guardians do not call the News API or change pending state. On restart, saved
+pending results are delivered before discovery or replacement research. An
+identical submission returns the original server receipt. An attempt without a
+saved pending result receives an explicit replacement claim; a raw Codex output
+file alone is not a saved delivery result. Do not remove the lock file or
+pending results to recover. If a guardian is also lost, inspect the private
+attempt directory and stop its research process group before restarting.
 
 The worker checks in even on an empty day. It claims only when one of eight
 slots is available and uses the claim response's exact instruction snapshot.
@@ -185,6 +197,9 @@ handling, persistence, validation, and delivery. Another test uses the actual
 Flask/SQLite protocol with fake Cloudflare verification data and a fake Codex
 process. Cron tests replace the OS crontab boundary. These tests never call a
 paid model, send email, change production data, or install real cron entries.
+The crash regression kills a real batch supervisor with SIGKILL while a fake
+researcher and its descendant remain alive. It verifies deadline cleanup,
+duplicate-start exclusion, unchanged pending state, and a later replacement.
 
 Focused command:
 
