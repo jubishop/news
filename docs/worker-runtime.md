@@ -25,6 +25,12 @@ alternatives. The surrounding supervisor design remains a recommendation.
 The [search budget](worker-web-research.md#accepted-cost-and-ownership-constraint)
 applies to the whole integration.
 
+The owner subsequently reopened the engine choice. The
+[Codex evaluation](worker-codex-evaluation.md) compares GPT-6 Luna through
+ChatGPT Pro with the local runs and recommends it as the leading candidate.
+Final selection remains open. Pi-specific details below describe the local
+candidate; the supervisor, schedule, and recovery design also apply to Codex.
+
 ## Local observations
 
 Read-only inspection on September 26, 2026 found:
@@ -68,14 +74,15 @@ load. Do not extrapolate a daily capacity from this short probe.
 
 ## Recommended execution boundary
 
-Recommendation: use a small Python supervisor and a dedicated Pi subprocess
-for each research attempt. Keep the server and worker protocol in Python,
-consistent with the repository. Let Pi manage the model conversation and
-research tool loop.
+Recommendation: use a small Python supervisor and a dedicated research
+subprocess for each attempt. Keep the server and worker protocol in Python,
+consistent with the repository. The chosen harness manages the model
+conversation and research tool loop.
 
 | Approach | Benefit | Cost and recommendation |
 | --- | --- | --- |
-| Python supervisor plus Pi subprocess | Reuses the working local model setup, agent loop, tool handling, and context management. | Adds a pinned Node/Pi runtime and a small News extension. Preferred first evaluation. |
+| Python supervisor plus Codex subprocess | Reuses the Pro subscription and built-in web tools; completed the paired pilot quickly. | Shared subscription limits and cloud inference. Leading candidate, subject to final engine selection and further reporting checks. |
+| Python supervisor plus Pi subprocess | Reuses the working local model setup, agent loop, tool handling, and context management. | Adds a pinned Node/Pi runtime and a small News extension. Tested local candidate. |
 | Python directly calling Ollama | One application language, direct control of tool calls and structured output. | News owns the conversation loop, tool dispatch, context limits, and model-specific recovery. Fallback if Pi adds more maintenance than it removes. |
 | TypeScript worker using Pi SDK | Direct control of sessions and custom tools without a subprocess protocol. | Adds a second application language for durable worker operations already suited to Python. Consider only if subprocess control becomes awkward. |
 

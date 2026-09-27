@@ -83,6 +83,8 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   tradeoffs, provider pricing, and evidence for the first worker trial.
 - [Search service evaluation](search-evaluation.md): controlled reporting prompts,
   provider trials, and source-based assessment.
+- [Codex worker evaluation](worker-codex-evaluation.md): GPT-6 Luna through the
+  existing Pro subscription, compared with the local Qwen reporting runs.
 - [Evaluation reports](evaluations/README.md): preserved candidate outputs from
   the search pilot, including known errors for comparison.
 - [Reporting examples](reporting-examples.md): concrete assignments and proposed

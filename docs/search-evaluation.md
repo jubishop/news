@@ -10,6 +10,11 @@ or two representative prompts before choosing a provider. See the
 [extension comparison](worker-research-comparison.md) and
 [search budget](worker-web-research.md#accepted-cost-and-ownership-constraint).
 
+The later [Codex evaluation](worker-codex-evaluation.md) uses these same
+assignments with GPT-6 Luna and built-in web tools. It compares complete
+reporting setups; the controlled local-Qwen provider comparison below
+remains separate.
+
 ## Questions this pilot can answer
 
 Do the tools find sources that support a useful report? Does Qwen verify dates
@@ -106,8 +111,8 @@ Word counts use whitespace-delimited words.
 | Family activities | exa | 6m 04s | 6/6 | 2/2 | 553 |
 | Family activities | firecrawl | 4m 29s | 8/8 | 7/8 | 831 |
 
-Read the [four unchanged model drafts](evaluations/README.md). The runs used
-identical assignments and limits, but adaptive query choices and batching
+Read the four Pi/Qwen drafts in the [evaluation index](evaluations/README.md).
+The runs used identical assignments and limits, but adaptive query choices and batching
 varied. These timings include model reasoning, tool use, and final writing;
 they do not isolate search-service latency.
 

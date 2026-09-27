@@ -128,6 +128,12 @@ prove that the model can complete the reporting assignments accurately.
 Keep model execution behind the worker boundary so this choice does not
 change newsroom records or APIs. No hosted-model fallback is selected.
 
+Later on September 26, the owner reopened this choice and requested a test
+of GPT-6 Luna using the existing ChatGPT Pro subscription. The
+[Codex evaluation](worker-codex-evaluation.md) recommends Luna as the leading
+candidate after two real comparisons. This recommendation does not yet
+supersede the accepted Qwen choice. The final engine selection is open.
+
 The [research integration decision](worker-web-research.md#selected-integration-and-alternatives)
 selects Pi with `pi-web-access` and free Exa search. The [runtime research](worker-runtime.md)
 records local observations and the proposed Python supervision around Pi.
