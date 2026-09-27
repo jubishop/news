@@ -87,8 +87,10 @@ each Codex history tool call has a 180-second limit inside the existing
 under a small watcher that stops their process groups when the supervisor's
 pipe closes. The watcher retains the worker lock until cleanup finishes, so a
 replacement batch cannot mutate the index while the old search process stops.
-This does not change the separate Codex orphan-deadline limitation in
-[issue #6](https://github.com/jubishop/news/issues/6).
+Each Codex attempt has a separate guardian that enforces its original deadline
+even after supervisor death; see [worker recovery](worker-operations.md#daily-batch-and-recovery).
+Shared history stops when the supervisor dies, so surviving research cannot
+rely on further history calls. Its guardian still bounds its remaining lifetime.
 
 ## Installation and checks
 
