@@ -173,3 +173,7 @@ Before enabling unattended publication:
    guarantee for an unattended service.
 
 No scheduler or production worker was installed by this evaluation.
+
+The subsequent [research additions comparison](worker-research-addons.md)
+identifies optional readers and source-specific tools to test against this
+built-in-search baseline.
