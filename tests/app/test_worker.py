@@ -663,6 +663,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         for index, diagnostic in enumerate((
             "Batch embedding error", "Embedding error for text", "Embedding error",
             "Structured query expansion failed",
+            "Reranker unavailable — skipping reranking",
         )):
             with self.subTest(diagnostic=diagnostic):
                 self.server.add(index)

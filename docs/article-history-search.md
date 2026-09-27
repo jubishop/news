@@ -84,9 +84,9 @@ further pages as needed. Codex enforces tool-output budgets of 3,000 tokens for
 search and 5,000 for reading, before its standard serialization allowance.
 Result counts and read lengths are agent instructions; the output token caps
 are the enforced context bound. Reporters are instructed to return a retryable
-failure for explicit tool errors. QMD can also hide embedding or expansion
-failures behind ordinary results. Before accepting each research result, the
-supervisor checks the search process and its known model-failure diagnostics.
+failure for explicit tool errors. QMD can also hide embedding, expansion, or
+reranker failures behind ordinary results. Before accepting each research result,
+the supervisor checks the search process and its known model-failure diagnostics.
 A detected failure rejects that result and prevents further research for the
 batch. Concurrent attempts can finish, but their results also become retryable
 failures; already saved results remain valid. The diagnostic strings are part

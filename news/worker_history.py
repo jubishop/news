@@ -186,7 +186,8 @@ class History:
             # QMD can return ordinary results after these inference failures.
             # Gate publication on its diagnostics, not only MCP tool success.
             failures = (b"Embedding error:", b"Embedding error for text:",
-                        b"Batch embedding error:", b"Structured query expansion failed:")
+                        b"Batch embedding error:", b"Structured query expansion failed:",
+                        b"Reranker unavailable")
             with (self.root / "search.log").open("rb") as log:
                 if any(line.startswith(failures) for line in log):
                     self.error = "History search model failed; inspect history/search.log. Restart the batch after correcting the model problem."
