@@ -6,15 +6,21 @@ from pathlib import Path
 import sys
 import tempfile
 from urllib.error import HTTPError
+from urllib import request as http_request
 
 from news.worker import run
 from support import ServerFixture
+from history_support import fake_qmd
+
+REAL_OPEN = http_request.OpenerDirector.open
 
 
 class WorkerContractTests(ServerFixture):
     def external_http(self, request, **kwargs):
         url = request if isinstance(request, str) else request.full_url
         prefix = "https://news.example.com"
+        if url.startswith("http://127.0.0.1:"):
+            return REAL_OPEN(http_request.build_opener(), request, **kwargs)
         if url.startswith(prefix):
             self.assertEqual(request.get_header("Cf-access-client-id"), "fixture-id")
             self.assertEqual(request.get_header("Cf-access-client-secret"), "fixture-secret")
@@ -52,7 +58,7 @@ else:
             self.assertEqual(run({
                 "server_url": "https://news.example.com", "client_id": "fixture-id",
                 "client_secret": "fixture-secret", "state_dir": str(root / "state"),
-                "codex": str(executable), "concurrency": 1,
+                "codex": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
             }), 0)
         self.assertIn("From the reporting worker", self.client.get("/").get_data(as_text=True))
         self.assertEqual(self.work(), [])

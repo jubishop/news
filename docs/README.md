@@ -77,6 +77,8 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   selection, run outcomes, and overdue-work detection.
 - [Worker operations](worker-operations.md): vanilla Codex implementation, private
   configuration, recovery, tests, and required after-merge cron installation.
+- [Article history search](article-history-search.md): semantic retrieval,
+  shared batch snapshots, local QMD setup, and retrieval checks.
 - [Pi research extension comparison](worker-research-comparison.md): package
   tradeoffs, provider pricing, and evidence for the first worker trial.
 - [Search service evaluation](search-evaluation.md): controlled reporting prompts,

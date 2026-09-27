@@ -114,7 +114,9 @@ the worker's machine rather than requested through the newsroom.
 
 Accepted on September 26, 2026: use vanilla Codex CLI with GPT-6 Luna and
 the existing ChatGPT subscription for v1. Use built-in research tools, with
-no MCP servers, plugins, or separate search provider. This supersedes the
+no plugins or separate web-search provider. The later
+[article history search](article-history-search.md) adds a private read-only
+QMD MCP connection for prior News coverage. This supersedes the
 Qwen/Ollama and Pi/Exa selections. The owner wants less integration code and
 to benefit from OpenAI's improvements. The tradeoff is cloud processing and
 shared subscription limits.

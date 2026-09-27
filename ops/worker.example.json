@@ -3,6 +3,10 @@
   "client_id": "REPLACE_WITH_NEWS_SERVICE_TOKEN_CLIENT_ID",
   "client_secret": "REPLACE_WITH_NEWS_SERVICE_TOKEN_SECRET",
   "codex": "/Users/REPLACE_ME/.local/bin/codex",
+  "qmd_command": [
+    "/Users/REPLACE_ME/.bun/bin/bun",
+    "/Users/REPLACE_ME/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd"
+  ],
   "state_dir": "/Users/REPLACE_ME/.local/state/news-worker",
   "model": "gpt-6-luna",
   "reasoning_effort": "medium",

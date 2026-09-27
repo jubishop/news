@@ -4,7 +4,6 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import fcntl
-import json
 import os
 from pathlib import Path
 import secrets
@@ -18,6 +17,7 @@ from zoneinfo import ZoneInfo
 from . import validation as v
 from .errors import Problem
 from .worker_codex import preflight, research
+from .worker_history import History, preflight as history_preflight
 from .worker_io import APIError, NewsAPI, WorkerError, read_json, remove_file, save_json
 
 RETENTION_SECONDS = 7 * 24 * 3600
@@ -44,6 +44,7 @@ class Batch:
         self.codex_lock = threading.Lock()
         self.codex_checked = False
         self.codex_error = None
+        self.history = History(settings, lock_fd)
 
     def check_codex(self):
         with self.codex_lock:
@@ -148,14 +149,8 @@ class Batch:
                 self.check_codex()
                 reporter = claim["reporter"]
                 reporter_id = v.identifier(reporter["id"], "reporter id")
-                recent = []
-                with (directory / "archive.jsonl").open("w", encoding="utf-8") as archive:
-                    for article in self.api.pages("/articles/search", "articles"):
-                        archive.write(json.dumps(article, ensure_ascii=False) + "\n")
-                        if article["reporter_id"] == reporter_id and len(recent) < 20:
-                            recent.append({key: article[key] for key in (
-                                "id", "title", "summary", "article_date", "coverage_start", "coverage_end",
-                            )})
+                self.history.prepare(self.api)
+                recent = self.history.summaries.get(reporter_id, [])
                 history = self.api.call(f"/reporters/{reporter_id}/runs?limit=30")["runs"]
                 assignment = {
                     "reporter": reporter, "run_id": run_id,
@@ -163,10 +158,11 @@ class Batch:
                     "reporting_date": reporting_date,
                     "current_time": datetime.now(ZoneInfo("America/Los_Angeles")).isoformat(),
                     "recent_articles": recent, "recent_runs": history,
+                    "history_snapshot": self.history.snapshot,
                 }
                 record["research_started"] = True
                 save_json(path, record)
-                candidate = research(self.settings, directory, assignment, self.lock_fd)
+                candidate = research(self.settings, directory, assignment, self.lock_fd, self.history.endpoint)
             except subprocess.TimeoutExpired:
                 candidate = failure("research_timeout", "Codex exceeded the reporting attempt time limit.")
             except (WorkerError, Problem, ValueError, UnicodeError) as exc:
@@ -186,6 +182,12 @@ class Batch:
         return {"run": job, "claim_request": request}
 
     def execute(self):
+        try:
+            return self.execute_batch()
+        finally:
+            self.history.close()
+
+    def execute_batch(self):
         self.cleanup()
         recovered_retries = self.recover_results()
         discovery = self.discover()
@@ -240,15 +242,33 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path.home() / ".config/news/worker.json")
     parser.add_argument("--check", action="store_true", help="Check Codex login and API access without claiming work or invoking a model.")
+    parser.add_argument("--prepare-history", action="store_true", help="Refresh and verify local history search without claiming or publishing work.")
     args = parser.parse_args()
     try:
         if args.config.stat().st_mode & 0o077:
             raise WorkerError("Worker config contains credentials: set its permissions to 0600.")
         settings = read_json(args.config)
+        settings.setdefault("state_dir", str(Path.home() / ".local/state/news-worker"))
+        if args.prepare_history:
+            root = Path(settings["state_dir"]).expanduser().resolve()
+            root.mkdir(mode=0o700, parents=True, exist_ok=True)
+            with (root / "worker.lock").open("a") as lock:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    raise WorkerError("The worker is running. Prepare history when the batch has finished.") from None
+                history = History(settings, lock.fileno())
+                try:
+                    history.prepare(NewsAPI(settings))
+                    print(f'History search ready: {history.snapshot["article_count"]} articles. No jobs claimed.')
+                finally:
+                    history.close()
+            return 0
         if args.check:
             preflight(settings.get("codex", shutil.which("codex") or "codex"))
+            history_preflight(settings)
             NewsAPI(settings).call("/articles/search?limit=1")
-            print("Codex ChatGPT login and News API access verified. No model was called.")
+            print("Codex ChatGPT login, QMD version, and News API access verified. No model was called.")
             return 0
         return run(settings)
     except (WorkerError, OSError, ValueError, KeyError, Problem) as exc:

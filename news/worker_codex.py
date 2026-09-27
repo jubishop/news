@@ -22,9 +22,18 @@ failed outcome, not evidence that there is nothing to publish.
 Choose article coverage dates from the assignment and past reporting. Dates
 may be in the future. Do not derive coverage from the reporter's cadence.
 Use recent summaries and run history to avoid repetition and cover gaps.
-The complete retained article archive is in archive.jsonl in this directory.
-Use the built-in shell to search/read it when more context is useful. It includes
-other reporters. The snapshot excludes deleted articles as of retrieval.
+Search the News history with the news_history query tool before deciding what
+to publish. Use a natural-language query for hybrid semantic and keyword search,
+limit=5 (at most 10), and minScore=0 so related coverage is not hidden by a cutoff.
+Search both the topic and each proposed story; try alternate wording and exact
+names when results are weak. No matches do not prove a story was never covered.
+Read promising matches with news_history get, maxLines=80, paging with fromLine
+for more. The header has the article ID, reporter, and coverage dates. Decide
+whether there is a new development rather than excluding everything related.
+History includes other reporters and is fixed for this entire batch. It excludes
+Trash at retrieval; it does not include stories published later in this batch.
+If history search or retrieval fails, return a retryable failed outcome, not
+nothing_to_publish. Never treat a broken tool as an empty archive.
 Use this directory for local context; do not inspect personal files or settings.
 No News API access is needed: the supervisor alone claims and publishes work.
 Return the requested JSON: published with 1–20 articles, nothing_to_publish
@@ -100,7 +109,7 @@ def preflight(executable):
         raise WorkerError("Codex preflight failed. Check its executable and ChatGPT login.") from None
 
 
-def research(settings, directory, assignment, lock_fd):
+def research(settings, directory, assignment, lock_fd, history_endpoint):
     directory = Path(directory)
     schema = directory / "schema.json"
     output = directory / "result.json"
@@ -118,6 +127,13 @@ def research(settings, directory, assignment, lock_fd):
         "web_search": '"live"', "project_doc_max_bytes": "0",
         "model_reasoning_effort": json.dumps(settings.get("reasoning_effort", "medium")),
         "mcp_servers": "{}", "shell_environment_policy.inherit": '"none"',
+        "mcp_servers.news_history.url": json.dumps(history_endpoint),
+        "mcp_servers.news_history.required": "true",
+        "mcp_servers.news_history.enabled_tools": '["query", "get"]',
+        "mcp_servers.news_history.startup_timeout_sec": "30",
+        "mcp_servers.news_history.tool_timeout_sec": "180",
+        "mcp_servers.news_history.tools.query.output_token_limit": "3000",
+        "mcp_servers.news_history.tools.get.output_token_limit": "5000",
         "default_permissions": '"news_research"',
         "permissions.news_research.filesystem": '{":minimal"="read",":workspace_roots"="read"}',
         "permissions.news_research.network.enabled": "false",
