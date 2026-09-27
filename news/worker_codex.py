@@ -4,13 +4,14 @@ import json
 import os
 from pathlib import Path
 import re
-import signal
 import subprocess
+import sys
 import time
 
 from . import validation as v
 from .errors import Problem
 from .worker_io import WorkerError, save_json
+from .worker_process import TIMEOUT_EXIT
 
 
 INSTRUCTIONS = """You are a reporter for a personal news site.
@@ -133,24 +134,32 @@ def research(settings, directory, assignment, lock_fd):
         command.extend(["-c", f"{key}={value}"])
     command.append("-")
     save_json(directory / "invocation.json", {"command": command, "model": settings.get("model", "gpt-6-luna")})
-    started = time.monotonic()
-    with (directory / "events.jsonl").open("wb") as events, (directory / "stderr.txt").open("wb") as errors:
+    timeout = settings.get("attempt_timeout_seconds", 1800)
+    deadline = time.monotonic() + timeout
+    guardian = [
+        sys.executable, "-B", str(Path(__file__).with_name("worker_process.py")),
+        str(deadline), str(lock_fd),
+    ]
+    with (
+        (directory / "events.jsonl").open("wb") as events,
+        (directory / "stderr.txt").open("wb") as errors,
+        (directory / "prompt.txt").open("rb") as prompt_input,
+    ):
         try:
             process = subprocess.Popen(
-                command, cwd=directory, env=child_environment(), stdin=subprocess.PIPE,
+                guardian + command, cwd=directory, env=child_environment(), stdin=prompt_input,
                 stdout=events, stderr=errors, start_new_session=True, pass_fds=(lock_fd,),
             )
         except OSError:
             raise WorkerError("Codex could not start.") from None
         try:
-            process.communicate(prompt.encode(), timeout=max(.001, settings.get("attempt_timeout_seconds", 1800) - (time.monotonic() - started)))
+            process.wait()
         except BaseException:
-            try:
-                os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
+            process.terminate()
             process.wait()
             raise
+    if process.returncode == TIMEOUT_EXIT:
+        raise subprocess.TimeoutExpired(command, timeout)
     if process.returncode:
         raise WorkerError("Codex exited unsuccessfully; inspect the private attempt log.")
     if not output.exists() or output.stat().st_size > 2_000_000:
