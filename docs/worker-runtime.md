@@ -152,6 +152,9 @@ Use `nicobailon/pi-web-access` as the Pi integration for search, page
 reading, and PDFs. Its existing extraction support can avoid maintaining these
 parsers in News. Use a pinned release with only approved providers and the
 raw-result workflow. The extension itself has not been installed or tested.
+The [package comparison](worker-research-comparison.md) records alternatives,
+current free allowances, and a successful HTTP probe of its Exa request format.
+That probe does not establish installed-extension or end-to-end compatibility.
 
 A search result is a discovery lead, not sufficient evidence for publication.
 Read the relevant source pages, record URLs and retrieval times, and distinguish

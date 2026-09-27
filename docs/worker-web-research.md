@@ -36,6 +36,12 @@ local. The tradeoff is reliance on Exa's availability and free-access limits.
 The owner's API-key clarification permits evaluating keyed free tiers if
 needed; it does not select another provider or authorize paid usage.
 
+The subsequent [extension comparison](worker-research-comparison.md) examines
+15 published packages, including the other research extensions the owner named.
+It retains `pi-web-access` as the leading trial candidate, with explicit
+limitations. This comparison does not establish superior report quality or
+complete the required installed-extension evaluation.
+
 Qwen reasons and writes locally. The extension sends a query to Exa and returns
 results, then reads relevant pages. This supplies the search tool that hosted
 agents commonly provide out of the box. The model does not gain search ability
@@ -69,6 +75,11 @@ and its [search/fetch API](https://docs.ollama.com/capabilities/web-search).
 Neither statement establishes unlimited nightly capacity or permanent free
 availability. A quota exhaustion must defer or fail research, never trigger
 billing. Free tiers must be verified again before deployment.
+
+Exa's keyed API is a different cost path from its free keyless limits. Adding
+a key is not an approved remedy for exhausted free access. The comparison
+also identifies Tavily, Brave, and Firecrawl's recurring free allowances;
+Tavily is the proposed next provider evaluation if Exa is insufficient.
 
 SearXNG's [search API](https://docs.searxng.org/dev/search_api.html) supports JSON
 when enabled in the instance. Its [limiter documentation](https://docs.searxng.org/admin/searx.limiter)
