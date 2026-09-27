@@ -91,16 +91,20 @@ class Batch:
     def recover_results(self):
         retry = set()
         for path in self.pending.glob("*.json"):
-            record = read_json(path)
-            if "result" not in record:
-                continue
             try:
+                record = read_json(path)
+                if "result" not in record:
+                    continue
                 if self.deliver(path, record):
                     retry.add(record["run"]["id"])
-            except WorkerError as exc:
-                self.errors = True
-                print(str(exc), file=sys.stderr)
+            except (WorkerError, Problem, OSError, ValueError, KeyError, TypeError) as exc:
+                self.report_error(path.stem, exc)
         return retry
+
+    def report_error(self, run_id, exc):
+        self.errors = True
+        message = str(exc) if isinstance(exc, (WorkerError, Problem)) else "Local state or API data is invalid or inaccessible; inspect private state."
+        print(f"Run {run_id}: {message}", file=sys.stderr, flush=True)
 
     def discover(self):
         path = self.root / "checkin.json"
@@ -196,9 +200,8 @@ class Batch:
                     try:
                         if future.result():
                             retry.add(futures[future])
-                    except (WorkerError, Problem) as exc:
-                        self.errors = True
-                        print(f'Run {futures[future]}: {exc}', file=sys.stderr, flush=True)
+                    except (WorkerError, Problem, OSError, ValueError, KeyError, TypeError) as exc:
+                        self.report_error(futures[future], exc)
             retry |= recovered_retries
             recovered_retries.clear()
             if not retry or round_number == 2:

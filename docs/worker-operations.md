@@ -56,6 +56,14 @@ supervisor cannot leave an old agent running alongside a replacement batch.
 Completed pending results are delivered before discovery or replacement
 research. An identical submission returns the original server receipt.
 
+The 30-minute deadline currently depends on the supervisor staying alive.
+After an abrupt supervisor death, a surviving Codex process retains the lock
+until it exits. If it stalls, later starts skip the batch. Inspect the process
+and its private attempt directory, stop that attempt's process group, then
+restart the worker. Do not remove the lock file or pending results to recover.
+[Issue #6](https://github.com/jubishop/news/issues/6) tracks an independent deadline
+for this crash case.
+
 The worker checks in even on an empty day. It claims only when one of eight
 slots is available and uses the claim response's exact instruction snapshot.
 Paused claims receive `skipped_paused` without starting Codex. A fresh process
@@ -84,6 +92,9 @@ payload. Redirects are refused so credentials do not follow an unexpected
 origin. After an unsuccessful delivery, pending state remains on disk and the
 worker exits nonzero. Other reporters continue. The next startup retries saved
 results before research. Do not delete pending state to retry a publication.
+Malformed archive pages become explicit research failures. A damaged pending
+record or a per-run storage error is reported without stopping other reporters;
+the affected state is retained for operator repair.
 
 Research retries use the server's three-attempt allowance. The batch waits
 15 minutes and five seconds between retry rounds, then rediscovers only its

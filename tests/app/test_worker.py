@@ -12,6 +12,7 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 from news.worker import run
 
@@ -37,6 +38,7 @@ class Newsroom:
         self.lose_result_responses = 0
         self.runs = []
         self.failures = {}
+        self.truncated_responses = {}
         self.archive = [dict(ARTICLE, id="old", reporter_id="reporter0")]
         self.lock = threading.Lock()
 
@@ -126,6 +128,14 @@ class WorkerTests(unittest.TestCase):
                     return
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"]))) if self.command == "POST" else None
                 status, payload = fixture.respond(self.command, self.path, body)
+                if fixture.truncated_responses.get(self.path, 0):
+                    fixture.truncated_responses[self.path] -= 1
+                    self.send_response(status)
+                    self.send_header("Transfer-Encoding", "chunked")
+                    self.end_headers()
+                    self.wfile.write(b'20\r\n{"incomplete":')
+                    self.close_connection = True
+                    return
                 data = json.dumps(payload).encode()
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
@@ -401,6 +411,82 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual(len(self.server.receipts), 1)
         self.assertEqual(self.server.results[0]["articles"], [ARTICLE])
         self.assertEqual(len(list((self.root / "state/pending").glob("*.json"))), 1)
+
+    def test_truncated_claim_and_result_responses_retry_identical_payloads(self):
+        self.server.add()
+        self.settings["http_retry_delays"] = [0, 0, 0]
+        self.server.truncated_responses = {
+            "/api/v1/worker/runs/run0/claim": 1,
+            "/api/v1/worker/runs/run0/result": 1,
+        }
+        self.assertEqual(self.execute(), 0)
+        claims = [body for _, path, body in self.server.requests if path.endswith("/claim")]
+        self.assertEqual(len(claims), 2)
+        self.assertEqual(claims[0], claims[1])
+        self.assertEqual(len(self.server.results), 2)
+        self.assertEqual(self.server.results[0], self.server.results[1])
+        self.assertEqual(len(self.server.receipts), 1)
+        self.assertEqual(len(self.captures()), 1)
+
+    def test_truncated_result_remains_pending_while_other_reporters_progress(self):
+        self.server.add(0)
+        self.server.add(1)
+        self.server.truncated_responses["/api/v1/worker/runs/run0/result"] = 2
+        self.assertEqual(self.execute(), 1)
+        self.server.add(2)
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(len(self.server.receipts), 3)
+        self.assertEqual(len(self.captures()), 3)
+        self.assertEqual(len(list((self.root / "state/pending").glob("*.json"))), 1)
+        self.assertEqual(self.execute(), 0)
+        self.assertEqual(len(self.captures()), 3)
+        self.assertEqual(list((self.root / "state/pending").glob("*.json")), [])
+
+    def test_invalid_archive_pages_become_explicit_research_failures(self):
+        original = self.server.respond
+        for page in ({"has_more": False}, {"articles": None, "has_more": False}, {"articles": [], "has_more": 0}):
+            with self.subTest(page=page):
+                number = len(self.server.claims)
+                self.server.add(number)
+                self.server.respond = lambda method, path, body: (200, page) if "/articles/search" in path else original(method, path, body)
+                self.assertEqual(self.execute(), 1)
+                results = [body for _, path, body in self.server.requests if path == f"/api/v1/worker/runs/run{number}/result"]
+                self.assertEqual(len(results), 3)
+                self.assertTrue(all(body["outcome"] == "failed" for body in results))
+        self.assertEqual(self.captures(), [])
+
+    def test_damaged_pending_record_does_not_block_saved_results_or_discovery(self):
+        self.server.add(0)
+        self.server.lose_result_responses = 1
+        self.assertEqual(self.execute(), 1)
+        damaged = self.root / "state/pending/damaged.json"
+        damaged.write_text("not JSON")
+        self.server.add(1)
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(len(self.server.receipts), 2)
+        self.assertEqual(len(self.captures()), 2)
+        self.assertEqual(damaged.read_text(), "not JSON")
+        self.assertEqual(list(damaged.parent.glob("*.json")), [damaged])
+
+    def test_one_local_write_failure_does_not_skip_other_runs_retry_rounds(self):
+        import io
+        self.server.add(0)
+        self.server.add(1)
+        self.fake_config["result"] = {
+            "outcome": "failed", "articles": [], "reason": "",
+            "error": {"code": "source_unavailable", "message": "Try again.", "retryable": True},
+        }
+        replace = os.replace
+        def replace_file(source, destination):
+            if Path(destination).name == "run0.json":
+                raise OSError("private-state-sentinel")
+            return replace(source, destination)
+        errors = io.StringIO()
+        with patch("os.replace", side_effect=replace_file), patch("sys.stderr", errors):
+            self.assertEqual(self.execute(), 1)
+        self.assertEqual(len(self.server.results), 3)
+        self.assertTrue(all(path.endswith("/runs/run1/result") for _, path, _ in self.server.requests if path.endswith("/result")))
+        self.assertNotIn("private-state-sentinel", errors.getvalue())
 
     def test_agent_environment_excludes_api_keys_and_worker_credentials(self):
         from unittest.mock import patch

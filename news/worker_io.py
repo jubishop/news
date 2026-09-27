@@ -1,5 +1,6 @@
 """Authenticated worker HTTP and durable private files."""
 
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path
@@ -99,7 +100,7 @@ class NewsAPI:
                 failure = APIError(status)
                 if status != 429 and status < 500:
                     raise failure from None
-            except (error.URLError, TimeoutError, ConnectionError, OSError):
+            except (error.URLError, HTTPException, TimeoutError, ConnectionError, OSError):
                 failure = APIError(0, "connection_failed")
             except (ValueError, UnicodeError):
                 failure = APIError(0, "invalid_response")
@@ -111,7 +112,10 @@ class NewsAPI:
         separator = "&" if "?" in route else "?"
         for page in range(1, 100_001):
             result = self.call(f"{route}{separator}page={page}&limit=100")
-            yield from result[field]
-            if not result["has_more"]:
+            items, more = result.get(field), result.get("has_more")
+            if not isinstance(items, list) or type(more) is not bool:
+                raise WorkerError("News API returned an invalid archive page.")
+            yield from items
+            if not more:
                 return
         raise WorkerError("News archive exceeds the API pagination limit.")
