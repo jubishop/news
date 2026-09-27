@@ -312,6 +312,20 @@ It supports both recurring roundups and focused one-time research. The
 tradeoff is that the reporting and storage interfaces must support multiple
 articles from one run. Default behavior for an unspecified format remains open.
 
+### Best-effort assignments
+
+Accepted on September 26, 2026: all assignments are best effort. Apply this
+as a default even when the reporter's prompt does not state it explicitly.
+A request for five worthwhile items can produce three supported items with
+a brief explanation when that is the useful result. Do not fail a run solely
+because it cannot meet a requested count or supply every requested detail.
+
+The owner stated that this should be implied by prompts. The tradeoff is
+variable completeness in exchange for useful reporting without filler.
+Best effort does not permit invented facts or concealment of material gaps.
+Keep research failures distinct from successful partial reporting and the
+existing successful "nothing to publish" outcome.
+
 ### Runs with nothing to publish
 
 Accepted on September 24, 2026: a run may publish no articles when it finds no

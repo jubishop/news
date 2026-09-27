@@ -89,6 +89,10 @@ model stop reason and settled state, not merely process exit code or the
 first end event. A failed assistant response can still leave JSON mode with
 exit status zero.
 
+Apply the [best-effort assignment rule](product-design.md#best-effort-assignments)
+in the shared reporting instructions. Useful partial results are permitted;
+missing a requested item count is not a schema or completion failure.
+
 The supervisor should own deterministic operations:
 
 1. Acquire a process lock and recover the durable local journal.
@@ -187,8 +191,7 @@ assume Pi's declared context changes Ollama's allocation.
 
 Resolve these through the design interview, one question at a time:
 
-- Bounds for a stuck research attempt, minimum publication evidence, and
-  behavior when a requested report cannot be supported fully.
+- Bounds for a stuck research attempt.
 - Archive context limits and local log/result retention.
 
 Accepted answers belong in their authoritative sections with their reasons;

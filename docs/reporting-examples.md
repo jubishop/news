@@ -97,11 +97,14 @@ Schedule, persistence, and tool-boundary behavior need automated tests.
 Editorial quality also needs review of representative generated reports;
 passing schema checks alone cannot establish the usefulness of the shortlist.
 
+Under the [best-effort rule](product-design.md#best-effort-assignments) accepted
+on September 26, 2026, fewer supported picks or unavailable practical details
+do not by themselves fail the assignment. Publish useful supported material,
+explain material gaps briefly, and do not invent details to fill the requested
+format. Evaluate this behavior alongside the cases above.
+
 ### Open questions exposed by this example
 
-- What happens when research supports fewer than the requested five picks?
-- Which missing practical details are acceptable with a clear caveat, and
-  which gaps should prevent an option or an entire report from publication?
 - How much prior coverage should be included, and what counts as a recent pick?
 - How should delayed or missed runs handle a weekend that is already underway
   or over?
