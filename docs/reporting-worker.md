@@ -1,5 +1,5 @@
 ---
-status: draft
+status: current
 ---
 
 # Reporting worker and newsroom API
@@ -50,8 +50,7 @@ database remain on the VPS, and the newsroom service performs no AI work.
 
 The tradeoff is dependence on the Mac's availability. The API boundary allows
 later relocation without moving the newsroom or its database. The
-[runtime proposal](worker-runtime.md) records the installed tools and proposed
-worker implementation.
+[operations guide](worker-operations.md) records the worker implementation.
 
 ## Worker connection
 
@@ -86,15 +85,11 @@ with a dedicated service token for the worker and separate owner browser access.
 
 ### Daily work discovery
 
-Accepted on September 26, 2026: start the worker daily at 01:00 Pacific Time
-on the current Mac. This replaces the initially selected 03:00 time on the
-same date; no further reason was stated for the change. The owner clarified
-that this is simply the initial daily cron time. Their references to news through the past night and completion
-before waking express the motivation, not a strict coverage cutoff or a
-ready-by deadline. Do not add either rule or its verification requirements.
-The tradeoff is that actual completion depends on the work and machine
-availability. Existing assignment-controlled coverage and server lateness
-rules continue to apply.
+Accepted on September 26, 2026: start the worker daily at 06:00 Pacific Time
+on the current Mac. This supersedes the earlier 01:00 choice. The owner wants
+to schedule reporters for the following day and inspect the results after
+waking. This is a startup time, with no strict coverage cutoff or completion
+deadline. The Mac must be awake for cron to run.
 
 Clarified by the owner on September 25, 2026: the worker checks for new work
 once a day, at a time chosen on the worker side. The server does not need to
@@ -110,35 +105,33 @@ Engineering implication: do not require continuous polling, a server push
 connection, or a worker wake-up mechanism. A daily check can retrieve work for
 multiple reporters. The daily discovery cadence does not limit API requests
 needed to process that work, such as fetching context, renewing a claim,
-submitting results, or retrying interrupted communication. Exact claim and
-retry behavior remains to be defined. Extra runs, if needed, are initiated on
+submitting results, or retrying interrupted communication. The
+[server contract](server-contract.md#daily-discovery-and-claims) defines claim
+and retry behavior. Extra runs, if needed, are initiated on
 the worker's machine rather than requested through the newsroom.
 
 ## Model engine
 
-Accepted on September 26, 2026: use the owner's installed Qwen 27B model
-through local Ollama. Inspection identified the exact installed tag as
-`qwen3.8:27b-mlx`. The owner requested this model; no further reason was
-stated. This replaces the earlier unresolved choice between a local model
-and GPT-6 Luna through Codex Pro. All reporters still share one model.
+Accepted on September 26, 2026: use vanilla Codex CLI with GPT-6 Luna and
+the existing ChatGPT subscription for v1. Use built-in research tools, with
+no MCP servers, plugins, or separate search provider. This supersedes the
+Qwen/Ollama and Pi/Exa selections. The owner wants less integration code and
+to benefit from OpenAI's improvements. The tradeoff is cloud processing and
+shared subscription limits.
 
-The tradeoff is that local machine availability, inference speed, and model
-research quality become operating constraints. Tool support alone does not
-prove that the model can complete the reporting assignments accurately.
-Keep model execution behind the worker boundary so this choice does not
-change newsroom records or APIs. No hosted-model fallback is selected.
+The owner prefers a moving Luna `latest` alias if supported. On September 26,
+2026, the [official model reference](https://learn.chatgpt.com/docs/models)
+and installed model catalog identify `gpt-6-luna`; no documented moving Luna
+alias was found. Use that configurable model name. Do not invent an alias or
+promise automatic upgrades across model generations. Codex tool improvements
+arrive with ordinary CLI updates; model changes may require a config edit.
 
-Later on September 26, the owner reopened this choice and requested a test
-of GPT-6 Luna using the existing ChatGPT Pro subscription. The
-[Codex evaluation](worker-codex-evaluation.md) recommends Luna as the leading
-candidate after two real comparisons. This recommendation does not yet
-supersede the accepted Qwen choice. The final engine selection is open.
+Accepted on September 26, 2026: process up to eight reporters concurrently.
+The owner chose eight because inference runs in the cloud. Claim only when
+capacity is available. Each attempt keeps its own context and durable state.
+The tradeoff is greater concurrent use of the shared subscription allowance.
 
-The [research integration decision](worker-web-research.md#selected-integration-and-alternatives)
-selects Pi with `pi-web-access` and free Exa search. The [runtime research](worker-runtime.md)
-records local observations and the proposed Python supervision around Pi.
-Web search and model inference are separate services; search is external
-while Qwen inference stays local.
+See [worker operations](worker-operations.md) for implementation and deployment.
 
 ## Timeliness and completion
 
@@ -425,7 +418,6 @@ timings remain to be specified where noted.
   its normal daily check, without discarding prior attempt history or creating
   a new contractor. It must not restart exhausted research on its own each day.
 
-The result format, progress reporting frequency, retry delays, expiration
-policy, and exact retired-record representation still need final contracts.
-Cloudflare Access is selected; credential setup and origin validation remain
-implementation work. Define these details before building the worker integration.
+The [server contract](server-contract.md#worker-api) now defines result payloads,
+claims, retries, and retired-record behavior. The [worker runbook](worker-operations.md)
+covers their implementation and the remaining deployment steps.

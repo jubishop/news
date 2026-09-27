@@ -9,7 +9,9 @@ The [product design](docs/product-design.md) develops the
 [concept](docs/concept.md). The [implementation design](docs/implementation-design.md)
 selects Python, Flask, SQLite, and a separate reporting worker. Server v1
 implements the public edition, owner newsroom, authenticated worker API,
-monitoring, and backup commands. The AI worker is a later phase. See the
+monitoring, and backup commands. The Mac worker runs vanilla Codex with Luna through the existing subscription.
+See [worker operations](docs/worker-operations.md) for setup and the 06:00
+Pacific cron installation after merge. See the
 [server contract](docs/server-contract.md) and
 [operations guide](docs/server-operations.md) for the implemented interface
 and deployment prerequisites.

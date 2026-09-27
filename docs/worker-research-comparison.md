@@ -4,11 +4,11 @@ status: draft
 
 # Pi research extension comparison
 
-Research checked on September 26, 2026 for the [local reporting worker](worker-runtime.md).
+Research checked on September 26, 2026 for the [local reporting worker](archive/worker-runtime-proposal.md).
 The recommendation remains a constrained `pi-web-access` trial. Evaluate
 Exa's free keyed plan first; its documented allowance strengthens this option. This is a comparative engineering judgment, not a measured finding
 that it produces better reports. The [accepted cost constraint and initial
-selection](worker-web-research.md) remain authoritative.
+selection](archive/worker-web-research.md) remain authoritative.
 
 ## Scope and method
 

@@ -4,7 +4,8 @@ status: current
 
 # Server setup and operations
 
-This is the runbook for server v1. The server is reviewable locally without an
+This is the runbook for server v1. See [worker operations](worker-operations.md)
+for the local Codex worker and after-merge commissioning. The server is reviewable locally without an
 AI worker. After one-time provisioning, the [deployment workflow](deployment.md)
 releases validated pushes to `main`, including migrations and maintenance.
 

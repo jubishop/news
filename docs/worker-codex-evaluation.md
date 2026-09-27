@@ -10,8 +10,8 @@ Two actual Codex runs used the exact assignments from the
 [local Qwen search pilot](search-evaluation.md). Recommendation: make Codex
 with Luna the leading candidate for the first worker. It required less setup
 and finished much faster, with better source handling in several respects.
-The final engine choice remains open; two reports do not establish reliable
-unattended reporting.
+The owner subsequently [selected vanilla Codex](reporting-worker.md#model-engine)
+for v1. Two reports do not establish reliable unattended reporting.
 
 ## Subscription access and ownership
 

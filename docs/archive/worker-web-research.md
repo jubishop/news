@@ -1,12 +1,15 @@
 ---
-status: draft
+status: superseded
 ---
 
 # Web research for the worker
 
-This September 26, 2026 research supports the [local worker proposal](worker-runtime.md).
+Superseded on September 26, 2026 by the [vanilla Codex worker](../worker-operations.md).
+The observations below preserve the earlier proposal; they do not configure v1.
+
+This September 26, 2026 research supports the [local worker proposal](worker-runtime-proposal.md).
 It separates the accepted cost constraint from search and tool recommendations.
-The worker's [selected Qwen model](reporting-worker.md#model-engine) generates
+The worker's [selected Qwen model](../reporting-worker.md#model-engine) generates
 search queries, reads tool results, and writes reports. A separate search tool
 actually contacts search services and returns sources to the model.
 
@@ -43,7 +46,7 @@ local. The tradeoff is reliance on Exa's availability and free-access limits.
 The later budget clarification permits evaluating paid routes within the
 conditional budget above. It does not establish that any provider is superior.
 
-The subsequent [extension comparison](worker-research-comparison.md) examines
+The subsequent [extension comparison](../worker-research-comparison.md) examines
 15 published packages, including the other research extensions the owner named.
 It retains `pi-web-access` as the leading trial candidate, with explicit
 limitations. This comparison does not establish superior report quality or
@@ -83,7 +86,7 @@ Neither statement establishes unlimited nightly capacity or permanent free
 availability. Quota exhaustion must follow the selected provider and spending
 policy. Free tiers must be verified again before deployment.
 
-The expanded [provider comparison](worker-research-comparison.md#providers-and-budget)
+The expanded [provider comparison](../worker-research-comparison.md#providers-and-budget)
 corrects the initial uncertainty about Exa's recurring keyed allowance using
 its pricing page. Recommendation: evaluate Exa's free keyed Starter plan first
 for its documented allowance, alongside free alternatives. Compare paid
@@ -107,7 +110,7 @@ must remain assignment-driven rather than a hidden fixed list of allowed beats.
 The selected [pi-web-access](https://github.com/nicobailon/pi-web-access)
 extension supplies the research tools. It supports SearXNG, keyless Exa,
 Ollama, DuckDuckGo, and local content extraction. The [inspected package source](https://github.com/nicobailon/pi-web-access/blob/main/package.json)
-reported 0.31.0. The later [search pilot](search-evaluation.md) tests that
+reported 0.31.0. The later [search pilot](../search-evaluation.md) tests that
 release in isolation with local Qwen; the production worker is not implemented.
 
 Use `workflow: "none"` for raw search results. Explicitly restrict providers,
@@ -139,5 +142,5 @@ Exercise rate-limit handling before relying on a free search route unattended.
 The local Pi/Qwen tool-use probe did not contact any search provider and cannot
 establish the quality or reliability of these options.
 
-The owner requested that comparison next. The [search service evaluation](search-evaluation.md)
+The owner requested that comparison next. The [search service evaluation](../search-evaluation.md)
 records two concrete prompts and the first isolated provider runs.

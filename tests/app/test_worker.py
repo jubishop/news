@@ -1,0 +1,442 @@
+"""The real supervisor between a mock HTTP newsroom and a fake Codex executable."""
+
+from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import json
+import os
+from pathlib import Path
+import sys
+import subprocess
+import tempfile
+import threading
+import time
+import unittest
+
+from news.worker import run
+
+ARTICLE = {
+    "title": "A verified development",
+    "summary": "Useful news, with an explicit source.",
+    "body_markdown": "Read the [primary source](https://example.com/story).",
+    "article_date": "2026-09-27",
+    "coverage_start": "2026-09-26",
+    "coverage_end": "2026-09-27",
+    "sources": [{"title": "Primary source", "url": "https://example.com/story"}],
+}
+RESULT = {"outcome": "published", "articles": [ARTICLE], "reason": "", "error": None}
+
+
+class Newsroom:
+    def __init__(self):
+        self.requests = []
+        self.results = []
+        self.claims = {}
+        self.receipts = {}
+        self.lose_claim_responses = 0
+        self.lose_result_responses = 0
+        self.runs = []
+        self.failures = {}
+        self.archive = [dict(ARTICLE, id="old", reporter_id="reporter0")]
+        self.lock = threading.Lock()
+
+    def add(self, number=0, paused=False):
+        reporter = {
+            "id": f"reporter{number}", "name": f"Reporter {number}",
+            "prompt": "Exact instructions: café\nFind useful news; preserve ‘quotes’.",
+            "schedule": {"cadence": "daily"}, "paused": paused, "config_version": 2,
+        }
+        self.runs.append({
+            "id": f"run{number}", "reporter": reporter, "expected_date": "2026-09-27",
+            "kind": "scheduled", "state": "pending", "current_attempt": None,
+        })
+        return reporter
+
+    def respond(self, method, path, body):
+        route = path.split("?", 1)[0].removeprefix("/api/v1/worker")
+        with self.lock:
+            self.requests.append((method, path, deepcopy(body)))
+            failure = self.failures.get(route)
+            if failure and failure[0] > 0:
+                failure[0] -= 1
+                return failure[1], {"error": "fixture_failure", "message": "Unavailable"}
+            if route == "/check-ins":
+                return 200, {"reporting_date": "2026-09-27", "runs": deepcopy(self.runs)}
+            if route == "/articles/search":
+                return 200, {"articles": self.archive, "has_more": False}
+            if route.endswith("/runs"):
+                return 200, {"runs": [], "has_more": False}
+            run_id = route.split("/")[2]
+            job = next((r for r in self.runs if r["id"] == run_id), None)
+            if route.endswith("/claim"):
+                key = body["request_id"]
+                if key not in self.claims:
+                    self.claims[key] = {
+                        "attempt_id": "attempt" + str(len(self.claims)),
+                        "attempt_number": 1 + sum(c["reporter"]["id"] == job["reporter"]["id"] for c in self.claims.values()),
+                        "ownership_token": body["ownership_token"],
+                        "claim_expires_at": time.time() + 21600,
+                        "acknowledgment_only": job["reporter"]["paused"],
+                        "reporter": dict(job["reporter"], prompt=job["reporter"]["prompt"] + "\nClaim snapshot."),
+                    }
+                if self.lose_claim_responses:
+                    self.lose_claim_responses -= 1
+                    return 503, {"error": "lost_response"}
+                return 200, self.claims[key]
+            if route.endswith("/renew"):
+                return 200, {"attempt_id": body["attempt_id"], "claim_expires_at": time.time() + 21600}
+            if route.endswith("/result"):
+                self.results.append(deepcopy(body))
+                if body["submission_id"] not in self.receipts:
+                    if job:
+                        attempts = sum(c["reporter"]["id"] == job["reporter"]["id"] for c in self.claims.values())
+                        if body["outcome"] != "failed" or not body["error"]["retryable"] or attempts >= 3:
+                            self.runs.remove(job)
+                    self.receipts[body["submission_id"]] = {"run_id": run_id, "submission_id": body["submission_id"],
+                             "outcome": body["outcome"], "article_ids": ["new"] if body["articles"] else []}
+                if self.lose_result_responses:
+                    self.lose_result_responses -= 1
+                    return 503, {"error": "lost_response"}
+                return 200, self.receipts[body["submission_id"]]
+            raise AssertionError((method, path))
+
+
+class WorkerTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.server = Newsroom()
+        fixture = self.server
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *args):
+                pass
+
+            def do_GET(self):
+                self.dispatch()
+
+            def do_POST(self):
+                self.dispatch()
+
+            def dispatch(self):
+                if (self.headers.get("CF-Access-Client-Id") != "test-id" or
+                        self.headers.get("CF-Access-Client-Secret") != "test-secret"):
+                    self.send_error(403)
+                    return
+                body = json.loads(self.rfile.read(int(self.headers["Content-Length"]))) if self.command == "POST" else None
+                status, payload = fixture.respond(self.command, self.path, body)
+                data = json.dumps(payload).encode()
+                self.send_response(status)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+
+        class FixtureHTTPServer(ThreadingHTTPServer):
+            request_queue_size = 32
+
+        self.http = FixtureHTTPServer(("127.0.0.1", 0), Handler)
+        thread = threading.Thread(target=self.http.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
+        thread.start()
+        self.addCleanup(self.http.server_close)
+        self.addCleanup(self.http.shutdown)
+        self.fake = self.root / "codex"
+        self.fake.write_text(f"#!{sys.executable}\n" + '''
+import fcntl, json, os, pathlib, signal, sys, time
+root = pathlib.Path(__file__).parent
+if "--version" in sys.argv:
+    print("codex-cli 0.157.1")
+    sys.exit(0)
+if "login" in sys.argv:
+    if json.loads((root / "fake.json").read_text()).get("login_failure"):
+        sys.exit(1)
+    print("Logged in using ChatGPT")
+    sys.exit(0)
+config = json.loads((root / "fake.json").read_text())
+prompt = sys.stdin.read()
+(root / ("capture-" + str(os.getpid()) + ".json")).write_text(json.dumps({"prompt": prompt, "argv": sys.argv, "env": dict(os.environ), "cwd": os.getcwd()}))
+if config.get("kill_supervisor"):
+    os.kill(os.getppid(), signal.SIGKILL)
+    sys.exit(0)
+with (root / "counts.lock").open("a") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    state = json.loads((root / "counts.json").read_text()) if (root / "counts.json").exists() else {"active": 0, "peak": 0}
+    state["active"] += 1
+    state["peak"] = max(state["peak"], state["active"])
+    (root / "counts.json").write_text(json.dumps(state))
+deadline = time.monotonic() + 5
+while True:
+    with (root / "counts.lock").open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        peak = json.loads((root / "counts.json").read_text())["peak"]
+    if peak >= config.get("wait_for_peak", 0):
+        break
+    if time.monotonic() > deadline:
+        sys.exit(2)
+    time.sleep(.01)
+time.sleep(config.get("delay", 0))
+with (root / "counts.lock").open("a") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    state = json.loads((root / "counts.json").read_text())
+    state["active"] -= 1
+    (root / "counts.json").write_text(json.dumps(state))
+if config.get("exit", 0):
+    print("Authentication or allowance unavailable", file=sys.stderr)
+    sys.exit(config["exit"])
+output = pathlib.Path(sys.argv[sys.argv.index("--output-last-message") + 1])
+output.write_text(config.get("raw", json.dumps(config["result"])))
+print(json.dumps({"type": "turn.completed", "usage": {}}))
+''')
+        self.fake.chmod(0o700)
+        self.fake_config = {"result": RESULT}
+        self.settings = {
+            "server_url": f"http://127.0.0.1:{self.http.server_port}",
+            "client_id": "test-id", "client_secret": "test-secret",
+            "state_dir": str(self.root / "state"), "codex": str(self.fake),
+            "http_retry_delays": [0], "retry_delay_seconds": 0,
+        }
+
+    def execute(self):
+        (self.root / "fake.json").write_text(json.dumps(self.fake_config))
+        return run(self.settings)
+
+    def captures(self):
+        return [json.loads(p.read_text()) for p in self.root.glob("capture-*.json")]
+
+    def test_claimed_instructions_and_dates_reach_codex_and_articles_reach_server(self):
+        reporter = self.server.add()
+        self.assertEqual(self.execute(), 0)
+        capture, = self.captures()
+        assignment = json.loads(capture["prompt"].split("Assignment JSON:\n", 1)[1])
+        self.assertEqual(assignment["reporter"]["prompt"], reporter["prompt"] + "\nClaim snapshot.")
+        self.assertEqual(assignment["expected_date"], "2026-09-27")
+        self.assertEqual(assignment["reporting_date"], "2026-09-27")
+        self.assertEqual(assignment["recent_articles"][0]["summary"], ARTICLE["summary"])
+        delivered, = self.server.results
+        self.assertEqual(delivered["articles"], [ARTICLE])
+        self.assertEqual(delivered["outcome"], "published")
+        claim, = self.server.claims.values()
+        self.assertEqual(delivered["attempt_id"], claim["attempt_id"])
+        self.assertEqual(delivered["ownership_token"], claim["ownership_token"])
+        self.assertNotIn("test-secret", json.dumps(capture))
+        self.assertIn("gpt-6-luna", capture["argv"])
+        self.assertIn("--ignore-user-config", capture["argv"])
+        self.assertIn('default_permissions="news_research"', capture["argv"])
+        self.assertIn('permissions.news_research.filesystem={":minimal"="read",":workspace_roots"="read"}', capture["argv"])
+        self.assertIn("permissions.news_research.network.enabled=false", capture["argv"])
+
+    def test_paused_job_is_acknowledged_without_codex(self):
+        self.server.add(paused=True)
+        self.assertEqual(self.execute(), 0)
+        self.assertEqual(self.captures(), [])
+        self.assertEqual(self.server.results[0]["outcome"], "skipped_paused")
+
+    def test_empty_day_still_checks_in_without_codex(self):
+        self.assertEqual(self.execute(), 0)
+        self.assertEqual(self.captures(), [])
+        self.assertTrue(any(path.endswith("/check-ins") for _, path, _ in self.server.requests))
+
+    def test_parallel_pool_runs_eight_jobs_and_keeps_context_separate(self):
+        for number in range(10):
+            self.server.add(number)
+        self.fake_config["delay"] = .05
+        self.fake_config["wait_for_peak"] = 8
+        self.assertEqual(self.execute(), 0)
+        self.assertEqual(json.loads((self.root / "counts.json").read_text())["peak"], 8)
+        self.assertEqual(len(self.server.results), 10)
+        assignments = [json.loads(c["prompt"].split("Assignment JSON:\n", 1)[1]) for c in self.captures()]
+        self.assertEqual({a["reporter"]["id"] for a in assignments}, {f"reporter{i}" for i in range(10)})
+        self.assertEqual(len({c["cwd"] for c in self.captures()}), 10)
+
+    def test_lost_claim_response_reuses_saved_request_and_token_after_restart(self):
+        self.server.add()
+        self.server.lose_claim_responses = 1
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(self.captures(), [])
+        self.assertEqual(self.execute(), 0)
+        requests = [body for _, path, body in self.server.requests if path.endswith("/claim")]
+        self.assertEqual(requests[0], requests[1])
+        self.assertEqual(len(self.server.claims), 1)
+
+    def test_lost_result_receipt_recovers_before_discovery_without_new_research(self):
+        self.server.add()
+        self.server.lose_result_responses = 1
+        self.assertEqual(self.execute(), 1)
+        pending = list((self.root / "state/pending").glob("*.json"))
+        self.assertEqual(len(pending), 1)
+        self.assertEqual(pending[0].stat().st_mode & 0o777, 0o600)
+        self.server.requests.clear()
+        self.assertEqual(self.execute(), 0)
+        self.assertTrue(self.server.requests[0][1].endswith("/result"))
+        self.assertEqual(len(self.captures()), 1)
+        self.assertEqual(self.server.results[0], self.server.results[1])
+        self.assertEqual(len(self.server.receipts), 1)
+
+    def test_invalid_json_does_not_publish_and_stops_at_three_attempts(self):
+        self.server.add()
+        self.fake_config["raw"] = "not JSON"
+        self.execute()
+        self.assertEqual(len(self.captures()), 3)
+        self.assertEqual(len(self.server.results), 3)
+        self.assertTrue(all(r["outcome"] == "failed" and r["articles"] == [] for r in self.server.results))
+
+    def test_invalid_article_and_agent_process_failure_become_explicit_failures(self):
+        for mode in ("invalid_article", "nonzero"):
+            with self.subTest(mode=mode):
+                self.server.add(len(self.server.claims))
+                if mode == "invalid_article":
+                    self.fake_config["result"] = deepcopy(RESULT)
+                    self.fake_config["result"]["articles"][0]["sources"][0]["url"] = "javascript:alert(1)"
+                else:
+                    self.fake_config["exit"] = 1
+                self.execute()
+        self.assertEqual(len(self.server.results), 6)
+        self.assertTrue(all(r["outcome"] == "failed" for r in self.server.results))
+
+    def test_timeout_kills_codex_and_reports_failure(self):
+        self.server.add()
+        self.settings["attempt_timeout_seconds"] = .1
+        self.fake_config["delay"] = 30
+        started = time.monotonic()
+        self.execute()
+        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual(len(self.captures()), 3)
+        self.assertTrue(all(r["error"]["code"] == "research_timeout" for r in self.server.results))
+        for capture_path in self.root.glob("capture-*.json"):
+            pid = int(capture_path.stem.split("-")[1])
+            with self.assertRaises(ProcessLookupError):
+                os.kill(pid, 0)
+
+    def test_nothing_to_publish_and_explicit_failure_are_forwarded(self):
+        for outcome in ("nothing_to_publish", "failed"):
+            self.server.add(len(self.server.claims))
+            self.fake_config["result"] = {
+                "outcome": outcome, "articles": [], "reason": "No useful new material.",
+                "error": {"code": "source_unavailable", "message": "Cannot access required source.", "retryable": False} if outcome == "failed" else None,
+            }
+            self.execute()
+        self.assertEqual([r["outcome"] for r in self.server.results], ["nothing_to_publish", "failed"])
+        self.assertEqual(self.server.results[0]["reason"], "No useful new material.")
+        self.assertFalse(self.server.results[1]["error"]["retryable"])
+
+    def test_old_logs_expire_without_losing_an_unacknowledged_result(self):
+        self.server.add()
+        self.server.lose_result_responses = 1
+        self.execute()
+        for directory in (self.root / "state/attempts").iterdir():
+            os.utime(directory, (0, 0))
+        self.assertEqual(self.execute(), 0)
+        self.assertEqual(len(self.captures()), 1)
+        self.assertEqual(self.server.results[0], self.server.results[1])
+        self.assertEqual(list((self.root / "state").rglob("prompt.txt")), [])
+
+    def test_overlapping_start_does_not_claim_twice(self):
+        self.server.add()
+        self.fake_config["delay"] = .3
+        (self.root / "fake.json").write_text(json.dumps(self.fake_config))
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            first = pool.submit(run, self.settings)
+            deadline = time.monotonic() + 5
+            while not self.captures() and time.monotonic() < deadline:
+                time.sleep(.01)
+            self.assertEqual(run(self.settings), 0)
+            self.assertEqual(first.result(), 0)
+        self.assertEqual(len(self.server.claims), 1)
+
+    def test_api_authentication_failure_stops_before_claiming(self):
+        self.server.add()
+        self.server.failures["/check-ins"] = [1, 403]
+        with self.assertRaisesRegex(Exception, "HTTP 403"):
+            self.execute()
+        self.assertEqual(self.server.claims, {})
+        self.assertEqual(self.captures(), [])
+
+    def test_crashed_research_gets_an_explicit_replacement_attempt(self):
+        self.server.add()
+        self.fake_config["kill_supervisor"] = True
+        (self.root / "fake.json").write_text(json.dumps(self.fake_config))
+        config = self.root / "worker.json"
+        config.write_text(json.dumps(self.settings))
+        config.chmod(0o600)
+        crashed = subprocess.run([sys.executable, "-B", "-m", "news.worker", "--config", str(config)], capture_output=True, timeout=10)
+        self.assertEqual(crashed.returncode, -9)
+        self.assertEqual(self.server.results, [])
+        self.fake_config["kill_supervisor"] = False
+        # Wait for the fake child's inherited process lock to close after exit.
+        import fcntl
+        deadline = time.monotonic() + 5
+        with (self.root / "state/worker.lock").open("a") as lock:
+            while True:
+                try:
+                    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                    break
+                except BlockingIOError:
+                    self.assertLess(time.monotonic(), deadline)
+                    time.sleep(.01)
+        self.assertEqual(self.execute(), 0)
+        requests = [body for _, path, body in self.server.requests if path.endswith("/claim")]
+        self.assertEqual(len(requests), 2)
+        self.assertEqual(requests[1]["replace_attempt_id"], "attempt0")
+        self.assertNotEqual(requests[0]["ownership_token"], requests[1]["ownership_token"])
+        self.assertEqual(len(self.server.results), 1)
+
+    def test_http_retries_use_identical_claim_and_result_payloads(self):
+        self.server.add()
+        self.settings["http_retry_delays"] = [0, 0, 0]
+        self.server.lose_claim_responses = 1
+        self.server.lose_result_responses = 1
+        self.assertEqual(self.execute(), 0)
+        claims = [body for _, path, body in self.server.requests if path.endswith("/claim")]
+        self.assertEqual(claims[0], claims[1])
+        self.assertEqual(self.server.results[0], self.server.results[1])
+        self.assertEqual(len(self.captures()), 1)
+
+    def test_one_undeliverable_result_does_not_block_other_reporters(self):
+        self.server.add(0)
+        self.server.add(1)
+        self.server.failures["/runs/run0/result"] = [20, 503]
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(len(self.captures()), 2)
+        self.assertEqual(len(self.server.receipts), 1)
+        self.assertEqual(self.server.results[0]["articles"], [ARTICLE])
+        self.assertEqual(len(list((self.root / "state/pending").glob("*.json"))), 1)
+
+    def test_agent_environment_excludes_api_keys_and_worker_credentials(self):
+        from unittest.mock import patch
+        self.server.add()
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "paid-key-fixture", "CODEX_API_KEY": "paid-codex-key-fixture", "CF_ACCESS_CLIENT_SECRET": "service-secret-fixture"}):
+            self.assertEqual(self.execute(), 0)
+        captured = json.dumps(self.captures())
+        for secret in ("paid-key-fixture", "paid-codex-key-fixture", "service-secret-fixture", "test-secret"):
+            self.assertNotIn(secret, captured)
+        for path in (self.root / "state/attempts").rglob("*"):
+            if path.is_file():
+                self.assertNotIn("test-secret", path.read_text())
+
+    def test_archive_download_follows_all_pages_and_supplies_recent_summaries(self):
+        self.server.add()
+        original = self.server.respond
+        older = dict(ARTICLE, id="older", reporter_id="another-reporter")
+        def respond(method, path, body):
+            if "/articles/search" in path:
+                self.server.requests.append((method, path, body))
+                if "page=1" in path:
+                    return 200, {"articles": self.server.archive, "has_more": True}
+                return 200, {"articles": [older], "has_more": False}
+            return original(method, path, body)
+        self.server.respond = respond
+        self.assertEqual(self.execute(), 0)
+        archive, = (self.root / "state/attempts").rglob("archive.jsonl")
+        self.assertEqual([json.loads(line)["id"] for line in archive.read_text().splitlines()], ["old", "older"])
+        self.assertTrue(any("page=2" in path for _, path, _ in self.server.requests))
+
+    def test_expired_codex_login_reports_failure_but_still_acknowledges_paused_work(self):
+        self.server.add(0)
+        self.server.add(1, paused=True)
+        self.fake_config["login_failure"] = True
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(self.captures(), [])
+        outcomes = [r["outcome"] for r in self.server.results]
+        self.assertEqual(outcomes.count("skipped_paused"), 1)
+        self.assertEqual(outcomes.count("failed"), 3)
