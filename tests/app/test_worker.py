@@ -465,9 +465,13 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
             self.assertEqual(len(self.server.claims), 1)
 
             def running(pid):
-                state = subprocess.run(
-                    ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True,
-                ).stdout.strip()
+                try:
+                    state = subprocess.run(
+                        ["ps", "-o", "stat=", "-p", str(pid)],
+                        capture_output=True, text=True, timeout=1,
+                    ).stdout.strip()
+                except subprocess.TimeoutExpired:
+                    self.fail(f"ps timed out while checking PID {pid}")
                 return bool(state) and not state.startswith("Z")
 
             deadline = time.monotonic() + self.settings["attempt_timeout_seconds"] + .5
