@@ -81,6 +81,10 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   and the proposed Pi research-tool configuration.
 - [Pi research extension comparison](worker-research-comparison.md): package
   tradeoffs, provider pricing, and evidence for the first worker trial.
+- [Search service evaluation](search-evaluation.md): controlled reporting prompts,
+  provider trials, and source-based assessment.
+- [Evaluation reports](evaluations/README.md): preserved candidate outputs from
+  the search pilot, including known errors for comparison.
 - [Reporting examples](reporting-examples.md): concrete assignments and proposed
   evaluation cases for the reporting engine.
 - [Development workflow](development-workflow.md): setup, search, hooks,

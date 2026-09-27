@@ -107,7 +107,8 @@ must remain assignment-driven rather than a hidden fixed list of allowed beats.
 The selected [pi-web-access](https://github.com/nicobailon/pi-web-access)
 extension supplies the research tools. It supports SearXNG, keyless Exa,
 Ollama, DuckDuckGo, and local content extraction. The [inspected package source](https://github.com/nicobailon/pi-web-access/blob/main/package.json)
-reported 0.31.0; an installed release has not been tested with News.
+reported 0.31.0. The later [search pilot](search-evaluation.md) tests that
+release in isolation with local Qwen; the production worker is not implemented.
 
 Use `workflow: "none"` for raw search results. Explicitly restrict providers,
 disable browser-cookie access and interactive review, and avoid hosted-model
@@ -137,3 +138,6 @@ full-page retrieval, blocked pages, per-run request counts, and total duration.
 Exercise rate-limit handling before relying on a free search route unattended.
 The local Pi/Qwen tool-use probe did not contact any search provider and cannot
 establish the quality or reliability of these options.
+
+The owner requested that comparison next. The [search service evaluation](search-evaluation.md)
+records two concrete prompts and the first isolated provider runs.

@@ -27,8 +27,10 @@ local inference time. Relative runtime and report quality need measurement.
 
 All inspected manifests declare MIT licenses. That gives control over client
 code, not ownership of a hosted search index or a guarantee of free service.
-No complete extension-to-Qwen research comparison has been run. The earlier
-fixture test established basic Pi/Qwen tool use only.
+The initial package review did not run an extension-to-Qwen comparison. The
+subsequent [search evaluation](search-evaluation.md) runs representative
+assignments with the same local model and different providers. Its scope and
+limits are recorded separately; it is not a trial of all 15 packages.
 
 ## Main candidates
 
@@ -155,3 +157,7 @@ omitted source details, request counts, blocked pages, and total runtime on
 the same assignments. Include an article, a PDF, and a dynamic event page.
 Test cancellation and quotas within the existing attempt limit. Do not treat
 this package survey or the successful HTTP request as that evaluation.
+
+The owner subsequently requested concrete test prompts and provider runs.
+See the [search service evaluation](search-evaluation.md) for those inputs,
+controls, and findings.

@@ -151,10 +151,10 @@ for the first evaluation.
 Use `nicobailon/pi-web-access` as the Pi integration for search, page
 reading, and PDFs. Its existing extraction support can avoid maintaining these
 parsers in News. Use a pinned release with only approved providers and the
-raw-result workflow. The extension itself has not been installed or tested.
-The [package comparison](worker-research-comparison.md) records alternatives,
-current free allowances, and a successful HTTP probe of its Exa request format.
-That probe does not establish installed-extension or end-to-end compatibility.
+raw-result workflow. The [package comparison](worker-research-comparison.md)
+records alternatives and pricing. The later [search pilot](search-evaluation.md)
+uses an isolated installation with the local Qwen model. This tests reporting
+behavior, not the complete worker-to-server publication flow.
 
 A search result is a discovery lead, not sufficient evidence for publication.
 Read the relevant source pages, record URLs and retrieval times, and distinguish
@@ -253,6 +253,6 @@ assume Pi's declared context changes Ollama's allocation.
 The material product choices for the first worker are settled. Python
 supervision, launchd configuration, context-size limits, and exact tool wiring
 remain engineering recommendations to validate during implementation.
-Track implementation work in GitHub Issues. The real search-provider trial
-and complete worker-to-server flow remain untested; the local probe establishes
-only basic Pi/Qwen tool use.
+Track implementation work in GitHub Issues. The [search pilot](search-evaluation.md)
+provides early reporting evidence. The complete worker-to-server flow, retention,
+and unattended scheduling still require implementation and validation.
