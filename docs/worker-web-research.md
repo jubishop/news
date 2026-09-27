@@ -2,7 +2,7 @@
 status: draft
 ---
 
-# Free web research for the worker
+# Web research for the worker
 
 This September 26, 2026 research supports the [local worker proposal](worker-runtime.md).
 It separates the accepted cost constraint from search and tool recommendations.
@@ -12,20 +12,27 @@ actually contacts search services and returns sources to the model.
 
 ## Accepted cost and ownership constraint
 
-Accepted on September 26, 2026: the owner requires the solution to be free
-and under their ownership or control. They are open to approaches that meet
-those conditions and requested advice about how Qwen should search.
+Accepted on September 26, 2026: prefer free search, but spending about
+$10 per month on search is acceptable if it is materially superior to the
+available free options. This supersedes the earlier absolute free-only
+constraint. The reason is better results; paying by itself is not evidence
+of better search. The tradeoff is recurring cost and usage accounting.
 
-Do not introduce a paid search subscription, metered API spending, automatic
-paid fallback, or a trial that later requires payment. Free software on existing
-hardware still uses power, network access, and maintenance time. The tradeoff
-is that free search services can impose quotas, change access, or block requests.
+The owner accepts API keys and external search services while retaining
+control of the worker and integration. Keyless access is convenient, not a
+requirement. Local Qwen remains the reasoning and writing engine.
 
-Clarified on September 26, 2026: an API key and external service are acceptable
-when a free tier supports this relatively small personal workload. The owner
-accepted controlling the worker and integration while using external search.
-Keyless access is convenient, not a requirement. No account or subscription
-has been created during this discussion.
+Recommendation: compare source relevance, coverage, and reliability on the
+same assignments before selecting a paid route. Set an initial $10 monthly
+ceiling for total paid search usage, including any billable retrieval and
+retries, and stop or defer requests at that ceiling. Free credits do not count
+as paid spending. The approximate budget is the accepted preference; this
+specific enforcement policy is an implementation recommendation.
+
+No paid provider has been selected. A paid route must satisfy the quality
+condition and have bounded spending before it becomes an unattended default.
+Do not let quota exhaustion silently enable paid fallback. Free software on
+existing hardware still uses power, network access, and maintenance time.
 
 ## Selected integration and alternatives
 
@@ -33,8 +40,8 @@ Accepted on September 26, 2026: start with Pi, `pi-web-access`, and Exa's free
 keyless search. The owner accepted the recommended option; no further reason
 was stated. This avoids a separate search service to operate and keeps Qwen
 local. The tradeoff is reliance on Exa's availability and free-access limits.
-The owner's API-key clarification permits evaluating keyed free tiers if
-needed; it does not select another provider or authorize paid usage.
+The later budget clarification permits evaluating paid routes within the
+conditional budget above. It does not establish that any provider is superior.
 
 The subsequent [extension comparison](worker-research-comparison.md) examines
 15 published packages, including the other research extensions the owner named.
@@ -73,13 +80,15 @@ upstream engines and public websites.
 [Ollama documents free-account web search](https://ollama.com/blog/web-search)
 and its [search/fetch API](https://docs.ollama.com/capabilities/web-search).
 Neither statement establishes unlimited nightly capacity or permanent free
-availability. A quota exhaustion must defer or fail research, never trigger
-billing. Free tiers must be verified again before deployment.
+availability. Quota exhaustion must follow the selected provider and spending
+policy. Free tiers must be verified again before deployment.
 
-Exa's keyed API is a different cost path from its free keyless limits. Adding
-a key is not an approved remedy for exhausted free access. The comparison
-also identifies Tavily, Brave, and Firecrawl's recurring free allowances;
-Tavily is the proposed next provider evaluation if Exa is insufficient.
+The expanded [provider comparison](worker-research-comparison.md#providers-and-budget)
+corrects the initial uncertainty about Exa's recurring keyed allowance using
+its pricing page. Recommendation: evaluate Exa's free keyed Starter plan first
+for its documented allowance, alongside free alternatives. Compare paid
+options if they show a meaningful benefit within the conditional budget.
+This is an evaluation recommendation, not a newly enabled fallback.
 
 SearXNG's [search API](https://docs.searxng.org/dev/search_api.html) supports JSON
 when enabled in the instance. Its [limiter documentation](https://docs.searxng.org/admin/searx.limiter)

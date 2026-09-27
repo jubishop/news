@@ -22,7 +22,7 @@ or strict past-night coverage cutoff.
 The [research integration decision](worker-web-research.md#selected-integration-and-alternatives)
 selects Pi with `pi-web-access` and free Exa search after research into
 alternatives. The surrounding supervisor design remains a recommendation.
-The [free-service requirement](worker-web-research.md#accepted-cost-and-ownership-constraint)
+The [search budget](worker-web-research.md#accepted-cost-and-ownership-constraint)
 applies to the whole integration.
 
 ## Local observations
@@ -142,7 +142,7 @@ report, but interrupted draft text is not a completed result.
 ## Research tools
 
 The [web research proposal](worker-web-research.md) records the accepted
-free-service requirement and compares search alternatives. The selected
+search budget and compares search alternatives. The selected
 initial route uses the extension's free, keyless Exa search and local page
 extraction.
 Qwen does the reasoning and writing. A separate search server is unnecessary

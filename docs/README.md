@@ -77,10 +77,10 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   selection, run outcomes, and overdue-work detection.
 - [Worker runtime research](worker-runtime.md): local Qwen and Pi observations,
   scheduling proposal, research-tool alternatives, and open decisions.
-- [Worker web research](worker-web-research.md): free search options, ownership,
+- [Worker web research](worker-web-research.md): search options, budget, ownership,
   and the proposed Pi research-tool configuration.
 - [Pi research extension comparison](worker-research-comparison.md): package
-  tradeoffs, free-provider limits, and evidence for the first worker trial.
+  tradeoffs, provider pricing, and evidence for the first worker trial.
 - [Reporting examples](reporting-examples.md): concrete assignments and proposed
   evaluation cases for the reporting engine.
 - [Development workflow](development-workflow.md): setup, search, hooks,
