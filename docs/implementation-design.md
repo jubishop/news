@@ -20,7 +20,10 @@ its implemented SQL and protocol are linked from the contract.
 Accepted on September 25, 2026: implement and deploy the newsroom server on
 the VPS first. Bring that server to a v1 the owner is happy with before
 separately implementing the reporting worker on one of the owner's local
-machines. The specific local host and model engine remain undecided.
+machines. The [worker design](reporting-worker.md#model-engine) now selects
+local Qwen through Ollama. The [runtime proposal](worker-runtime.md) develops
+the worker for the selected current Mac, 01:00 Pacific schedule, Pi harness,
+and free Exa search.
 
 The owner narrowed the initial implementation task: use a worktree under
 `worktrees/`, open a PR, and stop before merge or deployment. This does not
@@ -227,10 +230,11 @@ data and coordination service with no AI execution. Workers poll its API for
 jobs and context and submit articles or explicit run outcomes. The newsroom
 can monitor overdue work without performing the reporting itself.
 
-The [worker host](reporting-worker.md#worker-location) and
-[model engine](reporting-worker.md#model-engine-candidates) remain undecided.
-Local model execution and GPT-6 Luna through Codex Pro are candidates. The
-worker API is separate from whichever model interface is eventually chosen.
+The [model decision](reporting-worker.md#model-engine) selects local Qwen
+through Ollama. The [worker host](reporting-worker.md#worker-location) is the
+current Mac. Pi and free Exa search are selected; the [runtime proposal](worker-runtime.md)
+develops the surrounding implementation.
+The worker API remains separate from the chosen model interface.
 
 ## Access boundary
 

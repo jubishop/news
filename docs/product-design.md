@@ -185,10 +185,9 @@ different models.
 
 This supersedes the earlier September 24, 2026 decisions to support
 per-reporter model selection, multiple providers at launch, and saving a model
-alongside each run's prompt. The specific shared model, provider integration,
-and research tools remain open.
-The [worker design](reporting-worker.md#model-engine-candidates) records the
-local-model and Codex Pro candidates without selecting either.
+alongside each run's prompt. The [worker design](reporting-worker.md#model-engine)
+records the later selection of local Qwen through Ollama and links the
+Pi/web-search integration decision.
 
 ### Recurring reporters and one-time contractors
 
@@ -312,6 +311,20 @@ The user selected assignment-controlled output; their reason was not stated.
 It supports both recurring roundups and focused one-time research. The
 tradeoff is that the reporting and storage interfaces must support multiple
 articles from one run. Default behavior for an unspecified format remains open.
+
+### Best-effort assignments
+
+Accepted on September 26, 2026: all assignments are best effort. Apply this
+as a default even when the reporter's prompt does not state it explicitly.
+A request for five worthwhile items can produce three supported items with
+a brief explanation when that is the useful result. Do not fail a run solely
+because it cannot meet a requested count or supply every requested detail.
+
+The owner stated that this should be implied by prompts. The tradeoff is
+variable completeness in exchange for useful reporting without filler.
+Best effort does not permit invented facts or concealment of material gaps.
+Keep research failures distinct from successful partial reporting and the
+existing successful "nothing to publish" outcome.
 
 ### Runs with nothing to publish
 

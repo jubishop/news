@@ -74,7 +74,21 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
 - [Database schema](database-schema.md): accepted table and field baseline,
   relationships, and worker-supplied article coverage metadata.
 - [Reporting worker](reporting-worker.md): newsroom API boundary, model engine
-  candidates, run outcomes, and overdue-work detection.
+  selection, run outcomes, and overdue-work detection.
+- [Worker runtime research](worker-runtime.md): local Qwen and Pi observations,
+  scheduling proposal, research-tool alternatives, and open decisions.
+- [Worker web research](worker-web-research.md): search options, budget, ownership,
+  and the proposed Pi research-tool configuration.
+- [Pi research extension comparison](worker-research-comparison.md): package
+  tradeoffs, provider pricing, and evidence for the first worker trial.
+- [Search service evaluation](search-evaluation.md): controlled reporting prompts,
+  provider trials, and source-based assessment.
+- [Codex worker evaluation](worker-codex-evaluation.md): GPT-6 Luna through the
+  existing Pro subscription, compared with the local Qwen reporting runs.
+- [Codex research additions](worker-research-addons.md): reader, literature,
+  discussion, and browser tools that could complement built-in web search.
+- [Evaluation reports](evaluations/README.md): preserved candidate outputs from
+  the search pilot, including known errors for comparison.
 - [Reporting examples](reporting-examples.md): concrete assignments and proposed
   evaluation cases for the reporting engine.
 - [Development workflow](development-workflow.md): setup, search, hooks,
