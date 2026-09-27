@@ -73,12 +73,10 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   credentials, migrations, maintenance, and failure handling.
 - [Database schema](database-schema.md): accepted table and field baseline,
   relationships, and worker-supplied article coverage metadata.
-- [Reporting worker](reporting-worker.md): newsroom API boundary, model engine
+- [Reporting worker](reporting-worker.md): newsroom API boundary, shared Codex engine
   selection, run outcomes, and overdue-work detection.
-- [Worker runtime research](worker-runtime.md): local Qwen and Pi observations,
-  scheduling proposal, research-tool alternatives, and open decisions.
-- [Worker web research](worker-web-research.md): search options, budget, ownership,
-  and the proposed Pi research-tool configuration.
+- [Worker operations](worker-operations.md): vanilla Codex implementation, private
+  configuration, recovery, tests, and required after-merge cron installation.
 - [Pi research extension comparison](worker-research-comparison.md): package
   tradeoffs, provider pricing, and evidence for the first worker trial.
 - [Search service evaluation](search-evaluation.md): controlled reporting prompts,

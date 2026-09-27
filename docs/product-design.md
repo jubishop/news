@@ -186,8 +186,8 @@ different models.
 This supersedes the earlier September 24, 2026 decisions to support
 per-reporter model selection, multiple providers at launch, and saving a model
 alongside each run's prompt. The [worker design](reporting-worker.md#model-engine)
-records the later selection of local Qwen through Ollama and links the
-Pi/web-search integration decision.
+records the selected vanilla Codex CLI with GPT-6 Luna and built-in web
+research, which supersedes the earlier Qwen/Pi choice.
 
 ### Recurring reporters and one-time contractors
 

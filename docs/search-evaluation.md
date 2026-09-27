@@ -8,7 +8,7 @@ This September 26, 2026 pilot compares actual reporting from local Qwen
 using different search services. It implements the owner's request for one
 or two representative prompts before choosing a provider. See the
 [extension comparison](worker-research-comparison.md) and
-[search budget](worker-web-research.md#accepted-cost-and-ownership-constraint).
+[search budget](archive/worker-web-research.md#accepted-cost-and-ownership-constraint).
 
 The later [Codex evaluation](worker-codex-evaluation.md) uses these same
 assignments with GPT-6 Luna and built-in web tools. It compares complete

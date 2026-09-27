@@ -136,6 +136,25 @@ else:
                         result[str(path)] = (stat.st_mtime_ns, stat.st_size, path.read_bytes())
         return result
 
+    def test_qmd_configuration_writes_do_not_change_project_settings(self):
+        self.env["REWRITE_QMD_CONFIG"] = "1"
+        self.run_command("bin/setup")
+        for command in ("search", "query"):
+            result = self.run_command("bin/knowledge", command, "reference", "--json")
+            self.assertEqual(set(json.loads(result.stdout)["collections"]),
+                             set(json.loads((self.repo / ".config/knowledge.json").read_text())["collections"]))
+        self.assertEqual(json.loads(self.run_command("bin/doctor", "--json").stdout)["freshness"], "current")
+        self.drain()
+        self.assertEqual([r["command"] for r in self.records()], ["update", "embed", "search", "query"])
+
+    def test_lookup_recovers_configuration_rewritten_by_an_external_qmd(self):
+        self.run_command("bin/setup")
+        (self.repo / ".config/qmd/index.yml").write_text("models:\n  embed: upstream-default\n")
+        result = self.run_command("bin/knowledge", "search", "reference", "--json")
+        self.assertEqual(set(json.loads(result.stdout)["collections"]),
+                             set(json.loads((self.repo / ".config/knowledge.json").read_text())["collections"]))
+        self.assertEqual(json.loads(self.run_command("bin/doctor", "--json").stdout)["freshness"], "current")
+
     def test_fresh_copy_setup_from_subdirectory_and_search_routing(self):
         self.run_command("../bin/setup", root=self.repo / "docs")
         record = self.records()[0]
@@ -155,25 +174,6 @@ else:
         self.assertFalse((self.repo / ".envrc").exists())
         self.run_command("bin/setup")
         self.assertFalse((self.repo / ".envrc").exists())
-        self.assertEqual(json.loads(self.run_command("bin/doctor", "--json").stdout)["freshness"], "current")
-
-    def test_qmd_configuration_writes_do_not_change_project_settings(self):
-        self.env["REWRITE_QMD_CONFIG"] = "1"
-        self.run_command("bin/setup")
-        for command in ("search", "query"):
-            result = self.run_command("bin/knowledge", command, "reference", "--json")
-            self.assertEqual(set(json.loads(result.stdout)["collections"]),
-                             set(json.loads((self.repo / ".config/knowledge.json").read_text())["collections"]))
-        self.assertEqual(json.loads(self.run_command("bin/doctor", "--json").stdout)["freshness"], "current")
-        self.drain()
-        self.assertEqual([r["command"] for r in self.records()], ["update", "embed", "search", "query"])
-
-    def test_lookup_recovers_configuration_rewritten_by_an_external_qmd(self):
-        self.run_command("bin/setup")
-        (self.repo / ".config/qmd/index.yml").write_text("models:\n  embed: upstream-default\n")
-        result = self.run_command("bin/knowledge", "search", "reference", "--json")
-        self.assertEqual(set(json.loads(result.stdout)["collections"]),
-                             set(json.loads((self.repo / ".config/knowledge.json").read_text())["collections"]))
         self.assertEqual(json.loads(self.run_command("bin/doctor", "--json").stdout)["freshness"], "current")
 
     def test_repeat_setup_and_code_only_changes_skip_qmd_work(self):

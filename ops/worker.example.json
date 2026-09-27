@@ -1,0 +1,11 @@
+{
+  "server_url": "https://news.jubishop.com",
+  "client_id": "REPLACE_WITH_NEWS_SERVICE_TOKEN_CLIENT_ID",
+  "client_secret": "REPLACE_WITH_NEWS_SERVICE_TOKEN_SECRET",
+  "codex": "/Users/REPLACE_ME/.local/bin/codex",
+  "state_dir": "/Users/REPLACE_ME/.local/state/news-worker",
+  "model": "gpt-6-luna",
+  "reasoning_effort": "medium",
+  "concurrency": 8,
+  "attempt_timeout_seconds": 1800
+}

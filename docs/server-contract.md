@@ -6,7 +6,7 @@ status: current
 
 This is the server v1 implementation reference. It implements the accepted
 [product design](product-design.md) and [worker behavior](reporting-worker.md).
-The AI worker remains a separate phase. The server stores instructions,
+The separate [Codex worker](worker-operations.md) uses this API. The server stores instructions,
 assignments, outcomes, and articles; it never performs research or selects a
 model. See [operations](server-operations.md) for setup and deployment.
 

@@ -1,21 +1,24 @@
 ---
-status: draft
+status: superseded
 ---
 
 # Local reporting worker runtime
 
+Superseded on September 26, 2026 by the [vanilla Codex worker](../worker-operations.md).
+The observations below preserve the earlier proposal; they do not configure v1.
+
 This is the September 26, 2026 research and implementation proposal for the
-external News worker. The [worker boundary](reporting-worker.md) remains the
-behavior reference; the [server contract](server-contract.md) defines the
+external News worker. The [worker boundary](../reporting-worker.md) remains the
+behavior reference; the [server contract](../server-contract.md) defines the
 implemented API. This is a design record. Worker installation and end-to-end
 research evaluation remain implementation work.
 
 ## Decision state
 
-The [model decision](reporting-worker.md#model-engine) selects the installed
+The [model decision](../reporting-worker.md#model-engine) selects the installed
 Qwen 27B model through Ollama. The exact local tag is `qwen3.8:27b-mlx`.
-The [host decision](reporting-worker.md#worker-location) selects the current
-Mac, with [daily startup](reporting-worker.md#daily-work-discovery) at 01:00
+The [host decision](../reporting-worker.md#worker-location) selects the current
+Mac, with [daily startup](../reporting-worker.md#daily-work-discovery) at 01:00
 Pacific Time. This is a simple daily schedule, with no new morning deadline
 or strict past-night coverage cutoff.
 
@@ -26,7 +29,7 @@ The [search budget](worker-web-research.md#accepted-cost-and-ownership-constrain
 applies to the whole integration.
 
 The owner subsequently reopened the engine choice. The
-[Codex evaluation](worker-codex-evaluation.md) compares GPT-6 Luna through
+[Codex evaluation](../worker-codex-evaluation.md) compares GPT-6 Luna through
 ChatGPT Pro with the local runs and recommends it as the leading candidate.
 Final selection remains open. Pi-specific details below describe the local
 candidate; the supervisor, schedule, and recovery design also apply to Codex.
@@ -96,7 +99,7 @@ model stop reason and settled state, not merely process exit code or the
 first end event. A failed assistant response can still leave JSON mode with
 exit status zero.
 
-Apply the [best-effort assignment rule](product-design.md#best-effort-assignments)
+Apply the [best-effort assignment rule](../product-design.md#best-effort-assignments)
 in the shared reporting instructions. Useful partial results are permitted;
 missing a requested item count is not a schema or completion failure.
 
@@ -158,8 +161,8 @@ for the first evaluation.
 Use `nicobailon/pi-web-access` as the Pi integration for search, page
 reading, and PDFs. Its existing extraction support can avoid maintaining these
 parsers in News. Use a pinned release with only approved providers and the
-raw-result workflow. The [package comparison](worker-research-comparison.md)
-records alternatives and pricing. The later [search pilot](search-evaluation.md)
+raw-result workflow. The [package comparison](../worker-research-comparison.md)
+records alternatives and pricing. The later [search pilot](../search-evaluation.md)
 uses an isolated installation with the local Qwen model. This tests reporting
 behavior, not the complete worker-to-server publication flow.
 
@@ -212,7 +215,7 @@ authoritative article and run history.
 
 ## Archive context
 
-The existing [reporting-memory decision](product-design.md#reporting-memory-and-coverage-window)
+The existing [reporting-memory decision](../product-design.md#reporting-memory-and-coverage-window)
 requires recent article summaries and access to the full retained archive.
 Recommendation: begin each attempt with a bounded selection of the reporter's
 stored article summaries, supplied coverage dates, and recent run outcomes.
@@ -260,6 +263,6 @@ assume Pi's declared context changes Ollama's allocation.
 The material product choices for the first worker are settled. Python
 supervision, launchd configuration, context-size limits, and exact tool wiring
 remain engineering recommendations to validate during implementation.
-Track implementation work in GitHub Issues. The [search pilot](search-evaluation.md)
+Track implementation work in GitHub Issues. The [search pilot](../search-evaluation.md)
 provides early reporting evidence. The complete worker-to-server flow, retention,
 and unattended scheduling still require implementation and validation.
