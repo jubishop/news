@@ -168,6 +168,7 @@ if "login" in sys.argv:
     sys.exit(0)
 config = json.loads((root / "fake.json").read_text())
 prompt = sys.stdin.read()
+time.sleep(config.get("startup_delay", 0))
 endpoint = json.loads(next(arg.split("=",1)[1] for arg in sys.argv if arg.startswith("mcp_servers.news_history.url=")))
 def tool(name, arguments):
     body = json.dumps({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{"name":name,"arguments":arguments}}).encode()
@@ -333,12 +334,16 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
 
     def test_timeout_kills_codex_and_reports_failure(self):
         self.server.add()
-        self.settings["attempt_timeout_seconds"] = .1
+        self.settings["attempt_timeout_seconds"] = .5
+        self.fake_config["startup_delay"] = .2
         self.fake_config["delay"] = 30
         started = time.monotonic()
-        self.execute()
-        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual(self.execute(), 1)
+        elapsed = time.monotonic() - started
+        self.assertGreaterEqual(elapsed, 3 * self.settings["attempt_timeout_seconds"])
+        self.assertLess(elapsed, 5)
         self.assertEqual(len(self.captures()), 3)
+        self.assertEqual(len(self.server.results), 3)
         self.assertTrue(all(r["error"]["code"] == "research_timeout" for r in self.server.results))
         for capture_path in self.root.glob("capture-*.json"):
             pid = int(capture_path.stem.split("-")[1])
