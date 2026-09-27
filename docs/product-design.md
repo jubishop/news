@@ -185,10 +185,9 @@ different models.
 
 This supersedes the earlier September 24, 2026 decisions to support
 per-reporter model selection, multiple providers at launch, and saving a model
-alongside each run's prompt. The specific shared model, provider integration,
-and research tools remain open.
-The [worker design](reporting-worker.md#model-engine-candidates) records the
-local-model and Codex Pro candidates without selecting either.
+alongside each run's prompt. The [worker design](reporting-worker.md#model-engine)
+records the later selection of local Qwen through Ollama and links the
+Pi/web-search integration decision.
 
 ### Recurring reporters and one-time contractors
 

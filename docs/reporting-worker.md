@@ -8,7 +8,7 @@ The newsroom stores and coordinates reporting; a separate worker performs
 the research and AI work. This document defines that boundary within the
 [selected application stack](implementation-design.md#accepted-core-stack).
 Accepted requirements and proposed implementation details are separate.
-The proposed [server contract](server-contract.md) translates this behavior
+The implemented [server contract](server-contract.md) translates this behavior
 into concrete records and HTTP operations without selecting a model engine.
 
 ## Accepted responsibility split
@@ -41,18 +41,17 @@ supplies article coverage metadata; the server stores and queries it.
 
 ## Worker location
 
-Accepted on September 24, 2026: the worker host is deliberately undecided.
-The owner's current Mac and `mac-mini.local` are possible hosts. The earlier
-discussion also allowed a separate worker process on the VPS. The
+Accepted on September 26, 2026: run the worker on the owner's current Mac.
+This selects one of the local hosts considered in the September 25
 [implementation sequence](implementation-design.md#implementation-sequence)
-accepted on September 25, 2026 now places the later worker implementation on
-one of the owner's local machines; the specific machine remains undecided.
-The website and authoritative SQLite database remain on the VPS, and the
-newsroom service performs no AI work.
+and supersedes the earlier undecided host choice. The owner requested this
+machine; no further reason was stated. The website and authoritative SQLite
+database remain on the VPS, and the newsroom service performs no AI work.
 
-This preserves the owner's deployment options. The research worker does not
-need to share a host or filesystem with the newsroom. Supervision, machine
-availability, and any later relocation are deployment decisions still to make.
+The tradeoff is dependence on the Mac's availability. The API boundary allows
+later relocation without moving the newsroom or its database. The
+[runtime proposal](worker-runtime.md) records the installed tools and proposed
+worker implementation.
 
 ## Worker connection
 
@@ -87,6 +86,15 @@ with a dedicated service token for the worker and separate owner browser access.
 
 ### Daily work discovery
 
+Accepted on September 26, 2026: start the worker daily at 03:00 Pacific Time
+on the current Mac. The owner clarified that this is simply the initial daily
+cron time. Their references to news through the past night and completion
+before waking express the motivation, not a strict coverage cutoff or a
+ready-by deadline. Do not add either rule or its verification requirements.
+The tradeoff is that actual completion depends on the work and machine
+availability. Existing assignment-controlled coverage and server lateness
+rules continue to apply.
+
 Clarified by the owner on September 25, 2026: the worker checks for new work
 once a day, at a time chosen on the worker side. The server does not need to
 know that time. This supports the accepted day-based schedules and is the
@@ -105,48 +113,25 @@ submitting results, or retrying interrupted communication. Exact claim and
 retry behavior remains to be defined. Extra runs, if needed, are initiated on
 the worker's machine rather than requested through the newsroom.
 
-## Model engine candidates
+## Model engine
 
-Clarified by the owner on September 24, 2026: the shared model is not assumed
-to be Codex or a hosted API model. The current candidates are a local model,
-potentially through Ollama on the owner's machine, and GPT-6 Luna through the
-owner's Codex Pro subscription. Neither is selected. The
-[single-model rule](product-design.md#one-shared-reporting-model) still applies:
-no per-reporter model choice, article model field, or newsroom model selector.
+Accepted on September 26, 2026: use the owner's installed Qwen 27B model
+through local Ollama. Inspection identified the exact installed tag as
+`qwen3.8:27b-mlx`. The owner requested this model; no further reason was
+stated. This replaces the earlier unresolved choice between a local model
+and GPT-6 Luna through Codex Pro. All reporters still share one model.
 
-The implementation should isolate model execution in the worker so the
-newsroom's records and API do not depend on the eventual engine. This is a
-small code boundary, not a requirement to build multiple integrations at
-launch. The same accepted job and result formats must work for either candidate.
+The tradeoff is that local machine availability, inference speed, and model
+research quality become operating constraints. Tool support alone does not
+prove that the model can complete the reporting assignments accurately.
+Keep model execution behind the worker boundary so this choice does not
+change newsroom records or APIs. No hosted-model fallback is selected.
 
-### Verified capabilities and limits
-
-Official documentation checked on September 24, 2026:
-
-- Ollama documents [tool calling](https://docs.ollama.com/capabilities/tool-calling)
-  and [structured output](https://docs.ollama.com/capabilities/structured-outputs).
-  A local-model design still needs concrete web research and archive tools.
-  These capabilities do not establish the quality of any particular local model
-  on the [reference assignment](reporting-examples.md#weekly-family-activity-shortlist).
-- OpenAI's [Codex changelog](https://learn.chatgpt.com/docs/changelog)
-  announces GPT-6 Luna for Codex, including rollout to Pro accounts, with CLI
-  identifier `gpt-6-luna`. Actual account access remains subject to rollout
-  and workspace settings.
-- Codex's [non-interactive mode](https://learn.chatgpt.com/docs/non-interactive-mode)
-  supports scripted execution, saved CLI authentication, and a JSON Schema
-  for final results. If this candidate is selected, the Python worker can
-  invoke the supported CLI and validate its result before submission.
-- Codex [authentication](https://learn.chatgpt.com/docs/auth) distinguishes
-  ChatGPT sign-in for subscription access from API-key access. The
-  [pricing documentation](https://learn.chatgpt.com/docs/pricing) also separates
-  subscription limits from API-key billing. The owner's subscription-based
-  candidate must not silently become an API-key integration or an automatic
-  paid fallback.
-
-No research run or model-quality comparison has been performed for News.
-Tool permissions, process isolation, concrete model selection, and engine
-configuration remain open. Preserve the exact GPT-6 Luna candidate rather
-than substituting a different OpenAI model.
+The [research integration decision](worker-web-research.md#selected-integration-and-alternatives)
+selects Pi with `pi-web-access` and free Exa search. The [runtime research](worker-runtime.md)
+records local observations and the proposed Python supervision around Pi.
+Web search and model inference are separate services; search is external
+while Qwen inference stays local.
 
 ## Timeliness and completion
 
