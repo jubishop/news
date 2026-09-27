@@ -251,6 +251,14 @@ the existing Cloudflare hosting setup and the KidsBank access pattern. The
 tradeoff is a dependency on Cloudflare Access for protected requests and the
 need to configure separate owner and worker policies and credentials.
 
+Accepted on September 26, 2026: use Google sign-in through Cloudflare Access
+for the owner, with one-month application and global login sessions. The owner
+reported unreliable emailed codes and frequent login friction. This changes
+the browser login method; the owner email restriction and separate worker
+authentication still apply. Configure the shared Google connection through
+the `vps-infra` Cloudflare procedures. Google login and the newsroom page were
+verified in the owner's browser on September 26, 2026.
+
 | Surface | Access |
 | --- | --- |
 | Feed, article pages, and reporter filtering | Public, under the accepted reading requirement. |

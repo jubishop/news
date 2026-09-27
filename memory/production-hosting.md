@@ -29,6 +29,14 @@ Track rollout progress and remaining acceptance work in GitHub Issues.
   separate commissioning step. Keep worker monitoring disabled until then.
 - The Access issuer is `https://jubishop.cloudflareaccess.com`. App identifiers
   and distinct audiences are recorded privately in `~/.config/news/cloudflare.json`.
+- On September 26, 2026, the owner application and shared Access organization
+  login session were set to `730h` (one month) and verified through the API.
+  The owner policy inherits the application duration. The worker application
+  retains its separate `12h` duration and deny policy.
+- The owner application uses only the shared Google identity provider, with
+  automatic redirect to Google. Browser sign-in was verified on September 26,
+  2026. The shared provider and its private credential recovery location are
+  documented in `~/projects/vps-infra/memory/cloudflare.md`.
 
 ## Private configuration and recovery copies
 
