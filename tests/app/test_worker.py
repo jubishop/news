@@ -2,6 +2,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import fcntl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
@@ -392,7 +393,6 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual(self.server.results, [])
         self.fake_config["kill_supervisor"] = False
         # Wait for the inherited process lock to close after research exits.
-        import fcntl
         deadline = time.monotonic() + 5
         with (self.root / "state/worker.lock").open("a") as lock:
             while True:
@@ -450,6 +450,14 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
             while any(running(pid) for pid in pids) and time.monotonic() < deadline:
                 time.sleep(.02)
             self.assertFalse(any(running(pid) for pid in pids), "Orphaned research outlived its deadline")
+            with (self.root / "state/worker.lock").open("a") as lock:
+                while True:
+                    try:
+                        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        self.assertLess(time.monotonic(), deadline, "The attempt did not release its lock")
+                        time.sleep(.01)
             self.assertEqual(pending.read_bytes(), original)
             self.fake_config = {"result": RESULT}
             self.assertEqual(self.execute(), 0)
