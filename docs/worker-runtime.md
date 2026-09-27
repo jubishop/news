@@ -120,6 +120,25 @@ directory. Do not expose general shell or file-editing tools to reporting.
 This limits the effects of untrusted instructions embedded in retrieved pages;
 a prompt alone is not that boundary. Extensions themselves remain trusted code.
 
+## Research attempt limit
+
+Accepted on September 26, 2026: allow 30 elapsed minutes for each reporting
+attempt. The owner considers this enough time. The tradeoff is that unusually
+long research can stop before completion, while a stuck reporter cannot hold
+up the rest of the batch indefinitely.
+
+Implementation recommendation: the supervisor enforces this limit across
+research and drafting, including tool calls. If the attempt reaches the limit
+without a complete, valid result, stop its research process and report a
+retryable timeout failure. Continue other eligible assignments and use the
+server's existing retry delay and three-attempt allowance. Do not reset the
+clock for each tool call or create an additional retry allowance.
+
+A complete, valid result saved before the deadline remains eligible for
+delivery. The research limit does not discard saved results or impose a new
+deadline on communication retries. Best effort permits a useful partial
+report, but interrupted draft text is not a completed result.
+
 ## Research tools
 
 The [web research proposal](worker-web-research.md) records the accepted
@@ -174,6 +193,8 @@ publishes an accepted article result immediately; it is not a draft inbox.
   shortlist, and a quiet assignment with a valid empty result.
 - Test outages, blocked sources, malformed model output, tool errors, and a
   hostile page. Verify they cannot trigger arbitrary tools or false success.
+- Verify the 30-minute attempt limit, bounded timeout retries, continued work
+  for other reporters, and preservation of completed results awaiting delivery.
 - Exercise crash recovery, lost claim responses, lost submission acknowledgments,
   pause, deletion during research, exhausted attempts, and duplicate starts.
 - Verify actual context allocation and memory use on a representative assignment;
@@ -191,7 +212,6 @@ assume Pi's declared context changes Ollama's allocation.
 
 Resolve these through the design interview, one question at a time:
 
-- Bounds for a stuck research attempt.
 - Archive context limits and local log/result retention.
 
 Accepted answers belong in their authoritative sections with their reasons;
