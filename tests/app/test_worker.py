@@ -2,10 +2,12 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+import fcntl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
 from pathlib import Path
+import signal
 import sys
 import subprocess
 import tempfile
@@ -154,7 +156,7 @@ class WorkerTests(unittest.TestCase):
         self.addCleanup(self.http.shutdown)
         self.fake = self.root / "codex"
         self.fake.write_text(f"#!{sys.executable}\n" + '''
-import fcntl, json, os, pathlib, signal, sys, time, urllib.request
+import fcntl, json, os, pathlib, signal, subprocess, sys, time, urllib.request
 root = pathlib.Path(__file__).parent
 if "--version" in sys.argv:
     print("codex-cli 0.157.1")
@@ -177,8 +179,14 @@ matches = found["structuredContent"]["results"]
 article = tool("get", {"file":matches[0]["file"], "maxLines":80}) if matches else None
 (root / ("capture-" + str(os.getpid()) + ".json")).write_text(json.dumps({"prompt": prompt, "argv": sys.argv, "env": dict(os.environ), "cwd": os.getcwd(), "search":found,"article":article}))
 if config.get("kill_supervisor"):
-    os.kill(os.getppid(), signal.SIGKILL)
+    while not (root / "supervisor.pid").exists():
+        time.sleep(.01)
+    os.kill(int((root / "supervisor.pid").read_text()), signal.SIGKILL)
     sys.exit(0)
+if config.get("descendant"):
+    descendant = subprocess.Popen([sys.executable, "-c", "import signal, time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)"])
+    (root / "research-pids.tmp").write_text(json.dumps([os.getpid(), descendant.pid]))
+    (root / "research-pids.tmp").replace(root / "research-pids.json")
 with (root / "counts.lock").open("a") as lock:
     fcntl.flock(lock, fcntl.LOCK_EX)
     state = json.loads((root / "counts.json").read_text()) if (root / "counts.json").exists() else {"active": 0, "peak": 0}
@@ -388,12 +396,22 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         config = self.root / "worker.json"
         config.write_text(json.dumps(self.settings))
         config.chmod(0o600)
-        crashed = subprocess.run([sys.executable, "-B", "-m", "news.worker", "--config", str(config)], capture_output=True, timeout=10)
+        crashed = subprocess.Popen(
+            [sys.executable, "-B", "-m", "news.worker", "--config", str(config)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        try:
+            (self.root / "supervisor.tmp").write_text(str(crashed.pid))
+            (self.root / "supervisor.tmp").replace(self.root / "supervisor.pid")
+            crashed.communicate(timeout=10)
+        finally:
+            if crashed.poll() is None:
+                crashed.kill()
+            crashed.communicate(timeout=5)
         self.assertEqual(crashed.returncode, -9)
         self.assertEqual(self.server.results, [])
         self.fake_config["kill_supervisor"] = False
-        # Wait for the fake child's inherited process lock to close after exit.
-        import fcntl
+        # Wait for the inherited process lock to close after research exits.
         deadline = time.monotonic() + 5
         with (self.root / "state/worker.lock").open("a") as lock:
             while True:
@@ -409,6 +427,72 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual(requests[1]["replace_attempt_id"], "attempt0")
         self.assertNotEqual(requests[0]["ownership_token"], requests[1]["ownership_token"])
         self.assertEqual(len(self.server.results), 1)
+
+    def test_orphaned_research_and_descendants_stop_before_restart(self):
+        self.server.add()
+        self.settings["attempt_timeout_seconds"] = 2
+        self.fake_config.update(delay=30, descendant=True)
+        (self.root / "fake.json").write_text(json.dumps(self.fake_config))
+        config = self.root / "worker.json"
+        config.write_text(json.dumps(self.settings))
+        config.chmod(0o600)
+        supervisor = subprocess.Popen(
+            [sys.executable, "-B", "-m", "news.worker", "--config", str(config)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        )
+        pids = []
+        try:
+            ready = self.root / "research-pids.json"
+            deadline = time.monotonic() + 5
+            while not ready.exists():
+                self.assertIsNone(supervisor.poll())
+                self.assertLess(time.monotonic(), deadline)
+                time.sleep(.01)
+            pids = json.loads(ready.read_text())
+            supervisor.kill()
+            supervisor.communicate(timeout=5)
+            self.assertEqual(supervisor.returncode, -signal.SIGKILL)
+            pending = self.root / "state/pending/run0.json"
+            original = pending.read_bytes()
+            request_count = len(self.server.requests)
+            self.assertEqual(run(self.settings), 0)
+            self.assertEqual(len(self.server.requests), request_count)
+            self.assertEqual(len(self.server.claims), 1)
+
+            def running(pid):
+                state = subprocess.run(
+                    ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True,
+                ).stdout.strip()
+                return bool(state) and not state.startswith("Z")
+
+            deadline = time.monotonic() + self.settings["attempt_timeout_seconds"] + .5
+            while any(running(pid) for pid in pids) and time.monotonic() < deadline:
+                time.sleep(.02)
+            self.assertFalse(any(running(pid) for pid in pids), "Orphaned research outlived its deadline")
+            with (self.root / "state/worker.lock").open("a") as lock:
+                while True:
+                    try:
+                        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        self.assertLess(time.monotonic(), deadline, "The attempt did not release its lock")
+                        time.sleep(.01)
+            self.assertEqual(pending.read_bytes(), original)
+            self.fake_config = {"result": RESULT}
+            self.assertEqual(self.execute(), 0)
+            requests = [body for _, path, body in self.server.requests if path.endswith("/claim")]
+            self.assertEqual(len(requests), 2)
+            self.assertEqual(requests[1]["replace_attempt_id"], "attempt0")
+            self.assertEqual(len(self.server.results), 1)
+        finally:
+            if supervisor.poll() is None:
+                supervisor.kill()
+            supervisor.communicate(timeout=5)
+            if pids:
+                try:
+                    os.killpg(pids[0], signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
 
     def test_http_retries_use_identical_claim_and_result_payloads(self):
         self.server.add()
