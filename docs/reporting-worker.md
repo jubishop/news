@@ -86,9 +86,10 @@ with a dedicated service token for the worker and separate owner browser access.
 
 ### Daily work discovery
 
-Accepted on September 26, 2026: start the worker daily at 03:00 Pacific Time
-on the current Mac. The owner clarified that this is simply the initial daily
-cron time. Their references to news through the past night and completion
+Accepted on September 26, 2026: start the worker daily at 01:00 Pacific Time
+on the current Mac. This replaces the initially selected 03:00 time on the
+same date; no further reason was stated for the change. The owner clarified
+that this is simply the initial daily cron time. Their references to news through the past night and completion
 before waking express the motivation, not a strict coverage cutoff or a
 ready-by deadline. Do not add either rule or its verification requirements.
 The tradeoff is that actual completion depends on the work and machine

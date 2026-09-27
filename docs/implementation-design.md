@@ -22,7 +22,7 @@ the VPS first. Bring that server to a v1 the owner is happy with before
 separately implementing the reporting worker on one of the owner's local
 machines. The [worker design](reporting-worker.md#model-engine) now selects
 local Qwen through Ollama. The [runtime proposal](worker-runtime.md) develops
-the worker for the selected current Mac, 03:00 Pacific schedule, Pi harness,
+the worker for the selected current Mac, 01:00 Pacific schedule, Pi harness,
 and free Exa search.
 
 The owner narrowed the initial implementation task: use a worktree under

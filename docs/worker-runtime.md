@@ -15,7 +15,7 @@ research evaluation remain implementation work.
 The [model decision](reporting-worker.md#model-engine) selects the installed
 Qwen 27B model through Ollama. The exact local tag is `qwen3.8:27b-mlx`.
 The [host decision](reporting-worker.md#worker-location) selects the current
-Mac, with [daily startup](reporting-worker.md#daily-work-discovery) at 03:00
+Mac, with [daily startup](reporting-worker.md#daily-work-discovery) at 01:00
 Pacific Time. This is a simple daily schedule, with no new morning deadline
 or strict past-night coverage cutoff.
 
@@ -161,7 +161,7 @@ conflicting sources explicitly. Search failure cannot become a successful
 
 ## Daily startup
 
-The accepted schedule is 03:00 Pacific each day. Recommendation: use macOS
+The accepted schedule is 01:00 Pacific each day. Recommendation: use macOS
 `launchd` as the platform's daily cron equivalent. Keep the job definition
 small, with explicit executable and working-directory paths. Use
 `America/Los_Angeles` for worker calendar calculations and configure the
@@ -178,6 +178,41 @@ The owner's past-night and wake-time remarks do not add a research date limit,
 completion deadline, earlier alert, or benchmark requirement. Coverage remains
 controlled by each assignment and its history, including future-facing reports.
 The server's existing full-day lateness rule remains unchanged.
+
+## Research logs and local state
+
+Accepted on September 26, 2026: retain detailed research logs locally for
+seven days, then delete them automatically. Logs include reporter prompts,
+searches, source text, and model responses. Exclude credentials. The owner
+accepted the recommendation to support troubleshooting; no further reason
+was stated. The tradeoff is temporary local storage of private instructions
+and research content.
+
+Implementation recommendation: keep logs in a private worker data directory
+outside Git, redact credentials before writing, and expire each completed
+attempt's logs after seven elapsed days. Include failed and timed-out attempts
+so their errors can be diagnosed. Apply cleanup during normal worker startup.
+
+Diagnostic retention is separate from reliable delivery. Preserve completed
+results that the server has not acknowledged, together with the request IDs
+and tokens needed to resend them safely. Do not delete that pending work when
+its research logs expire. After acknowledgment, remove complete local result
+payloads with the diagnostic retention cleanup; server records remain the
+authoritative article and run history.
+
+## Archive context
+
+The existing [reporting-memory decision](product-design.md#reporting-memory-and-coverage-window)
+requires recent article summaries and access to the full retained archive.
+Recommendation: begin each attempt with a bounded selection of the reporter's
+stored article summaries, supplied coverage dates, and recent run outcomes.
+Expose archive search and full-article retrieval so Qwen can obtain older or
+more detailed context when useful, including other reporters' work.
+
+Choose initial item and token limits during implementation, then adjust them
+using the reference assignments. These are context-size controls, not a fixed
+coverage lookback. The assignment and history still determine what to cover.
+No new owner decision is needed for those initial engineering limits.
 
 ## Evaluation before unattended publication
 
@@ -199,6 +234,8 @@ publishes an accepted article result immediately; it is not a draft inbox.
   pause, deletion during research, exhausted attempts, and duplicate starts.
 - Verify actual context allocation and memory use on a representative assignment;
   advertised context alone does not establish a working configuration.
+- Verify seven-day log cleanup, credential exclusion, and preservation of
+  unacknowledged results after diagnostic logs expire.
 
 Ollama supports [tool calling](https://docs.ollama.com/capabilities/tool-calling)
 and [schema-constrained output](https://docs.ollama.com/capabilities/structured-outputs).
@@ -208,12 +245,11 @@ explains that larger context requires more memory. Evaluate a bounded context
 with the exact endpoint configuration and verify it with `ollama ps`; do not
 assume Pi's declared context changes Ollama's allocation.
 
-## Open decisions
+## Implementation readiness
 
-Resolve these through the design interview, one question at a time:
-
-- Archive context limits and local log/result retention.
-
-Accepted answers belong in their authoritative sections with their reasons;
-unanswered questions remain proposals. Implementation work should be tracked
-in GitHub Issues after the required behavior is settled.
+The material product choices for the first worker are settled. Python
+supervision, launchd configuration, context-size limits, and exact tool wiring
+remain engineering recommendations to validate during implementation.
+Track implementation work in GitHub Issues. The real search-provider trial
+and complete worker-to-server flow remain untested; the local probe establishes
+only basic Pi/Qwen tool use.
