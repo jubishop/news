@@ -60,6 +60,13 @@ refresh prevents research from using the old index. Preparation failure is
 cached for that batch; its retry attempts report failure. A new worker start
 tries preparation again.
 
+QMD can exit successfully after skipping unreadable files or failing to embed
+some articles. The worker rejects skipped reads and checks QMD's index status
+before declaring the snapshot ready: the document count must match the archive,
+no embeddings may be pending, and a nonempty archive must have a vector index.
+This status check is supervisor-only; reporters still receive only `query`
+and `get`.
+
 The API uses offset pagination. It does not provide a transactionally frozen
 export. No new reporter research starts until download completes, but an owner
 can still change Trash while pages are being fetched. Such changes can shift

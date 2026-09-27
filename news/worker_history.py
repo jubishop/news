@@ -1,6 +1,7 @@
 """One private, semantic article-search snapshot shared by a worker batch."""
 
 from datetime import datetime, timezone
+from http.client import HTTPException
 import json
 import os
 from pathlib import Path
@@ -90,9 +91,10 @@ class History:
                 for args in (("update",), ("cleanup",), ("embed",)):
                     self.command(*args)
                 self.start()
+                self.verify_index()
                 save_json(self.root / "snapshot.json", self.snapshot)
                 self.ready = True
-            except (WorkerError, OSError, ValueError, KeyError, TypeError, Problem, subprocess.SubprocessError) as exc:
+            except (WorkerError, OSError, ValueError, KeyError, TypeError, Problem, HTTPException, subprocess.SubprocessError) as exc:
                 self.close()
                 self.error = str(exc) if isinstance(exc, WorkerError) else "History snapshot could not be prepared; inspect private worker state."
                 raise WorkerError(self.error) from exc
@@ -139,7 +141,8 @@ class History:
         self.snapshot = {"retrieved_at": datetime.now(timezone.utc).isoformat(), "article_count": len(seen)}
 
     def command(self, *args):
-        with (self.root / "indexing.log").open("ab") as log:
+        with (self.root / "indexing.log").open("a+b") as log:
+            offset = log.tell()
             process = self.spawn(args, log)
             try:
                 result = process.wait(timeout=1800)
@@ -147,8 +150,35 @@ class History:
                 process.stdin.close()
                 if process.poll() is None:
                     process.wait(timeout=8)
+            # QMD update exits zero after skipped reads, retaining old content.
+            log.seek(offset)
+            if args[0] == "update" and any(re.match(rb"Skipped [1-9][\d,]* (?:unreadable file|file\(s\) outside)", line) for line in log):
+                raise WorkerError("QMD skipped article files; inspect history/indexing.log. Stale history will not be used.")
         if result:
             raise WorkerError(f"QMD {args[0]} failed; inspect history/indexing.log. Stale history will not be used.")
+
+    def verify_index(self):
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                           "params": {"name": "status", "arguments": {}}}).encode()
+        req = request.Request(self.endpoint, data=body, headers={
+            "Content-Type": "application/json", "Accept": "application/json, text/event-stream",
+            "MCP-Protocol-Version": "2025-03-26",
+        })
+        with request.build_opener(NoRedirect).open(req, timeout=5) as response:
+            raw = response.read(1_000_001)
+            if len(raw) > 1_000_000:
+                raise WorkerError("QMD index status exceeds the response limit.")
+            if response.headers.get_content_type() == "text/event-stream":
+                raw = next((line[5:].strip() for line in raw.splitlines() if line.startswith(b"data:")), b"")
+        result = json.loads(raw)["result"]
+        status = result.get("structuredContent") if isinstance(result, dict) and not result.get("isError") else None
+        count = self.snapshot["article_count"]
+        # QMD embed can exit zero after exhausting retries or its own deadline.
+        if (not isinstance(status, dict)
+                or type(status.get("totalDocuments")) is not int or status["totalDocuments"] != count
+                or type(status.get("needsEmbedding")) is not int or status["needsEmbedding"] != 0
+                or (count and status.get("hasVectorIndex") is not True)):
+            raise WorkerError("QMD history index is incomplete; inspect history/indexing.log. Stale history will not be used.")
 
     def spawn(self, args, log):
         watcher = Path(__file__).with_name("worker_search_process.py")

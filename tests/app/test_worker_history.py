@@ -129,6 +129,36 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual(history.summaries, {})
         self.assertEqual(history.snapshot["article_count"], 0)
 
+    def test_zero_exit_qmd_with_incomplete_index_is_a_cached_failure(self):
+        complete = {"totalDocuments": 1, "needsEmbedding": 0, "hasVectorIndex": True}
+        for changed in (
+            {"needsEmbedding": 1}, {"totalDocuments": 0}, {"hasVectorIndex": False},
+            {"needsEmbedding": None},
+        ):
+            with self.subTest(changed=changed):
+                (self.root / "qmd-settings.json").write_text(json.dumps({"status": complete | changed}))
+                history = self.history()
+                for _ in range(2):
+                    with self.assertRaisesRegex(WorkerError, "incomplete"):
+                        history.prepare(self.api)
+                self.assert_process_stopped(int((self.root / "qmd-pid").read_text()))
+
+    def test_status_tool_failure_is_not_ready_history(self):
+        (self.root / "qmd-settings.json").write_text(json.dumps({"status_error": True}))
+        with self.assertRaises(WorkerError):
+            self.history().prepare(self.api)
+        self.assert_process_stopped(int((self.root / "qmd-pid").read_text()))
+
+    def test_zero_exit_skipped_read_cannot_serve_old_article(self):
+        old = self.history()
+        old.prepare(self.api)
+        old.close()
+        self.api.articles[0]["summary"] = "An updated summary"
+        (self.root / "qmd-settings.json").write_text(json.dumps({"skip_read": True}))
+        for _ in range(2):
+            with self.assertRaisesRegex(WorkerError, "skipped"):
+                self.history().prepare(self.api)
+
     def test_recent_summaries_are_bounded_and_keep_api_order(self):
         self.api.articles = [dict(ARTICLE, id=f"story{i}", reporter_id="reporter") for i in range(25)]
         history = self.history()

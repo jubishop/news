@@ -22,7 +22,10 @@ with (root / "qmd-calls.jsonl").open("a") as log:
 if settings.get("fail") == sys.argv[1]:
     sys.exit(7)
 if sys.argv[1] == "update":
-    index.write_text(json.dumps({p.name:p.read_text() for p in pathlib.Path(collection).glob("*.md")}))
+    if settings.get("skip_read"):
+        print("Skipped 1 unreadable file(s)", file=sys.stderr)
+    else:
+        index.write_text(json.dumps({p.name:p.read_text() for p in pathlib.Path(collection).glob("*.md")}))
     sys.exit(0)
 if sys.argv[1] in ("embed", "cleanup"):
     sys.exit(0)
@@ -44,6 +47,12 @@ class Handler(BaseHTTPRequestHandler):
             result = {"protocolVersion":"2025-03-26", "capabilities":{"tools":{}}, "serverInfo":{"name":"qmd", "version":"2.8.3"}}
         elif message["method"] == "tools/list":
             result = {"tools":[{"name":n,"description":n,"inputSchema":{"type":"object"}} for n in ("query", "get")]}
+        elif name == "status":
+            result = {"structuredContent": settings.get("status", {
+                "totalDocuments": len(data), "needsEmbedding": 0, "hasVectorIndex": bool(data),
+            })}
+            if settings.get("status_error"):
+                result = {"isError": True, "content": [{"type": "text", "text": "Index unavailable"}]}
         elif name == "query":
             result = {"content":[{"type":"text","text":"Search results"}],"structuredContent":{"results":[{"file":"qmd://articles/"+n,"snippet":v[:300]} for n,v in data.items()][:args.get("limit",5)]}}
         elif name == "get":
