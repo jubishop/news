@@ -55,6 +55,9 @@ class Handler(BaseHTTPRequestHandler):
                 result = {"isError": True, "content": [{"type": "text", "text": "Index unavailable"}]}
         elif name == "query":
             result = {"content":[{"type":"text","text":"Search results"}],"structuredContent":{"results":[{"file":"qmd://articles/"+n,"snippet":v[:300]} for n,v in data.items()][:args.get("limit",5)]}}
+            if settings.get("query_failure"):
+                print(settings["query_failure"] + ": fixture model failure", file=sys.stderr, flush=True)
+                result["structuredContent"]["results"] = []
         elif name == "get":
             result = {"content":[{"type":"resource","resource":{"uri":args["file"],"mimeType":"text/markdown","text":data[args["file"].split("/")[-1]]}}]}
         else:

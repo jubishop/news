@@ -163,6 +163,7 @@ class Batch:
                 record["research_started"] = True
                 save_json(path, record)
                 candidate = research(self.settings, directory, assignment, self.lock_fd, self.history.endpoint)
+                self.history.check()
             except subprocess.TimeoutExpired:
                 candidate = failure("research_timeout", "Codex exceeded the reporting attempt time limit.")
             except (WorkerError, Problem, ValueError, UnicodeError) as exc:

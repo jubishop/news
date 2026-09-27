@@ -69,6 +69,7 @@ def main():
             body = "\n".join(c["resource"]["text"] if c["type"] == "resource" else c.get("text", "") for c in article["content"])
             for expected in ("id: model-v21", "Fixture reporter", "2026-09-26", "https://example.com/model-v21"):
                 assert expected in body, (expected, body)
+            history.check()
         finally:
             history.close()
         # A subsequent empty snapshot must remove all indexed content and still
@@ -82,6 +83,7 @@ def main():
             assert result["structuredContent"]["results"] == [], result
             missing = call(empty, "get", {"file": "articles/model-v21.md", "maxLines": 80})
             assert missing.get("isError"), missing
+            empty.check()
         finally:
             empty.close()
     report["empty_snapshot_and_removal"] = "passed"

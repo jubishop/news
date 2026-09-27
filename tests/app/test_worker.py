@@ -658,3 +658,23 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         outcomes = [r["outcome"] for r in self.server.results]
         self.assertEqual(outcomes.count("skipped_paused"), 1)
         self.assertEqual(outcomes.count("failed"), 3)
+
+    def test_hidden_history_model_failure_cannot_be_accepted_as_success(self):
+        for index, diagnostic in enumerate((
+            "Batch embedding error", "Embedding error for text", "Embedding error",
+            "Structured query expansion failed",
+        )):
+            with self.subTest(diagnostic=diagnostic):
+                self.server.add(index)
+                self.fake_config["result"] = RESULT if index % 2 == 0 else {
+                    "outcome": "nothing_to_publish", "articles": [],
+                    "reason": "No new stories after searching history.", "error": None,
+                }
+                (self.root / "qmd-settings.json").write_text(json.dumps({"query_failure": diagnostic}))
+                before = len(self.server.results)
+                attempts = len(self.captures())
+                self.assertEqual(self.execute(), 1)
+                results = self.server.results[before:]
+                self.assertEqual(len(results), 3)
+                self.assertTrue(all(r["outcome"] == "failed" and r["error"]["retryable"] and not r["articles"] for r in results))
+                self.assertEqual(len(self.captures()), attempts + 1)

@@ -71,8 +71,7 @@ class History:
             if self.error:
                 raise WorkerError(self.error)
             if self.ready:
-                if self.process.poll() is not None:
-                    raise WorkerError("History search stopped during the reporting batch.")
+                self.check()
                 return
             try:
                 self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -179,6 +178,20 @@ class History:
                 or type(status.get("needsEmbedding")) is not int or status["needsEmbedding"] != 0
                 or (count and status.get("hasVectorIndex") is not True)):
             raise WorkerError("QMD history index is incomplete; inspect history/indexing.log. Stale history will not be used.")
+
+    def check(self):
+        if not self.error and self.process.poll() is not None:
+            self.error = "History search stopped during the reporting batch."
+        if not self.error:
+            # QMD can return ordinary results after these inference failures.
+            # Gate publication on its diagnostics, not only MCP tool success.
+            failures = (b"Embedding error:", b"Embedding error for text:",
+                        b"Batch embedding error:", b"Structured query expansion failed:")
+            with (self.root / "search.log").open("rb") as log:
+                if any(line.startswith(failures) for line in log):
+                    self.error = "History search model failed; inspect history/search.log. Restart the batch after correcting the model problem."
+        if self.error:
+            raise WorkerError(self.error)
 
     def spawn(self, args, log):
         watcher = Path(__file__).with_name("worker_search_process.py")

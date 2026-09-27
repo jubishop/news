@@ -83,10 +83,16 @@ Prompts request five results, at most ten, and article reads of 80 lines with
 further pages as needed. Codex enforces tool-output budgets of 3,000 tokens for
 search and 5,000 for reading, before its standard serialization allowance.
 Result counts and read lengths are agent instructions; the output token caps
-are the enforced context bound. Search errors are explicit tool errors, and
-reporters are instructed to return a retryable failure when history is
-unavailable. Required MCP startup prevents research when the connection cannot
-initialize. Tests cannot guarantee that a model obeys every instruction.
+are the enforced context bound. Reporters are instructed to return a retryable
+failure for explicit tool errors. QMD can also hide embedding or expansion
+failures behind ordinary results. Before accepting each research result, the
+supervisor checks the search process and its known model-failure diagnostics.
+A detected failure rejects that result and prevents further research for the
+batch. Concurrent attempts can finish, but their results also become retryable
+failures; already saved results remain valid. The diagnostic strings are part
+of the QMD compatibility check when upgrading. Required MCP startup prevents
+research when the connection cannot initialize. Tests cannot guarantee that a
+model obeys every instruction.
 
 QMD setup commands have a 30-minute limit. Search startup has a 60-second limit;
 each Codex history tool call has a 180-second limit inside the existing
