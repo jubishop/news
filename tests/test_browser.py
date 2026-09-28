@@ -9,6 +9,58 @@ from preview import preview
 
 
 class BrowserJourney(unittest.TestCase):
+    def test_contractor_dates_edit_catch_up_and_retained_history(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner)
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                previews = []
+                page.on("request", lambda request: previews.append(request)
+                        if "/schedule-preview" in request.url else None)
+                page.goto(fixture.base_url + "/newsroom/reporters/new")
+                page.get_by_label("Reporter name").fill("A finite assignment")
+                page.get_by_label("Beat & instructions").fill("Report useful changes.")
+                page.get_by_label("How often").select_option(label="Contractor")
+                page.get_by_label("Assignment dates", exact=True).fill("2026-10-05\n2026-10-01\n2026-10-03")
+                page.get_by_label("Reporter name").click()
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-01")
+                page.get_by_role("button", name="Add reporter", exact=True).click()
+                expect(page.get_by_role("heading", name="A finite assignment")).to_be_visible()
+                reporter = page.url.rsplit("/", 1)[-1]
+                expect(page.get_by_label("Assignment dates", exact=True)).to_have_value("2026-10-01\n2026-10-03\n2026-10-05")
+                fixture.at("2026-10-04T06:00:00-07:00")
+                page.reload()
+                expect(page.get_by_text("Original dates already due", exact=True)).to_be_visible()
+                expect(page.get_by_label("Future assignment dates")).to_have_value("2026-10-05")
+                page.get_by_label("Future assignment dates").fill("2026-10-06\n2026-10-08")
+                page.get_by_role("button", name="Save changes", exact=True).click()
+                expect(page.get_by_label("Future assignment dates")).to_have_value("2026-10-06\n2026-10-08")
+                job = next(run for run in fixture.work() if run["reporter_id"] == reporter)
+                self.assertEqual(job["assignment_dates"], ["2026-10-01", "2026-10-03"])
+                fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"])))
+                fixture.at("2026-10-08T06:00:00-07:00")
+                job = next(run for run in fixture.work() if run["reporter_id"] == reporter)
+                fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"]), outcome="nothing_to_publish", articles=[], reason="No updates"))
+                page.reload()
+                expect(page.locator(".section-heading .badge").first).to_have_text("Completed")
+                expect(page.get_by_role("button", name="Save changes")).to_have_count(0)
+                expect(page.get_by_role("link", name="This week in research")).to_be_visible()
+                self.assertEqual(page.locator(".run-row").count(), 4)
+                page.locator(".run-row").filter(has_text="2026-10-03").locator("summary").first.click()
+                expect(page.get_by_text("Assignment dates: 2026-10-01, 2026-10-03", exact=True)).to_be_visible()
+                for width in (1280, 390):
+                    page.set_viewport_size({"width": width, "height": 900})
+                    self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                Path("test-results").mkdir(exist_ok=True)
+                page.screenshot(path="test-results/contractor-history-mobile.png", full_page=True)
+                self.assertEqual(errors, [])
+                self.assertTrue(previews)
+                self.assertTrue(all(request.method == "POST" and "?" not in request.url for request in previews))
+            finally:
+                browser.close()
+
     def test_feed_has_one_column_and_equal_story_prominence(self):
         with preview() as fixture, sync_playwright() as playwright:
             for day in (27, 28):

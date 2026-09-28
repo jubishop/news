@@ -63,6 +63,8 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
 - [Concept](concept.md): the draft idea for a personal AI news agency.
 - [Product design](product-design.md): accepted product decisions and open
   questions for the first useful version.
+- [Contractor assignment dates](contractor-schedules.md): finite date lists,
+  catch-up, completion, retained failures, and retry recovery.
 - [Implementation design](implementation-design.md): server-first implementation
   sequence, selected stack, deployment context, and remaining technical choices.
 - [Backups](backups.md): encrypted recovery snapshots, retention, restore

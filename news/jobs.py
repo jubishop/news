@@ -5,7 +5,7 @@ import hmac
 import json
 import secrets
 
-from . import clock, incidents, reporters, validation as v
+from . import clock, contractors, incidents, reporters, validation as v
 from .db import one, many
 from .errors import Problem
 
@@ -88,7 +88,9 @@ def discover(connection, worker, values):
                 AND state IN ('pending','retry_wait') ORDER BY expected_date,id""",
                 (row["id"],),
             )
-            if reporter["schedule"]["cadence"] != "once":
+            if reporter["schedule"]["cadence"] == "once":
+                candidates = contractors.combine(connection, reporter, candidates)
+            else:
                 missed = [
                     run
                     for run in candidates
@@ -140,6 +142,8 @@ def discover(connection, worker, values):
             (run["id"],),
         )
         run.update(reporter=reporter, late=late(run), current_attempt=attempt)
+        if reporter["schedule"]["cadence"] == "once":
+            run["assignment_dates"] = contractors.assignment_dates(connection, reporter, run)
         output.append(run)
     return {"reporting_date": clock.today().isoformat(), "runs": output}
 
@@ -248,10 +252,14 @@ def claim(connection, run_id, worker, values):
         "SELECT coalesce(max(attempt_number),0)+1 FROM run_attempts WHERE run_id=?",
         (run_id,),
     ).fetchone()[0]
+    if reporter["schedule"]["cadence"] == "once":
+        contractors.combine(connection, reporter, [run])
     snapshot = {
         key: reporter[key]
         for key in ("id", "name", "prompt", "schedule", "paused", "config_version")
     }
+    if reporter["schedule"]["cadence"] == "once":
+        snapshot["assignment_dates"] = contractors.assignment_dates(connection, reporter, run)
     connection.execute(
         """INSERT INTO run_attempts
         (id,run_id,attempt_number,retry_generation,worker_id,request_id,acknowledgment_only,
@@ -467,7 +475,9 @@ def result(connection, run_id, worker, values):
                 (SELECT id FROM runs WHERE reporter_id=? AND expected_date<=?)""",
             (clock.now(), reporter["id"], reporter["id"], run["expected_date"]),
         )
-        if reporter["schedule"]["cadence"] == "once":
+        if reporter["schedule"]["cadence"] == "once" and not contractors.remaining_dates(
+            connection, reporter
+        ):
             connection.execute(
                 "UPDATE reporters SET completed_at=?,updated_at=? WHERE id=?",
                 (clock.now(), clock.now(), reporter["id"]),

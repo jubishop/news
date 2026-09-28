@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import json
 import secrets
 
-from . import clock, incidents, schedules, validation as v
+from . import clock, contractors, incidents, schedules, validation as v
 from .db import one, many
 from .errors import Problem
 
@@ -14,6 +14,11 @@ def get(connection, identity):
     if not row:
         raise Problem("Reporter not found.", 404, "not_found")
     row["schedule"] = json.loads(row["schedule_json"])
+    if row["schedule"]["cadence"] == "once":
+        row["schedule"] = schedules.parse(row["schedule"])
+        today = clock.today().isoformat()
+        row["fixed_dates"] = [day for day in row["schedule"]["dates"] if day <= today]
+        row["future_dates"] = [day for day in row["schedule"]["dates"] if day > today]
     row["cadence_label"] = schedules.label(row["schedule"])
     row["next_date"] = None
     if not row["deleted_at"] and not row["completed_at"]:
@@ -24,7 +29,8 @@ def get(connection, identity):
             (identity,),
         )
         if row["schedule"]["cadence"] == "once":
-            row["next_date"] = row["schedule"]["date"]
+            remaining = contractors.remaining_dates(connection, row)
+            row["next_date"] = remaining[0] if remaining else None
         elif pending:
             row["next_date"] = pending["expected_date"]
         else:
@@ -80,31 +86,9 @@ def save(connection, values, identity=None):
     current = get(connection, identity) if identity else None
     if current and (current["deleted_at"] or current["completed_at"]):
         raise Problem("This reporter is retired.", 409, "retired")
-    if current and (
-        (schedule["cadence"] == "once") != (current["schedule"]["cadence"] == "once")
-    ):
-        raise Problem(
-            "Create a new reporter to change between recurring and one-time work."
-        )
+    schedules.validate_change(schedule, current["schedule"] if current else None)
     changed_schedule = not current or schedule != current["schedule"]
-    if (
-        changed_schedule
-        and current
-        and current["schedule"]["cadence"] == "once"
-        and current["schedule"]["date"] <= clock.today().isoformat()
-    ):
-        raise Problem(
-            "This assignment is already due. Its original date stays fixed; you can still change its instructions.",
-            409,
-            "assignment_due",
-        )
     tomorrow = clock.today() + timedelta(days=1)
-    if (
-        changed_schedule
-        and schedule["cadence"] == "once"
-        and date.fromisoformat(schedule["date"]) < tomorrow
-    ):
-        raise Problem("One-time assignments must start tomorrow or later.")
     if not current:
         identity = secrets.token_hex(16)
         connection.execute(
@@ -145,14 +129,21 @@ def save(connection, values, identity=None):
         if schedule["cadence"] == "once" and prompt != current["prompt"]:
             for run in many(
                 connection,
-                "SELECT id FROM runs WHERE reporter_id=? AND state='failed'",
-                (identity,),
+                "SELECT id FROM runs WHERE reporter_id=? AND state='failed' AND expected_date=?",
+                (identity, schedule["dates"][-1]),
             ):
                 connection.execute(
                     "UPDATE runs SET state='pending',finished_at=NULL,retry_not_before=NULL,retry_generation=retry_generation+1 WHERE id=?",
                     (run["id"],),
                 )
                 incidents.resolve(connection, "failed:" + run["id"])
+        if schedule["cadence"] == "once" and not contractors.remaining_dates(
+            connection, {"id": identity, "schedule": schedule}
+        ):
+            connection.execute(
+                "UPDATE reporters SET completed_at=?,updated_at=? WHERE id=?",
+                (clock.now(), clock.now(), identity),
+            )
     return identity
 
 
