@@ -7,8 +7,14 @@ and [operations guide](docs/server-operations.md) for server v1. Read [worker op
 and its required after-merge commissioning.
 
 Keep designs, decisions, and research in [docs](docs/README.md). Use the
-[GitHub Issues](https://github.com/jubishop/news/issues) for work items and
-implementation progress.
+[GitHub Issues](https://github.com/jubishop/news/issues) for shared work and
+acceptance criteria.
+
+Use `td` for local tasks, progress, blockers, and handoffs. In each new agent
+context, run `td usage --new-session -q` once; use `td usage` for full workflow
+guidance. Follow the [task workflow](docs/task-tracking.md), including first-time
+setup. Keep GitHub Issues for shared scope and acceptance criteria; link related
+issues from td.
 
 Before non-trivial work or writing memory, search the relevant knowledge.
 Use `bin/knowledge search "term"` for known terms and

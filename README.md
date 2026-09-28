@@ -16,8 +16,8 @@ Pacific cron installation after merge. See the
 [operations guide](docs/server-operations.md) for the implemented interface
 and deployment prerequisites.
 
-Use [GitHub Issues](https://github.com/jubishop/news/issues) for work items
-and implementation progress.
+Use [GitHub Issues](https://github.com/jubishop/news/issues) for shared work
+and acceptance criteria.
 
 ## Development
 
@@ -60,3 +60,11 @@ license notice in [LICENSE.project-starter](LICENSE.project-starter).
 
 [MIT](LICENSE), selected by the owner on September 24, 2026. The separate
 starter notice is retained with the copied foundation.
+
+## Local task tracking
+
+Use `td` for local tasks, progress, blockers, and session handoffs. After cloning,
+install td and run `td init` in the primary checkout. Use `td status` or
+`td monitor` to inspect progress. Follow the [task workflow](docs/task-tracking.md)
+for setup, review, worktrees, and local data. Keep GitHub Issues for shared scope
+and acceptance criteria, linked from related td tasks.

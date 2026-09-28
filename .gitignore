@@ -12,3 +12,6 @@ worktrees/
 var/
 *.sqlite3*
 test-results/
+
+# Local td task state
+.todos/
