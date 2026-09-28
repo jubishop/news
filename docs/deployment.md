@@ -12,8 +12,8 @@ This supersedes the earlier PR-only delivery scope for server implementation.
 ## Release workflow
 
 [Repository checks](../.github/workflows/check.yml) runs full validation on
-Python 3.12, 3.13, and 3.14 for every push and PR. A push to `main`, including
-a merged PR, deploys after all three jobs succeed unless it carries the
+Python 3.14 for every push and PR. A push to `main`, including
+a merged PR, deploys after validation succeeds unless it carries the
 explicit skip decision described below. PR checks cannot deploy or read
 production credentials. A manual run on `main` requests deployment even when
 the commit carries a skip decision; it performs the same checks first.
@@ -101,7 +101,8 @@ create provider credentials that the deployment does not have.
 
 On the VPS, create `/opt/news/releases` and install `ops/receive-release` as
 root-owned mode 0755 at `/usr/local/sbin/news-receive-release`. Install
-`python3.12-venv`, `restic`, `curl`, and `util-linux` (for `flock`). Add a
+`restic`, `curl`, and `util-linux` (for `flock`), and provision the dedicated
+[Python 3.14 runtime](server-operations.md#production-python). Add a
 dedicated public deployment key to root's `authorized_keys` with:
 
 ```text

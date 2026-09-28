@@ -13,7 +13,7 @@ this choice and the daily 06:00 Pacific startup.
 
 ## Runtime and configuration
 
-Use Python 3.12–3.14 and Codex CLI >=0.157.1,<1.0. The worker checks the CLI
+Use Python 3.14 and Codex CLI >=0.157.1,<1.0. The worker checks the CLI
 version and ChatGPT sign-in before starting research. The CLI executable must
 be available unattended; the inspected standalone Mac binary needs no Node
 runtime. QMD has its own [runtime and model setup](article-history-search.md#installation-and-checks).

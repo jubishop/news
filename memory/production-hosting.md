@@ -16,6 +16,12 @@ Track rollout progress and remaining acceptance work in GitHub Issues.
 
 - News runs as the `news` system user on loopback port 3070. Caddy forwards
   the News hostname to that port. Preserve the other applications on this host.
+- On September 28, 2026, CPython 3.14.7 was installed for News under
+  `/opt/news/python`, with `/opt/news/python3.14` pointing to its interpreter.
+  The tree is root-owned and executable by `news`. The provisioning tool is
+  uv 0.12.18 in `/opt/news/tools`; it does not modify shell profiles.
+  Ubuntu's `/usr/bin/python3` remains 3.12.3. Follow the
+  [runtime procedure](../docs/server-operations.md#production-python) for upgrades.
 - The DNS A record is proxied through Cloudflare. The origin certificate and
   private key are `/etc/caddy/certs/news.pem` and `news.key`, owned by
   `root:caddy`, mode 0640. The certificate covers only `news.jubishop.com`.
@@ -85,4 +91,7 @@ install trusted releases as root, so protect changes to `main`.
 
 The receiver is installed separately from application releases. The selected
 release is `/opt/news/current`; its `REVISION` file records the deployed commit.
+The receiver uses the dedicated News Python interpreter. The prior Python 3.12
+receiver is retained at `/opt/news/receiver-backups/receive-release-before-python314`,
+owned by root with mode 0600, for operator-led recovery.
 Keep provider credentials out of GitHub deployment logs and release archives.
