@@ -1,6 +1,7 @@
 """Stored articles, bounded search, safe Markdown, and 30-day Trash."""
 
 import json
+import re
 
 from markdown_it import MarkdownIt
 from markupsafe import Markup
@@ -46,6 +47,28 @@ def article(connection, identity):
     if not row:
         raise Problem("Article not found.", 404, "not_found")
     return decode(row)
+
+
+def archive_version(connection, expected=None):
+    if expected is not None and not re.fullmatch(r"[0-9a-f]{32}", expected):
+        raise Problem("Invalid archive version.")
+    version = connection.execute("SELECT version FROM archive_state WHERE singleton=1").fetchone()[0]
+    if expected is not None and expected != version:
+        raise Problem("The article archive changed. Restart synchronization.", 409, "archive_changed")
+    return version
+
+
+def manifest(connection, params):
+    limit = v.integer(params.get("limit", 100), "limit", 1, 100)
+    page = v.integer(params.get("page", 1), "page", 1, 100_000)
+    if page > 1 and "version" not in params:
+        raise Problem("Archive version is required after the first page.")
+    version = archive_version(connection, params.get("version"))
+    total = connection.execute("SELECT count(*) FROM articles WHERE deleted_at IS NULL").fetchone()[0]
+    rows = many(connection, """SELECT id,revision FROM articles WHERE deleted_at IS NULL
+                ORDER BY published_at DESC,id DESC LIMIT ? OFFSET ?""", (limit, (page - 1) * limit))
+    return {"articles": rows, "version": version, "page": page, "limit": limit,
+            "total": total, "has_more": page * limit < total}
 
 
 def search(connection, params):

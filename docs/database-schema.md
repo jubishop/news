@@ -14,6 +14,9 @@ operational records alongside the articles.
 
 The baseline is implemented in [version 1 SQL](../news/schema.sql). Its detailed
 constraints, indexes, and additional operational fields are engineering choices.
+[Migration 2](../news/migrations/002-archive.sql) adds article revisions and a
+single-row `archive_state` metadata table. Transactional triggers update these
+tokens for the [archive synchronization protocol](server-contract.md#archive-manifest-protocol).
 The [server contract](server-contract.md) specifies the implemented calendar,
 claims, retry bounds, HTTP operations, and result payloads.
 

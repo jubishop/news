@@ -140,7 +140,8 @@ durable local storage before making the corresponding request.
 | `POST /runs/{id}/result` | Atomically submit a result and receive its receipt. |
 | `GET /reporters/{id}/runs` | Paginated factual history, outcomes, errors, and attempt timestamps. |
 | `GET /articles/search` | Search retained article text/metadata and supplied coverage dates. |
-| `GET /articles/{id}` | Retrieve a complete retained article. |
+| `GET /articles/manifest` | Bounded ID/revision listing for consistent archive synchronization. |
+| `GET /articles/{id}` | Retrieve a complete retained article, optionally guarded by archive `version`. |
 
 ### Daily discovery and claims
 
@@ -234,7 +235,8 @@ spans supplied by workers. Search uses literal SQL `LIKE` over title, summary,
 and body, with parameters and escaped wildcards. This intentionally avoids
 another index for the initial small archive; add an index when measured load
 justifies it. There is no server-side embedding or AI search service. The worker
-builds its own [semantic history index](article-history-search.md) from this API.
+builds its own [semantic history index](article-history-search.md) using the
+manifest protocol below. Search remains available for bounded ad hoc requests.
 
 History and search default to 30 rows, allow 1–100, and return `page`, `limit`,
 `total`, and `has_more`. Page numbers are bounded to 1–100,000. Articles sort by
@@ -247,6 +249,40 @@ Errors are JSON `{"error":"stable_code","message":"Explanation"}`. HTTP status:
 record; 409 state/idempotency conflict; 413 too large; 415 wrong media type;
 422 invalid payload. Invalid JSON syntax is 400. A validation failure never
 partially publishes. Do not log tokens or complete request bodies.
+
+### Archive manifest protocol
+
+`GET /articles/manifest` returns `articles:[{id,revision}]`, `version`, `page`,
+`limit`, `total`, and `has_more`. It contains no article text. The default limit
+is 100; allowed limits are 1–100 and pages are 1–100,000. Retained articles sort
+by publication time and ID descending. Empty archives return an empty first page,
+`total:0`, and `has_more:false`.
+
+Article revisions and the archive version are opaque 32-character lowercase
+hexadecimal tokens. [Schema migration 2](../news/migrations/002-archive.sql)
+initializes them for existing data. SQLite triggers change revisions on article
+insertion or updates to identity, reporter attribution, title, summary, body,
+sources, dates, publication order, or Trash state. These changes and purge also
+change the archive version in the same transaction. Reporter profile edits do
+not change stored historical attribution. The tokens are equality checks, not
+timestamps or sequence numbers.
+
+Start with page 1 without `version`. Send its returned version with every later
+page and each `GET /articles/{id}?version=...` request. Pages after the first
+require a version. Each request checks the version and reads its result in one
+SQLite read transaction. A mismatched version returns HTTP 409 with
+`error:archive_changed`; a malformed version returns 422. Article retrieval
+returns its `revision` and excludes Trash. Retrieval without a version retains
+the existing behavior.
+
+After validating all pages and any downloaded bodies, request manifest page 1
+with the same version and `limit=1` as a final consistency check. Verify the
+version and total again, including for an empty archive. A conflict requires a
+fresh listing, never deletion based on an incomplete one. The worker allows three
+attempts, preserves its last valid cache on preparation failure, and serves no
+stale fallback. Server writers remain free to commit; the protocol detects changes
+instead of holding a database transaction open across HTTP requests. Later changes
+wait for the next batch. See [worker recovery](article-history-search.md#private-state-and-recovery).
 
 ## Calendar, pause, and deletion behavior
 

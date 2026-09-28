@@ -23,6 +23,8 @@ class HistorySmokeTests(unittest.TestCase):
         tests = self.root / "tests"
         (tests / "fixtures").mkdir(parents=True)
         shutil.copy2(ROOT / "tests/history_search_smoke.py", tests)
+        (tests / "app").mkdir()
+        shutil.copy2(ROOT / "tests/app/history_support.py", tests / "app")
         shutil.copy2(ROOT / "tests/fixtures/article-history.json", tests / "fixtures")
         (self.root / "news").symlink_to(ROOT / "news", target_is_directory=True)
         self.fixture = json.loads((tests / "fixtures/article-history.json").read_text())
@@ -60,7 +62,7 @@ class HistorySmokeTests(unittest.TestCase):
         self.assertEqual(len({row["query"] for row in report["queries"]}), 6)
         self.assertTrue(all(row["status"] == "passed" for row in report["queries"]))
         self.assertEqual(next(row["ids"] for row in report["queries"] if row["query"] == query), observed)
-        for check in ("article_read", "model_health", "empty_model_health", "empty_snapshot_and_removal", "cleanup"):
+        for check in ("article_read", "model_health", "empty_model_health", "empty_snapshot_and_removal", "incremental_refresh", "cleanup"):
             self.assertEqual(report[check], "passed")
 
     def test_missing_related_article_fails_and_retains_every_client_result(self):

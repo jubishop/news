@@ -1,13 +1,19 @@
 """QMD executable fake: the worker still performs real sync and process I/O."""
 
+from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
+
+from news.worker_io import APIError, WorkerError
 import sys
 
 
 def fake_qmd(root):
     executable = Path(root) / "qmd"
     executable.write_text(f"#!{sys.executable}\n" + r'''
-import json, os, pathlib, sys
+import json, os, pathlib, sqlite3, sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 root = pathlib.Path(__file__).parent
 settings = json.loads((root / "qmd-settings.json").read_text()) if (root / "qmd-settings.json").exists() else {}
@@ -26,7 +32,10 @@ if sys.argv[1] == "update":
     if settings.get("skip_read"):
         print("Skipped 1 unreadable file(s)", file=sys.stderr)
     else:
-        index.write_text(json.dumps({p.name:p.read_text() for p in pathlib.Path(collection).glob("*.md")}))
+        with sqlite3.connect(index) as connection:
+            connection.execute("CREATE TABLE IF NOT EXISTS documents(name TEXT PRIMARY KEY, body TEXT)")
+            connection.execute("DELETE FROM documents")
+            connection.executemany("INSERT INTO documents VALUES(?,?)", [(p.name,p.read_text()) for p in pathlib.Path(collection).glob("*.md")])
     sys.exit(0)
 if sys.argv[1] in ("embed", "cleanup"):
     sys.exit(0)
@@ -41,7 +50,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(b'{"status":"ok"}')
     def do_POST(self):
         message = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        data = json.loads(index.read_text())
+        with sqlite3.connect(index) as connection:
+            data = dict(connection.execute("SELECT name,body FROM documents"))
         name = message.get("params", {}).get("name")
         args = message.get("params", {}).get("arguments", {})
         with (root / "qmd-requests.jsonl").open("a") as log:
@@ -95,3 +105,51 @@ http.serve_forever()
 ''')
     executable.chmod(0o700)
     return [str(executable)]
+
+
+class Archive:
+    """External News API fake with version guards and transfer measurements."""
+
+    def __init__(self, articles):
+        self.articles = articles
+        self.downloads = 0
+        self.bodies = []
+        self.requests = []
+        self.bytes = 0
+        self.error = False
+        self.before_call = None
+
+    def pages(self, route, field):
+        self.downloads += 1
+        self.bodies.extend(a["id"] for a in self.articles)
+        yield from self.articles
+        if self.error:
+            raise WorkerError("Page two failed.")
+
+    def call(self, route):
+        self.requests.append(route)
+        if self.before_call:
+            self.before_call(route)
+        parsed = urlsplit(route)
+        params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
+        records = [dict(a, revision=hashlib.sha256(json.dumps(a, sort_keys=True).encode()).hexdigest()[:32])
+                   for a in self.articles]
+        version = hashlib.sha256(json.dumps(records, sort_keys=True).encode()).hexdigest()[:32]
+        if "version" in params and params["version"] != version:
+            raise APIError(409, "archive_changed")
+        if parsed.path == "/articles/manifest":
+            page, limit = int(params.get("page", 1)), int(params.get("limit", 100))
+            if page == 1 and "version" not in params:
+                self.downloads += 1
+            if self.error:
+                raise WorkerError("Page two failed.")
+            result = {"articles": [{"id": a["id"], "revision": a["revision"]} for a in records[(page-1)*limit:page*limit]],
+                      "version": version, "page": page, "limit": limit, "total": len(records), "has_more": page*limit < len(records)}
+        else:
+            identity = parsed.path.removeprefix("/articles/")
+            self.bodies.append(identity)
+            result = next((a for a in records if a["id"] == identity), None)
+            if result is None:
+                raise APIError(404)
+        self.bytes += len(json.dumps(result, separators=(",", ":")).encode())
+        return deepcopy(result)

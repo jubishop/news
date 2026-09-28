@@ -1,6 +1,5 @@
 """History snapshot and search lifecycle through API and process boundaries."""
 
-from copy import deepcopy
 import json
 import os
 from pathlib import Path
@@ -10,24 +9,12 @@ import tempfile
 import time
 import unittest
 from urllib import request
+from unittest.mock import patch
 
 from news.worker_history import History
 from news.worker_io import WorkerError
-from history_support import fake_qmd
+from history_support import Archive, fake_qmd
 from test_worker import ARTICLE
-
-
-class Archive:
-    def __init__(self, articles):
-        self.articles = articles
-        self.downloads = 0
-        self.error = False
-
-    def pages(self, route, field):
-        self.downloads += 1
-        yield from self.articles
-        if self.error:
-            raise WorkerError("Page two failed.")
 
 
 class HistoryTests(unittest.TestCase):
@@ -67,7 +54,7 @@ class HistoryTests(unittest.TestCase):
         history = self.history()
         history.prepare(self.api)
         history.close()
-        unchanged = self.root / "state/history/articles/old.md"
+        unchanged = self.root / "state/history/current/articles/old.md"
         stamp = unchanged.stat().st_mtime_ns
         other = dict(ARTICLE, id="other", reporter_id="another")
         self.api.articles.append(other)
@@ -79,13 +66,177 @@ class HistoryTests(unittest.TestCase):
         deletion = self.history()
         deletion.prepare(self.api)
         self.assertFalse(unchanged.exists())
-        self.assertNotIn("old.md", json.loads((self.root / "state/history/index.sqlite").read_text()))
+        self.assertTrue(self.call(deletion, "get", {"file": "qmd://articles/old.md"}).get("isError"))
         deletion.close()
         self.api.articles.append(dict(ARTICLE, id="old", reporter_id="reporter"))
         restoration = self.history()
         restoration.prepare(self.api)
         self.assertTrue(unchanged.exists())
         self.assertEqual(restoration.snapshot["article_count"], 2)
+
+    def test_unchanged_refresh_downloads_no_bodies_and_repairs_only_missing_files(self):
+        self.api.articles[0]["body_markdown"] = "First café paragraph.\r\n\r\nSecond paragraph."
+        first = self.history()
+        first.prepare(self.api)
+        first.close()
+        self.api.bodies.clear()
+        second = self.history()
+        second.prepare(self.api)
+        second.close()
+        self.assertEqual(self.api.bodies, [])
+        (self.root / "state/history/current/articles/old.md").unlink()
+        repaired = self.history()
+        repaired.prepare(self.api)
+        self.assertEqual(self.api.bodies, ["old"])
+
+    def test_changes_corruption_and_missing_cache_records_fetch_only_affected_articles(self):
+        self.api.articles.append(dict(ARTICLE, id="other", reporter_id="other"))
+        initial = self.history()
+        initial.prepare(self.api)
+        initial.close()
+        cache = self.root / "state/history/current"
+        for mutation in ("body", "metadata", "file", "record"):
+            with self.subTest(mutation=mutation):
+                if mutation == "body":
+                    self.api.articles[0]["body_markdown"] = "A changed body"
+                elif mutation == "metadata":
+                    self.api.articles[0]["reporter_name"] = "Corrected attribution"
+                elif mutation == "file":
+                    (cache / "articles/old.md").write_text("Damaged Markdown")
+                else:
+                    records = json.loads((cache / "cache.json").read_text())
+                    del records["articles"]["old"]
+                    (cache / "cache.json").write_text(json.dumps(records))
+                self.api.bodies.clear()
+                history = self.history()
+                history.prepare(self.api)
+                history.close()
+                self.assertEqual(self.api.bodies, ["old"])
+                self.assertIn("A changed body", (cache / "articles/old.md").read_text())
+        (cache / "cache.json").write_text("broken JSON")
+        self.api.bodies.clear()
+        rebuilt = self.history()
+        rebuilt.prepare(self.api)
+        rebuilt.close()
+        self.assertEqual(self.api.bodies, ["old", "other"])
+        (cache / "index.sqlite").write_bytes(b"broken index")
+        self.api.bodies.clear()
+        self.history().prepare(self.api)
+        self.assertEqual(self.api.bodies, [])
+
+    def test_legacy_cache_upgrade_reuses_index_and_removes_obsolete_layout(self):
+        initial = self.history()
+        initial.prepare(self.api)
+        initial.close()
+        root = self.root / "state/history"
+        generation = (root / "current").resolve()
+        (root / "current").unlink()
+        for name in ("articles", "index.sqlite", "config", "snapshot.json"):
+            (generation / name).rename(root / name)
+        self.api.bodies.clear()
+        upgraded = self.history()
+        upgraded.prepare(self.api)
+        self.assertEqual(self.api.bodies, ["old"])
+        self.assertTrue(self.call(upgraded, "query", {"query": "prior"})["structuredContent"]["results"])
+        self.assertFalse((root / "articles").exists())
+        self.assertFalse((root / "index.sqlite").exists())
+        self.assertFalse(generation.exists())
+
+    def test_malformed_or_truncated_manifest_never_removes_valid_cached_content(self):
+        initial = self.history()
+        initial.prepare(self.api)
+        initial.close()
+        current = self.root / "state/history/current"
+        previous = current.resolve()
+        original = self.api.call
+        for change in ({"articles": []}, {"total": 0}, {"has_more": True}, {"version": None}, {"page": 2}, {"limit": True}):
+            with self.subTest(change=change):
+                self.api.call = lambda route: original(route) | change if "/manifest?" in route else original(route)
+                failed = self.history()
+                with self.assertRaises(WorkerError):
+                    failed.prepare(self.api)
+                self.assertFalse(failed.ready)
+                self.assertEqual(current.resolve(), previous)
+                self.assertTrue((current / "articles/old.md").exists())
+        self.api.call = original
+
+    def test_changes_during_pages_body_fetch_and_final_guard_retry_complete_snapshot(self):
+        self.api.articles = [dict(ARTICLE, id=f"story{n}", reporter_id="reporter") for n in range(101)]
+        for phase in ("page", "body", "final"):
+            with self.subTest(phase=phase):
+                changed = False
+                def mutate(route):
+                    nonlocal changed
+                    match = {"page": "page=2", "body": "/articles/story0?", "final": "limit=1&"}[phase]
+                    if not changed and match in route:
+                        changed = True
+                        self.api.articles.append(dict(ARTICLE, id="added-" + phase, reporter_id="reporter"))
+                self.api.before_call = mutate
+                # Require story0 to be fetched in each phase.
+                self.api.articles[0]["summary"] = phase
+                history = self.history()
+                history.prepare(self.api)
+                history.close()
+                self.assertTrue(changed)
+                self.assertEqual(history.snapshot["article_count"], len(self.api.articles))
+                self.assertEqual({p.stem for p in (self.root / "state/history/current/articles").glob("*.md")},
+                                 {a["id"] for a in self.api.articles})
+
+    def test_interrupted_or_unstable_refresh_preserves_entire_last_snapshot(self):
+        old = self.history()
+        old.prepare(self.api)
+        old.close()
+        current = self.root / "state/history/current"
+        previous = current.resolve()
+        snapshot = (current / "snapshot.json").read_bytes()
+        self.api.articles = [dict(ARTICLE, id=f"story{n}", reporter_id="reporter") for n in range(101)]
+        for phase in ("page=2", "/articles/story0?", "limit=1&", "unstable"):
+            with self.subTest(phase=phase):
+                def interrupt(route):
+                    if phase in route:
+                        raise WorkerError("Interrupted request")
+                    if phase == "unstable" and "version=" in route:
+                        self.api.articles[0]["summary"] += "."
+                self.api.before_call = interrupt
+                history = self.history()
+                with self.assertRaises(WorkerError):
+                    history.prepare(self.api)
+                self.assertFalse(history.ready)
+                self.assertIsNone(history.endpoint)
+                self.assertEqual(current.resolve(), previous)
+                self.assertEqual((current / "snapshot.json").read_bytes(), snapshot)
+                self.assertEqual({p.stem for p in (current / "articles").glob("*.md")}, {"old"})
+        self.api.before_call = None
+        recovered = self.history()
+        recovered.prepare(self.api)
+        self.assertEqual(recovered.snapshot["article_count"], 101)
+
+    def test_failed_index_or_atomic_switch_retains_previous_snapshot_and_recovers(self):
+        old = self.history()
+        old.prepare(self.api)
+        old.close()
+        current = self.root / "state/history/current"
+        previous = current.resolve()
+        old_body = (current / "articles/old.md").read_bytes()
+        self.api.articles[0]["summary"] = "Changed"
+        (self.root / "qmd-settings.json").write_text(json.dumps({"fail": "embed"}))
+        with self.assertRaisesRegex(WorkerError, "embed failed"):
+            self.history().prepare(self.api)
+        self.assertEqual(current.resolve(), previous)
+        self.assertEqual((current / "articles/old.md").read_bytes(), old_body)
+        (self.root / "qmd-settings.json").unlink()
+        replace = os.replace
+        def fail_switch(source, target):
+            if Path(target).name == "current" and Path(target).parent.resolve() == current.parent.resolve():
+                raise OSError("Disk failure")
+            return replace(source, target)
+        with patch("os.replace", side_effect=fail_switch):
+            with self.assertRaises(WorkerError):
+                self.history().prepare(self.api)
+        self.assertEqual(current.resolve(), previous)
+        recovered = self.history()
+        recovered.prepare(self.api)
+        self.assertIn("Changed", self.call(recovered, "get", {"file": "qmd://articles/old.md"})["content"][0]["resource"]["text"])
 
     def test_failed_download_preserves_previous_files_but_does_not_serve_them(self):
         history = self.history()
@@ -99,7 +250,7 @@ class HistoryTests(unittest.TestCase):
                 failed.prepare(self.api)
         self.assertEqual(self.api.downloads, 2)
         self.assertIsNone(failed.endpoint)
-        files = {p.name for p in (self.root / "state/history/articles").iterdir()}
+        files = {p.name for p in (self.root / "state/history/current/articles").iterdir()}
         self.assertEqual(files, {"old.md"})
 
     def test_invalid_archive_records_are_failures_before_indexing(self):
@@ -201,11 +352,10 @@ class HistoryTests(unittest.TestCase):
 import json, pathlib, sys, time
 from news.worker_history import History
 fixture = json.loads(pathlib.Path(sys.argv[1]).read_text())
-class API:
-    def pages(self, route, field):
-        yield from fixture["articles"]
+sys.path.insert(0, str(pathlib.Path.cwd() / "tests/app"))
+from history_support import Archive
 history = History(fixture["settings"])
-history.prepare(API())
+history.prepare(Archive(fixture["articles"]))
 pathlib.Path(sys.argv[1]+".ready").touch()
 time.sleep(30)
 '''

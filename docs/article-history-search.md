@@ -44,34 +44,46 @@ replacement for QMD's retrieval pipeline. No Python dependency was added.
 
 ## Snapshot and access boundaries
 
-The first research attempt downloads all retained articles through the existing
-paginated worker API. Other attempts wait for this shared preparation. Paused
-acknowledgments and empty batches do not start QMD. Saved pending publications
-are delivered before snapshot preparation, so they are included when visible
-in the API. Each reporter still receives up to 20 recent article summaries and
-30 recent run outcomes.
+The first research attempt refreshes the retained archive through the authenticated
+[manifest protocol](server-contract.md#archive-manifest-protocol). Other attempts
+wait for this shared preparation. Paused acknowledgments and empty batches do not
+start QMD. Saved pending publications are delivered first, so the snapshot includes
+them when visible in the API. Each reporter still receives up to 20 recent article
+summaries and 30 recent run outcomes.
 
-The supervisor validates every page and article before replacing article files.
-Each Markdown record includes its article ID, original reporter attribution,
-article and coverage dates, summary, body, and source links. Unchanged files
-keep their modification times. QMD updates its index, removes inactive records
-and orphaned content, and embeds only missing or changed content. A failed
-refresh prevents research from using the old index. Preparation failure is
-cached for that batch; its retry attempts report failure. A new worker start
-tries preparation again.
+The supervisor lists IDs and revisions in pages of 100, then downloads only new,
+changed, restored, or locally damaged articles. It checks cached Markdown and
+summary metadata against local SHA-256 digests. Missing records are downloaded
+again. An unchanged archive transfers no article bodies. The first download, a
+missing cache manifest, or an invalid manifest requires all bodies once.
+
+Every page and body request after the first carries the archive version. A final
+manifest request with `limit=1` checks that version again, including for an empty
+archive. Publication, content or attribution edits, Trash, restore, or purge change
+the version. The worker restarts an inconsistent download, with at most three
+complete attempts. Network failures, malformed or incomplete pages, and repeated
+archive changes fail the batch explicitly. A partial listing never removes cached
+records. The successful version defines a complete archive at the final check;
+changes after that check wait until the next batch.
+
+Preparation builds a separate local generation. Unchanged Markdown files use hard
+links to retain their contents and modification times. Each record includes its
+ID, original reporter attribution, dates, summary, body, and source links. The
+worker copies the previous SQLite index with SQLite's backup API, including any
+committed WAL content. QMD updates that copy, removes inactive records and orphaned
+content, and embeds only missing or changed content.
 
 QMD can exit successfully after skipping unreadable files or failing to embed
-some articles. The worker rejects skipped reads and checks QMD's index status
-before declaring the snapshot ready: the document count must match the archive,
-no embeddings may be pending, and a nonempty archive must have a vector index.
-This status check is supervisor-only; reporters still receive only `query`
-and `get`.
+some articles. The worker rejects skipped reads and checks QMD's index status:
+the document count must match the archive, no embeddings may be pending, and a
+nonempty archive must have a vector index. This status check is supervisor-only;
+reporters still receive only `query` and `get`.
 
-The API uses offset pagination. It does not provide a transactionally frozen
-export. No new reporter research starts until download completes, but an owner
-can still change Trash while pages are being fetched. Such changes can shift
-pages. The snapshot means the completed local download shared by all reporters,
-not an atomic database view at a precise timestamp.
+Only after validation does one atomic pointer replacement publish the generation.
+Old generations are then removed. A download, index, or promotion failure leaves
+the previous valid generation intact and prevents research from using it. The
+failure is cached for that batch; retries report the failure. A new worker start
+tries preparation again. Up to eight reporters share the same fixed generation.
 
 The worker starts one QMD HTTP process on a selected loopback port. Its index
 contains only News articles. Personal QMD collections and the repository's
@@ -143,34 +155,50 @@ bin/worker --config ~/.config/news/worker.json --prepare-history
 ```
 
 `--check` verifies the QMD version, Codex login, and API access without calling
-a model. `--prepare-history` downloads the archive, updates embeddings, and
+a model. `--prepare-history` synchronizes the archive, updates embeddings, and
 verifies search-service startup without claiming jobs or publishing. It obtains
 the same worker lock and refuses to run during a reporting batch. It can call
 local embedding models and download missing model files. It does not run Codex
 or prove query-expansion/reranking quality; use the smoke test below for that.
 
-After this change merges, update the permanent worker checkout to the reviewed
-revision, provision its QMD command and models, and run these two checks. Run
+After the manifest change merges, verify successful server deployment and its
+schema migration before updating the permanent worker checkout. The new worker
+requires the manifest endpoint; it fails explicitly against an older server.
+Preserve its QMD command and models, then run these two checks twice. The second
+preparation should download no bodies and reuse embeddings. Run
 the synthetic smoke test with the same configured command. Preserve the cron
 entry and pending delivery state. This immediate verification does not require
 waiting for tomorrow's batch or claiming a real reporter.
 
 ## Private state and recovery
 
-`state_dir/history/` holds the latest Markdown records, QMD configuration,
-SQLite index, snapshot timestamp/count, and logs from the latest preparation
-and search service. Its parent directory is mode 0700. This derived state can
-be rebuilt from the API. It is separate from durable `pending/` submissions.
-Article files removed from the API are removed here at the next successful
-refresh. Older reporter diagnostics can retain summaries and retrieved excerpts
-for the existing seven-day log period.
+`state_dir/history/current` points to the last validated `generation-*` directory.
+Each generation contains `articles/`, `cache.json` (revisions, summaries, and
+integrity digests), `config/`, `index.sqlite`, and `snapshot.json` (timestamp,
+count, and archive version). `history/indexing.log` and `history/search.log` hold
+diagnostics from the latest attempt. The history directory is mode 0700, and
+article and manifest files are mode 0600. This derived state is separate from
+durable `pending/` submissions.
 
-On failure, inspect `history/indexing.log`, `history/search.log`, and the
-attempt's `failure.json`. Correct the runtime, model, disk, or API problem,
-then rerun preparation when no batch is active. A damaged derived index can be
-moved aside for rebuilding after confirming the worker is stopped. Never remove
-the worker lock or pending results as an index-repair step. Do not copy private
-logs to the public issue tracker.
+The first refresh after upgrading an older cache downloads all bodies once and
+copies its existing index to retain embeddings. The old layout is removed only
+after successful validation. Articles removed from the server disappear from the
+active cache and index at the next successful refresh. Older reporter diagnostics
+can retain excerpts for the existing seven-day log period.
+
+On failure, inspect the history logs and the attempt's `failure.json`. Correct the
+runtime, model, disk, or API problem, then rerun preparation when no batch is active.
+A missing or corrupt cache record is repaired from the server. An unreadable SQLite
+database is rebuilt from the cached article files. If QMD still rejects an index,
+move the derived `history/` directory aside while the worker is stopped and prepare
+again. A crash before the pointer switch leaves the previous generation current;
+an unreferenced generation is discarded after the next successful refresh. Allow
+space for a second index and changed articles during preparation. Cached Markdown
+is read locally to check integrity; this change reduces network transfer, not all
+local disk work.
+
+Never remove the worker lock or pending results as an index-repair step. Do not
+copy private logs to the public issue tracker.
 
 ## Validation and limits
 
@@ -189,7 +217,8 @@ related stories with different wording and similar but distinct versions:
 
 Use `--qmd-command /absolute/runtime /absolute/qmd-launcher` when needed. The
 [smoke test](../tests/history_search_smoke.py) checks eight concurrent clients,
-six query cases, article metadata and source retrieval, deletion, and an empty
+six query cases, article metadata and source retrieval, an unchanged refresh,
+deletion, and an empty
 archive. It uses an isolated temporary index inside this checkout's `.cache/`
 and writes `.cache/history-search-smoke.json`. It calls only local models.
 The broad medicine query requires all three related articles in the first five
@@ -202,7 +231,7 @@ Each invocation replaces the previous report with `status: running` before
 loading the fixture or preparing QMD. It saves every completed client's ranked
 IDs, response, timing, and failure, then finishes with `passed` or `failed`.
 Handled failures exit nonzero. An interrupted run can leave `running`, which
-is not a successful result. Indexing and search logs from both snapshots are
+is not a successful result. Indexing and search logs from all generations are
 copied into the report before the temporary index is removed. Query failures
 do not suppress the other clients, article read, or model-health checks.
 Copy this report after each invocation when comparing independent runs; the
@@ -215,3 +244,29 @@ query. A real Codex CLI 0.157.1 / GPT-6 Luna probe also searched the fictional
 Orion 2.1 story and retrieved its identity and coverage dates through these
 MCP tools, without a production API call. These small synthetic checks do not
 establish recall on a large archive or guarantee that reporters avoid repeats.
+
+
+### Synchronization cost
+
+The September 27, 2026 automated HTTP measurement uses the real Flask/SQLite API
+with 205 synthetic articles, each with about 21 KB of Markdown. Counts include
+all manifest pages and the final version check. Bytes are uncompressed JSON
+response bodies; HTTP headers and transport overhead are excluded. Opaque IDs can
+slightly change the final one-record check's size.
+
+| Refresh | Requests | Article bodies | Response bytes, approximately |
+| --- | ---: | ---: | ---: |
+| Previous full-search protocol, every batch | 3 | 205 | 4.71 MB |
+| New initial synchronization | 209 | 205 | 4.72 MB |
+| New unchanged synchronization | 4 | 0 | 13.5 KB |
+| New synchronization with one changed article | 5 | 1 | 36.5 KB |
+
+Trash and purge need no bodies; restoration and one addition each need one.
+The remaining manifest cost grows with article count: one ID and 32-character
+revision per article, page envelopes, and one final one-record check. Initial
+synchronization makes more requests because bodies use individual retrieval.
+Local preparation copies the index and checks cached file bytes. A change feed
+or bulk body-fetch endpoint is not required for this network improvement.
+
+The real-QMD check also verified 14 unchanged documents, zero new or updated
+documents, and reuse of all existing embeddings after the generation switch.
