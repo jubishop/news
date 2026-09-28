@@ -122,18 +122,22 @@ class ArchiveCache:
                 if identity in records:
                     raise ArchiveChanged("News API repeated an archive article.")
                 entry, source = cached.get(identity), self.previous / "articles" / f"{identity}.md"
+                try:
+                    cached_bytes = source.read_bytes()
+                except OSError:
+                    cached_bytes = None
                 text = None
-                if isinstance(entry, dict) and entry.get("revision") == expected:
+                if cached_bytes is not None and isinstance(entry, dict) and entry.get("revision") == expected:
                     try:
-                        text = source.read_bytes().decode("utf-8")
+                        text = cached_bytes.decode("utf-8")
                         if entry["summary"]["id"] != identity or entry["digest"] != digest(entry, text):
                             text = None
-                    except (OSError, ValueError, KeyError, TypeError):
+                    except (ValueError, KeyError, TypeError):
                         text = None
                 if text is None:
                     entry, text = render(api.call(f"/articles/{identity}?version={version}"), identity, expected)
                 target = articles / f"{identity}.md"
-                if source.is_file() and source.read_bytes() == text.encode():
+                if cached_bytes == text.encode():
                     os.link(source, target)
                 else:
                     target.write_text(text, encoding="utf-8")

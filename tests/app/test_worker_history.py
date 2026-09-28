@@ -124,6 +124,33 @@ class HistoryTests(unittest.TestCase):
         self.history().prepare(self.api)
         self.assertEqual(self.api.bodies, [])
 
+    def test_unreadable_cached_article_is_repaired_without_refetching_other_records(self):
+        self.api.articles.append(dict(ARTICLE, id="other", reporter_id="other"))
+        initial = self.history()
+        initial.prepare(self.api)
+        initial.close()
+        damaged = self.root / "state/history/current/articles/old.md"
+        read_bytes = Path.read_bytes
+
+        def read_cached(path):
+            if path.resolve() == damaged.resolve():
+                raise PermissionError("Cached article is unreadable")
+            return read_bytes(path)
+
+        for changed in (False, True):
+            with self.subTest(changed=changed):
+                if changed:
+                    self.api.articles[0]["summary"] = "Updated summary"
+                self.api.bodies.clear()
+                repaired = self.history()
+                with patch.object(Path, "read_bytes", read_cached):
+                    repaired.prepare(self.api)
+                self.assertEqual(self.api.bodies, ["old"])
+                self.assertEqual(repaired.snapshot["article_count"], 2)
+                article = self.call(repaired, "get", {"file": "qmd://articles/old.md"})["content"][0]["resource"]["text"]
+                self.assertIn(self.api.articles[0]["summary"], article)
+                repaired.close()
+
     def test_legacy_cache_upgrade_reuses_index_and_removes_obsolete_layout(self):
         initial = self.history()
         initial.prepare(self.api)
