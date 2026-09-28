@@ -9,6 +9,79 @@ from preview import preview
 
 
 class BrowserJourney(unittest.TestCase):
+    def test_feed_has_one_column_and_equal_story_prominence(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            for day in (27, 28):
+                fixture.at(f"2026-09-{day}T12:00:00-07:00")
+                run = fixture.work()[0]["id"]
+                claim = fixture.claim(run)
+                response = fixture.result(
+                    run,
+                    fixture.envelope(
+                        claim,
+                        articles=[
+                            fixture.article(
+                                title=f"Bulletin {day}: research update {index}",
+                                summary="A sample report with useful context. "
+                                * (1 + index % 3),
+                            )
+                            for index in range(16)
+                        ],
+                    ),
+                )
+                self.assertEqual(response.status_code, 200)
+            reporter = claim["reporter"]["id"]
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page()
+                for width in (1280, 768, 390):
+                    page.set_viewport_size({"width": width, "height": 900})
+                    for query, count in (
+                        ("", 30),
+                        ("?page=2", 4),
+                        (f"?reporter_id={reporter}&q=Bulletin", 30),
+                    ):
+                        with self.subTest(width=width, query=query):
+                            page.goto(fixture.base_url + "/" + query)
+                            stories = page.get_by_role("article")
+                            expect(stories).to_have_count(count)
+                            boxes = [story.bounding_box() for story in stories.all()]
+                            for previous, current in zip(boxes, boxes[1:]):
+                                self.assertAlmostEqual(current["x"], previous["x"])
+                                self.assertAlmostEqual(
+                                    current["width"], previous["width"]
+                                )
+                                self.assertGreaterEqual(
+                                    current["y"], previous["y"] + previous["height"]
+                                )
+                            for selector in ("h2", "p"):
+                                styles = stories.locator(selector).evaluate_all(
+                                    """elements => elements.map(element => {
+                                        const style = getComputedStyle(element);
+                                        return [style.fontSize, style.fontFamily,
+                                                style.fontWeight, style.lineHeight];
+                                    })"""
+                                )
+                                self.assertTrue(
+                                    all(style == styles[0] for style in styles),
+                                    f"Unequal {selector} typography: {styles}",
+                                )
+                            self.assertTrue(
+                                page.evaluate(
+                                    "document.documentElement.scrollWidth <= innerWidth"
+                                )
+                            )
+                page.get_by_role("link", name="Older stories →").click()
+                expect(page.get_by_role("article")).to_have_count(2)
+                expect(page.get_by_label("Search stories")).to_have_value("Bulletin")
+                expect(page.get_by_label("From the desk of")).to_have_value(reporter)
+                story = page.get_by_role("article").first
+                title = story.get_by_role("heading").inner_text()
+                story.get_by_role("link", name="Read the story").click()
+                expect(page.get_by_role("heading", name=title)).to_be_visible()
+            finally:
+                browser.close()
+
     def test_inactive_schedule_fields_do_not_block_submission(self):
         with preview() as fixture, sync_playwright() as playwright:
             browser = playwright.chromium.launch()
