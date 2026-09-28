@@ -40,6 +40,10 @@ Follow the engineering policies linked below:
 - Declare supported [runtime and toolchain versions](docs/development-workflow.md#runtime-and-toolchain-versions)
   and keep development, CI, and deployment compatible.
 
+Before pushing or merging to `main`, assess the complete delivery under the
+[deployment policy](docs/deployment.md#deployment-decisions). Record a skip
+decision only for functionally immaterial changes with no outstanding material
+release. Full CI checks still run.
 
 Run `bin/setup` after cloning. Choose checks for the changed files: use
 `bin/check --documents-only` for Markdown edits and `bin/check` for foundation

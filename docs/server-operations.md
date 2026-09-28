@@ -116,8 +116,10 @@ Only deploy a reviewed revision with successful full validation. Export that
 revision (for example with `git archive`) into `/opt/news/releases/REVISION` on
 the VPS. Do not copy `.venv`, caches, local `.env` files, or preview databases.
 Run the uploaded `ops/install-server /opt/news/releases/REVISION` as root.
-The [automatic workflow](deployment.md) performs this sequence for pushes to
-`main`; use manual installation only for operator-led recovery or setup.
+The [automatic workflow](deployment.md) performs this sequence for material
+deliveries to `main`; reviewed immaterial changes can skip deployment under
+the [deployment policy](deployment.md#deployment-decisions). Use manual
+installation only for operator-led recovery or setup.
 
 The installer builds the production environment before stopping any service.
 It uses a dedicated unprivileged `news` account and root-owned release code.

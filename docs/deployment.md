@@ -12,10 +12,11 @@ This supersedes the earlier PR-only delivery scope for server implementation.
 ## Release workflow
 
 [Repository checks](../.github/workflows/check.yml) runs full validation on
-Python 3.12, 3.13, and 3.14. A push to `main`, including a merged PR, deploys
-only after all three jobs succeed. PR checks cannot deploy or read production
-credentials. The workflow also supports a manual run on `main` to retry a
-release; it performs the same checks first.
+Python 3.12, 3.13, and 3.14 for every push and PR. A push to `main`, including
+a merged PR, deploys after all three jobs succeed unless it carries the
+explicit skip decision described below. PR checks cannot deploy or read
+production credentials. A manual run on `main` requests deployment even when
+the commit carries a skip decision; it performs the same checks first.
 
 The production environment permits only the `main` branch. A new push does
 not cancel a running deployment. Runs are serialized, and a waiting run can
@@ -49,6 +50,47 @@ The workflow uses GitHub's
 [job dependencies](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds)
 and [concurrency controls](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency),
 checked September 25, 2026. The VPS lock also protects against manual installs.
+
+## Deployment decisions
+
+On September 28, 2026, the owner requested that functionally immaterial changes
+stop causing production deployments. The agent preparing the push or merge
+assesses the complete delivery and records its decision in the final commit.
+CI executes that decision; it does not infer functional impact from filenames.
+
+Deploy changes that can affect the server's behavior, rendered content,
+dependencies, data, runtime settings, or production operations. Documentation,
+comments, formatting-only edits, and tooling changes that leave the production
+release unaffected can skip deployment. Consider the actual effect: Markdown
+used as application content can be material, while a source comment can be
+immaterial.
+
+Before choosing to skip, confirm production already contains all outstanding
+material changes. Review the complete change since that deployed revision,
+including earlier commits in the push or merge. A pending or failed material
+release still needs deployment; a later documentation commit must not suppress
+it. For mixed changes or uncertainty, retain the default deployment.
+
+For a reviewed immaterial delivery, add these Git trailers at the end of the
+final commit message, after a blank line, with a specific reason:
+
+```text
+News-Deploy: skip
+News-Deploy-Reason: Agent instructions only; production contains all material changes.
+```
+
+Preserve the trailers in the final squash or merge commit that reaches `main`.
+An unmarked commit, a missing reason, or conflicting decisions keeps deployment
+enabled. Do not use a CI-skip marker: all validation still runs.
+
+[deployment-decision](../bin/deployment-decision) reads the tested commit's
+trailers and supplies the deploy job's condition. A skipped deployment never
+starts that job or loads its production credentials. The decision and reason
+remain reviewable in Git and in the decision job's log. This relies on the
+agent's assessment; it is not an automatic proof that two versions behave alike.
+
+Use **Run workflow** on `main` when an explicit deployment or retry is needed,
+including for a commit that previously skipped deployment.
 
 ## One-time setup
 

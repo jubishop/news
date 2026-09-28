@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+"""Report whether a validated workflow run should deploy production."""
+
+import argparse
+import re
+import subprocess
+import sys
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("event")
+    parser.add_argument("ref")
+    parser.add_argument("revision")
+    args = parser.parse_args()
+    deploy = args.ref == "refs/heads/main" and args.event in {"push", "workflow_dispatch"}
+    if deploy and args.event == "push":
+        if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
+            raise ValueError("Expected a full commit SHA.")
+        message = subprocess.run(
+            ["git", "show", "-s", "--format=%B", args.revision],
+            check=True, capture_output=True, text=True,
+        ).stdout
+        trailers = subprocess.run(
+            ["git", "interpret-trailers", "--parse"],
+            input=message, check=True, capture_output=True, text=True,
+        ).stdout
+        decisions, reasons = [], []
+        for line in trailers.splitlines():
+            key, _, value = line.partition(":")
+            if key.lower() == "news-deploy":
+                decisions.append(value.strip())
+            elif key.lower() == "news-deploy-reason":
+                reasons.append(value.strip())
+        if decisions == ["skip"] and len(reasons) == 1 and reasons[0]:
+            deploy = False
+            print("Skipping deployment: " + reasons[0], file=sys.stderr)
+    print("deploy=" + str(deploy).lower())
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(str(error), file=sys.stderr)
+        sys.exit(1)
