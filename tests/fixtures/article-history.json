@@ -242,6 +242,7 @@
   "queries": [
     {
       "query": "medicines for losing weight",
+      "first_any_of": ["obesity", "obesity-followup", "apnea"],
       "expected": [
         "obesity",
         "obesity-followup",
@@ -250,30 +251,35 @@
     },
     {
       "query": "private offline AI on a personal computer",
+      "first_any_of": ["local-model"],
       "expected": [
         "local-model"
       ]
     },
     {
       "query": "rainy day activities for young kids",
+      "first_any_of": ["children-museum"],
       "expected": [
         "children-museum"
       ]
     },
     {
       "query": "why electric cars replenish energy slowly in cold weather",
+      "first_any_of": ["ev-charging"],
       "expected": [
         "ev-charging"
       ]
     },
     {
       "query": "Orion 2.1 JSON bug fix",
+      "first_any_of": ["model-v21"],
       "expected": [
         "model-v21"
       ]
     },
     {
       "query": "what happens when patients discontinue anti-obesity medication",
+      "first_any_of": ["obesity-followup"],
       "expected": [
         "obesity-followup"
       ]

@@ -192,6 +192,22 @@ Use `--qmd-command /absolute/runtime /absolute/qmd-launcher` when needed. The
 six query cases, article metadata and source retrieval, deletion, and an empty
 archive. It uses an isolated temporary index inside this checkout's `.cache/`
 and writes `.cache/history-search-smoke.json`. It calls only local models.
+The broad medicine query requires all three related articles in the first five
+results and any one of those articles first. The focused queries still require
+their specified article first, including Orion 2.1 ahead of Orion 2. The fixture
+records the required set in `expected` and the allowed first results in
+`first_any_of`; the order of `expected` does not define ranking.
+
+Each invocation replaces the previous report with `status: running` before
+loading the fixture or preparing QMD. It saves every completed client's ranked
+IDs, response, timing, and failure, then finishes with `passed` or `failed`.
+Handled failures exit nonzero. An interrupted run can leave `running`, which
+is not a successful result. Indexing and search logs from both snapshots are
+copied into the report before the temporary index is removed. Query failures
+do not suppress the other clients, article read, or model-health checks.
+Copy this report after each invocation when comparing independent runs; the
+next invocation replaces it. Diagnose any failed run instead of retrying until
+one passes. These synthetic reports contain no private archive articles.
 
 The September 27 pilot ranked the intended primary article first in all six
 queries. All three expected articles were returned for the broader medicine
