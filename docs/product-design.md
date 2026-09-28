@@ -114,13 +114,13 @@ reporter resumed on Friday waits until the next Thursday. If today's scheduled
 run is still pending when the reporter resumes, the worker may perform it
 when it checks.
 
-An unfinished one-time contractor whose due date has passed becomes available
-at the next worker check after resumption. Retain its original assignment and
-due date, including when the worker previously acknowledged it as paused.
+An unfinished contractor becomes available at the next worker check after
+resumption. Retain its original dates and pause acknowledgments, then combine
+unfinished due dates under the [contractor catch-up rule](contractor-schedules.md).
 
 The owner accepted this recommendation; no further reason was stated. It
 preserves recurring schedules while allowing a paused contractor to finish
-its single assignment. The tradeoff is that recurring reporting may wait until
+its unfinished assignments. The tradeoff is that recurring reporting may wait until
 the next scheduled day. The prompt and worker still determine the article's
 coverage span, including how to treat the gap during a pause.
 
@@ -191,80 +191,29 @@ research, which supersedes the earlier Qwen/Pi choice.
 
 ### Recurring reporters and one-time contractors
 
-Accepted on September 25, 2026: once a contractor's assignment is due, keep
-its original date fixed. The owner can still change its instructions, pause
-or resume it, and remove it. This preserves one assignment and its history.
-Before the due day, its scheduled date can still change under the normal
-schedule activation rule.
+Accepted on September 24, 2026: most reporters run on a repeating schedule;
+contractors support finite assignments and leave the active roster after
+successful completion. On September 28, the owner extended contractors to
+any number of specific dates, keeping one Contractor option. A single date
+remains the simplest case.
 
+The [contractor date rules](contractor-schedules.md) record the accepted date
+editing, catch-up, completion, pause, and retry decisions. They supersede the
+original single-date restriction and retirement after the first successful
+result. Articles and run history remain after retirement.
 
-Accepted on September 24, 2026: most reporters run on a repeating schedule.
-The owner can also create a contractor with a one-time assignment and schedule.
-The contractor performs the assignment once and then disappears from the
-newsroom.
-
-This supports occasional research without leaving a permanent reporter in
-the active roster. Retry details and retention of contractor records remain
-open. Disappearance from the newsroom does not specify physical deletion from
-storage. Failures follow the notification policy below.
-
-Accepted on September 25, 2026: remove a contractor from the active newsroom
-only after a successful result, including a successful "nothing to publish"
-result. A failed, overdue, or paused contractor remains visible with its
-status. A pause acknowledgment is not successful research and does not finish
-the contract. Published articles remain available under the independent
-article lifecycle.
-
-The owner accepted this completion rule; no further reason was stated. It
-keeps unfinished assignments visible while completed contractors leave the
-active roster. The tradeoff is that a failed contractor can remain until the
-work succeeds or the owner deletes it. Detailed retry behavior remains to be
-specified.
-
-Accepted on September 25, 2026: a one-time assignment that misses its reporting
-day does not automatically expire. Keep it visible as overdue and offer it
-when the worker next connects, with the original due date and instructions.
-The worker uses the prompt to decide whether the assignment remains useful.
-If it is no longer useful, it can return a successful "nothing to publish"
-result with a reason, which completes the contractor. A failure keeps the
-contractor visible under the bounded retry policy.
-
-The owner accepted this recommendation; no further reason was stated. It
-leaves judgments about usefulness with the prompt and worker instead of
-making the server infer them. The tradeoff is that an overdue assignment
-remains visible until it receives a successful result or the owner removes it.
-No automatic expiration does not mean unlimited retries after failure.
-
-Accepted on September 25, 2026: after a one-time contractor exhausts its
-retries, saving revised instructions makes the same assignment eligible for
-a fresh bounded set of attempts at the next worker check. Keep its original
-assignment identity and previous attempts and errors. Without that instruction
-change, the contractor stays visibly failed and does not retry indefinitely
-on subsequent days.
-
-The owner accepted the recommendation; no further reason was stated. This
-lets the owner correct an assignment through the newsroom without adding a
-"Run now" button. The tradeoff is that editing a failed contractor's instructions
-also requests another attempt when the worker next checks. Resubmitting
-unchanged instructions or making a cosmetic name edit does not replenish the
-retry allowance. Existing pause and deletion rules still govern eligibility.
-
-Accepted on September 25, 2026: a reporter's category is fixed after creation
-in v1. Recurring reporters can change between daily, weekly, and monthly
-schedules. One-time contractors remain one-time assignments. To change category,
-create a new reporter; articles from the original reporter remain available
-with their original attribution.
-
-The owner accepted this recommendation; no further reason was stated. It
-avoids ambiguity about contractor completion when a schedule changes while
-work is underway. The tradeoff is creating a new reporter instead of converting
-an existing one. Conversion can be considered later; it does not add article
-inheritance or reassignment to v1.
+Accepted on September 25, 2026: a reporter's category is fixed after creation.
+Recurring reporters can change between daily, weekly, and monthly schedules.
+Contractors remain finite date lists. To change category, create a new
+reporter; articles retain their original attribution. The owner accepted the
+recommendation without a further stated reason. This avoids changing
+completion rules while work is underway, at the cost of creating a new
+reporter for a different category.
 
 ### Schedules by day
 
 Accepted on September 25, 2026: schedule reporting by day, with daily, weekly
-on selected days, monthly, and one-time cadences. The newsroom does not ask
+on selected days, monthly, and contractor assignment dates. The newsroom does not ask
 for a clock time. The worker chooses when to execute within a reporting day;
 the server does not need that planned execution time. Interpret reporting
 dates in Pacific Time.
@@ -279,7 +228,7 @@ allows the full reporting day.
 Accepted on September 25, 2026: new reporters and schedule changes take effect
 starting tomorrow in Pacific Time. The first expected run uses the next
 matching scheduled date after today. Schedule edits preserve today's existing
-assignments and change future dates. New one-time contractors must be scheduled
+assignments and change future dates. New contractor dates must be scheduled
 for tomorrow or later. Show the first expected reporting date in the newsroom
 before saving.
 

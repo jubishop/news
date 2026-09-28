@@ -15,6 +15,13 @@ payloads, browser routes, and worker API operations for the first phase.
 The [database schema](database-schema.md) is the accepted six-table baseline;
 its implemented SQL and protocol are linked from the contract.
 
+The September 28 [contractor extension](contractor-schedules.md) supports a
+finite list of dates under the existing reporter category and schema. Acceptance
+includes one catch-up for overdue dates plus today, recovery of exhausted older
+dates through later success, and retirement only after all dates are satisfied.
+The server preserves old schedules and snapshots. HTTP, browser, and worker
+integration tests cover these rules; recurring scheduling remains unchanged.
+
 ## Implementation sequence
 
 Accepted on September 25, 2026: implement and deploy the newsroom server on
@@ -93,7 +100,7 @@ a production worker:
   emails for that outage, and continued visibility of all missing work. While
   worker contact is healthy, exhaust one run's retries and verify its own alert.
 - Verify that a contractor leaves the active roster after publishing or a
-  successful empty result. Failure, lateness, and pause acknowledgments keep
+  successful empty result satisfies its last remaining date. Failure, lateness, and pause acknowledgments keep
   it visible with its status, and completing it preserves its articles.
 - Exhaust a contractor's retry allowance, then save changed instructions in
   the newsroom. Verify that the same assignment becomes eligible for a fresh

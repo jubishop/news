@@ -257,9 +257,11 @@ site.
 
 Missed one-time work follows the accepted
 [contractor policy](product-design.md#recurring-reporters-and-one-time-contractors):
-retain the assignment without automatic expiration and offer it when the
-worker returns. The worker determines usefulness from the prompt and original
-due date; the server does not infer that it is stale.
+retain assignments without automatic expiration and combine unfinished due
+dates into one catch-up when the worker returns. Include today when scheduled;
+leave future dates pending. The worker determines usefulness from the prompt
+and original dates; the server does not infer that they are stale. See the
+[contractor date rules](contractor-schedules.md).
 
 ### Alert grouping
 
@@ -415,10 +417,11 @@ timings remain to be specified where noted.
 - Report errors explicitly and use the accepted bounded retry and email policy.
   The server must also recover claims abandoned by a disconnected worker.
 - Follow the accepted [contractor recovery rule](product-design.md#recurring-reporters-and-one-time-contractors).
-  An exhausted contractor remains failed until changed instructions authorize
-  a new retry allowance. The worker discovers that reopened assignment through
-  its normal daily check, without discarding prior attempt history or creating
-  a new contractor. It must not restart exhausted research on its own each day.
+  An exhausted assignment remains failed until changed instructions authorize
+  a new retry allowance or a later scheduled run succeeds. Later success also
+  satisfies earlier failed dates while retaining their history. The worker
+  discovers available work through its normal check and must not restart
+  exhausted research on its own each day.
 
 The [server contract](server-contract.md#worker-api) now defines result payloads,
 claims, retries, and retired-record behavior. The [worker runbook](worker-operations.md)

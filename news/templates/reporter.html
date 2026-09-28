@@ -17,8 +17,9 @@
           class="editor-form"
           action="{{ url_for('pages.save_reporter',identity=reporter.id) if reporter else url_for('pages.save_reporter') }}"
           data-schedule-form
-          {% if retired or (reporter and reporter.schedule.cadence == 'once' and reporter.schedule.date <= pacific_today().isoformat()) %}data-fixed-schedule{% endif %}>
+          {% if retired %}data-fixed-schedule{% endif %}>
         <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}">
+        {% if reporter %}<input type="hidden" name="reporter_id" value="{{ reporter.id }}">{% endif %}
         <fieldset {% if retired %}disabled{% endif %}>
             <legend class="eyebrow">The assignment</legend>
             <label for="name">Reporter name</label><input id="name"
@@ -46,7 +47,7 @@
         {% if reporter and reporter.schedule.cadence == 'monthly' %}selected{% endif %}
         {% if reporter and reporter.schedule.cadence == 'once' %}disabled{% endif %}>Monthly</option><option value="once"
         {% if reporter and reporter.schedule.cadence == 'once' %}selected{% endif %}
-        {% if reporter and reporter.schedule.cadence != 'once' %}disabled{% endif %}>One-time contractor</option></select>
+        {% if reporter and reporter.schedule.cadence != 'once' %}disabled{% endif %}>Contractor</option></select>
             <div data-cadence="weekly">
                 <p class="field-label">Reporting days</p>
                 <div class="weekday-options">
@@ -66,14 +67,18 @@
        value="{{ reporter.schedule.day_of_month if reporter and reporter.schedule.cadence == 'monthly' else 1 }}">
             <p class="field-help">Short months use their last day.</p>
         </div>
-        <div data-cadence="once"><label for="date">Assignment date</label><input id="date"
-       type="date"
-       name="date"
-       {% if reporter and reporter.schedule.cadence == 'once' and reporter.schedule.date <= pacific_today().isoformat() %}readonly{% endif %}
-       value="{{ reporter.schedule.date if reporter and reporter.schedule.cadence == 'once' else tomorrow }}"
-       {% if not reporter or reporter.schedule.cadence != 'once' %}min="{{ tomorrow }}"{% endif %}></div>
+        <div data-cadence="once">
+            {% if reporter and reporter.fixed_dates %}
+                <p class="field-label">Original dates already due</p>
+                <p class="field-help">These dates stay in the assignment. See their results in Reporting history.</p>
+                <ul>{% for day in reporter.fixed_dates %}<li>{{ day }}<input type="hidden" name="dates" value="{{ day }}"></li>{% endfor %}</ul>
+            {% endif %}
+            <label for="dates">{{ 'Future assignment dates' if reporter and reporter.fixed_dates else 'Assignment dates' }}</label>
+            <p class="field-help" id="dates-help">Enter one date per line as YYYY-MM-DD, or separate dates with commas. New dates must be after today in Pacific Time.</p>
+            <textarea id="dates" name="dates" rows="5" aria-describedby="dates-help">{{ reporter.future_dates|join('\n') if reporter and reporter.schedule.cadence == 'once' else tomorrow }}</textarea>
+        </div>
         <p class="schedule-preview" data-schedule-preview role="status">
-        {% if reporter and reporter.schedule.cadence == "once" and reporter.schedule.date <= pacific_today().isoformat() %}Original assignment date: {{ reporter.schedule.date }}. Instructions can still change.{% else %}New schedules begin tomorrow. All dates use Pacific Time.{% endif %}</p>
+        New schedules begin tomorrow. All dates use Pacific Time.</p>
     </fieldset>
     {% if not retired %}
         <div class="form-actions">
@@ -145,6 +150,9 @@
             {% if run.closed_reason %}
                 <p>{{ run.closed_reason }}</p>
             {% endif %}
+            {% if run.satisfied_by_run_id and run.satisfied_by_run_id != run.id %}
+                <p>Assignment satisfied by a later successful run. Earlier outcomes remain below.</p>
+            {% endif %}
             {% for attempt in run.attempts %}
                 <div class="attempt">
                     <p>
@@ -155,6 +163,7 @@
                     {% if attempt.reason or attempt.error_message %}
                         <p>{{ attempt.reason or attempt.error_message }}</p>
                     {% endif %}
+                    {% if attempt.snapshot.assignment_dates %}<p>Assignment dates: {{ attempt.snapshot.assignment_dates|join(', ') }}</p>{% endif %}
                     <details>
                         <summary>Instructions used</summary>
                         <pre class="prompt-history">{{ attempt.snapshot.prompt }}</pre>

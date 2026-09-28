@@ -48,7 +48,7 @@ a small schema-version record in addition to these application tables.
 | `config_version` | Integer incremented when editable configuration changes. |
 | `created_at`, `updated_at` | Server-recorded lifecycle timestamps. |
 | `deleted_at` | Nullable time of owner removal. |
-| `completed_at` | Nullable time a one-time reporter successfully finished. |
+| `completed_at` | Nullable time all contractor dates were satisfied, with no future dates remaining. |
 
 A reporter is on the active roster while both `deleted_at` and `completed_at`
 are null. Paused reporters remain on that roster. A completed contractor and
@@ -62,7 +62,7 @@ Schedule objects:
   {"cadence": "daily"},
   {"cadence": "weekly", "weekdays": ["mon", "thu"]},
   {"cadence": "monthly", "day_of_month": 15},
-  {"cadence": "once", "date": "2026-10-03"}
+  {"cadence": "once", "dates": ["2026-10-01", "2026-10-03"]}
 ]
 ```
 
@@ -74,6 +74,14 @@ among daily, weekly, and monthly schedules. Keep the chosen monthly
 `day_of_month` unchanged. Under the accepted
 [monthly scheduling rule](product-design.md#schedules-by-day), generate an
 occurrence on the last day of a month when the chosen day does not exist.
+
+The [contractor date-list extension](contractor-schedules.md) reads legacy
+`{"cadence":"once","date":"2026-10-03"}` objects as one-element lists.
+It needs no new schema version and does not rewrite stored attempt snapshots.
+Each scheduled date still has its own run. A successful later run satisfies
+earlier dates while their original failed or superseded outcomes remain.
+Completion is derived from successful run dates; API history exposes a separate
+`satisfied_by_run_id` value without changing stored failures into successes.
 
 The `schedule_effective_date` field is an engineering addition for the accepted
 [schedule activation rule](product-design.md#schedules-by-day). Set it to
@@ -115,14 +123,15 @@ under the accepted [instruction-edit recovery rule](product-design.md#recurring-
 `skipped_paused` closes a recurring occurrence,
 but suspends an unfinished contractor's assignment. Under the accepted
 [resume behavior](product-design.md#pausing-reporters), that contractor's same
-run returns to `pending` on resumption. Its prior pause attempt remains in
+run returns to `pending` on resumption, then can join a later catch-up. Its prior pause attempt remains in
 history; the eventual research uses a new attempt. Keep `finished_at` null
 while the contractor's assignment is suspended. Neither a pause acknowledgment
 nor resumption completes the contractor.
 
 Engineering bookkeeping for instruction-edit recovery: increment
 `retry_generation` only when changed instructions reopen an exhausted
-contractor. Set the same run back to `pending`, clear its terminal timestamp,
+contractor's unresolved assignment. Dates satisfied by later success cannot
+reopen. Set the same run back to `pending`, clear its terminal timestamp,
 and preserve its original due date, attempts, and errors. Prior failure times
 remain in the attempts and incidents. Renaming, ordinary polling, unchanged
 instruction saves, and pause acknowledgments cannot reset the retry budget.

@@ -116,15 +116,25 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | `POST /newsroom/reporters` | Create a reporter. |
 | `POST /newsroom/reporters/{id}` | Save name, instructions, and schedule. |
 | `POST /newsroom/reporters/{id}/{pause,resume,delete}` | Change reporter lifecycle. |
-| `GET /newsroom/schedule-preview` | Preview a proposed schedule's first expected date. |
+| `POST /newsroom/schedule-preview` | Preview a proposed schedule's first future date; legacy GET remains supported. |
 | `GET /newsroom/trash` | Recoverable articles and removal deadlines. |
 | `POST /newsroom/articles/{id}/{delete,restore}` | Move an article to Trash or restore it. |
 
 Schedule form fields are `cadence` (`daily`, `weekly`, `monthly`, `once`),
-repeated `weekdays` (`mon` through `sun`), `day_of_month` (1–31), and `date`.
-Only fields relevant to the chosen cadence apply. Owner history accepts
+repeated `weekdays` (`mon` through `sun`), `day_of_month` (1–31), and `dates`.
+Contractor `dates` accepts repeated values or a list separated by whitespace
+or commas. Dates must be distinct; there is no date-count cap. The legacy
+single `date` field remains accepted when `dates` is absent. Saved contractor
+schedules use `{"cadence":"once","dates":["2026-10-01","2026-10-03"]}`.
+Only fields relevant to the chosen cadence apply. For edits, preview accepts
+`reporter_id` to validate retained due dates. Its `next_date` is the first future
+date, or null when only due dates remain. Owner history accepts
 `page` for runs and `articles_page` for stories. There is no Run Now, article
 editor, per-reporter model selection, reassignment, or feedback inbox.
+
+The newsroom posts preview fields with its CSRF token so long date lists do
+not depend on URL-length limits. The existing form-body limit is 300,000 bytes;
+the overall request limit is 2,000,000 bytes. Neither sets a fixed date count.
 
 ## Worker API
 
@@ -150,6 +160,9 @@ contains its ID, reporter configuration, original expected date, kind, state,
 `late`, and any `current_attempt` ID/expiry. A fresh daily request ID records
 contact even when no assignment is due. Replaying an old request ID does not
 create a new contact date. The work list reflects current state on each fetch.
+Contractor runs also include `assignment_dates`: the unfinished dates included
+in this execution. A catch-up keeps the latest included scheduled date as its
+`expected_date`; it does not manufacture another daily retry allowance.
 
 Claim body:
 
@@ -166,6 +179,9 @@ The server stores only its SHA-256 hash. The reply contains `attempt_id`,
 and the exact `reporter` snapshot to follow. Repeating the same request ID and
 token recovers that reply after a lost response; conflicting reuse returns 409.
 The snapshot is taken at claim time, so edits between discovery and claim apply.
+For contractors the snapshot also contains `assignment_dates`. These dates
+are scheduling context, not a research coverage interval. The existing worker
+passes the exact snapshot to research without a separate installation change.
 
 Ownership information lasts six hours and can be renewed with `attempt_id`
 and `ownership_token`. Expiry alone does not discard work or make a second
@@ -183,8 +199,11 @@ Research permits three attempts per run/retry generation. A retryable reported
 failure waits 15 minutes before another claim; a deliberate crash replacement
 can proceed immediately. Exhaustion or `retryable:false` closes the run and
 opens an incident. Paused acknowledgment-only attempts do not spend this
-research allowance. Changed contractor instructions reopen a failed assignment
-with a new bounded generation, retaining its due date and earlier attempts.
+research allowance. Changed contractor instructions reopen failed, unresolved
+assignments with a new bounded generation, retaining due dates and attempts.
+A later scheduled contractor run has its own allowance. Its success satisfies
+earlier failed dates, including exhausted ones. Repeated checks alone never
+replenish an exhausted allowance, and satisfied failures never reopen.
 
 ### Results and receipts
 
@@ -208,8 +227,9 @@ with a new bounded generation, retaining its due date and earlier attempts.
 
 An acknowledgment-only claim accepts only `skipped_paused`. A research attempt
 started before a pause may still finish its research. A result cannot change
-its reporter attribution. A completed contractor leaves the active roster only
-after publication or a successful empty result.
+its reporter attribution. A contractor leaves the active roster only when
+all retained assignment dates are satisfied by publication or successful empty
+results and no future dates remain. Earlier failed outcomes remain in history.
 
 If a contractor resumes before its pause acknowledgment arrives, the server
 records that acknowledgment and reoffers the same assignment for research.
@@ -243,6 +263,8 @@ History and search default to 30 rows, allow 1–100, and return `page`, `limit`
 publication time then ID descending; runs by expected date then ID descending.
 Concurrent publication can shift offset-based pages; this is not an archive
 snapshot protocol. Deleted articles are absent from search and retrieval.
+Contractor history includes nullable `satisfied_by_run_id`, identifying the
+successful run that satisfied that date independently of its original outcome.
 
 Errors are JSON `{"error":"stable_code","message":"Explanation"}`. HTTP status:
 401 invalid/missing authentication; 403 wrong role or ownership; 404 missing
@@ -288,9 +310,10 @@ wait for the next batch. See [worker recovery](article-history-search.md#private
 
 New schedules and edits activate tomorrow in Pacific Time; today's old
 assignment remains. Monthly schedules clamp to the month's last day while
-retaining the selected day for later months. Recurring and one-time categories
-cannot be interchanged. A contractor date can change before it is due. Once
-its due day arrives, the date stays fixed; its instructions can still change.
+retaining the selected day for later months. Recurring and contractor categories
+cannot be interchanged. Contractor future dates can be added, edited, or removed.
+Each new date must be after today. Once a date is due, it stays fixed; instructions
+can still change. Old single-date schedules and attempt snapshots remain valid.
 
 Discovery combines missed, unstarted recurring assignments into one current
 catch-up. It retains old rows as `superseded` and links them to that run. An
@@ -298,10 +321,18 @@ active attempt takes precedence. Each current recurring occurrence has its own
 retry allowance. Failed completed occurrences stay in history; the next normal
 occurrence can proceed. No catch-up operation infers a coverage span.
 
+Contractor discovery combines unfinished due dates, including today when
+scheduled, under the latest eligible scheduled run. It retains superseded
+rows and failed attempts. Failed runs keep their outcomes even when later
+success satisfies their dates. An active attempt keeps its scope; dates that
+become due while it runs wait. A successful run satisfies all scheduled dates
+through its original expected date. Future dates remain pending. See the
+[contractor rules](contractor-schedules.md) for examples and recovery.
+
 Pausing prevents new research but keeps daily worker contact meaningful.
 Acknowledged recurring occurrences stay skipped. A paused contractor retains
-one unfinished assignment; resume reoffers that original run. An overdue
-contractor never expires automatically.
+unfinished assignments; resume combines due dates under the catch-up rule.
+An overdue contractor never expires automatically.
 
 An entire due day is allowed. A run is late at the next Pacific midnight,
 including daylight-saving changes. Maintenance runs independently of browsers

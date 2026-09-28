@@ -35,6 +35,40 @@ class WorkerHTTPFixture(ServerFixture):
 
 
 class WorkerContractTests(WorkerHTTPFixture):
+    def test_worker_receives_one_catch_up_with_all_contractor_dates(self):
+        dates = ["2026-10-01", "2026-10-03", "2026-10-05"]
+        reporter = self.reporter("once", dates=dates)
+        self.at("2026-10-05T06:00:00-07:00")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / "codex"
+            executable.write_text(f"#!{sys.executable}\n" + f'''
+import json, pathlib, sys
+if "--version" in sys.argv:
+    print("codex-cli 0.157.1")
+elif "login" in sys.argv:
+    print("Logged in using ChatGPT")
+else:
+    assignment = json.loads(sys.stdin.read().split("Assignment JSON:\\n", 1)[1])
+    assert assignment["reporter"]["assignment_dates"] == {dates!r}
+    assert assignment["reporter"]["schedule"] == {{"cadence": "once", "dates": {dates!r}}}
+    assert assignment["expected_date"] == "2026-10-05"
+    assert assignment["run_kind"] == "catch_up"
+    output = pathlib.Path(sys.argv[sys.argv.index("--output-last-message") + 1])
+    output.write_text(json.dumps({{"outcome": "nothing_to_publish", "articles": [], "reason": "Nothing useful", "error": None}}))
+''')
+            executable.chmod(0o700)
+            settings = {
+                "server_url": "https://news.example.com", "client_id": "fixture-id",
+                "client_secret": "fixture-secret", "state_dir": str(root / "state"),
+                "codex": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
+            }
+            self.assertEqual(run(settings), 0)
+            self.assertEqual(run(settings), 0)
+        history = self.client.get(f"/api/v1/worker/reporters/{reporter}/runs", headers=self.worker).json["runs"]
+        self.assertEqual(sum(len(row["attempts"]) for row in history), 1)
+        self.assertEqual(self.work(), [])
+
     def test_real_api_receives_agent_article_and_renders_it_publicly(self):
         reporter = self.reporter()
         self.at("2026-09-27T06:00:00-07:00")

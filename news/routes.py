@@ -16,7 +16,7 @@ from flask import (
     url_for,
 )
 
-from . import clock, content, jobs, reporters, schedules, validation as v
+from . import clock, content, contractors, jobs, reporters, schedules, validation as v
 from .db import many, one, transaction
 from .errors import Problem
 
@@ -167,6 +167,7 @@ def reporter_detail(identity):
             )
             for attempt in run["attempts"]:
                 attempt["snapshot"] = json.loads(attempt.pop("config_snapshot_json"))
+        contractors.annotate_history(connection, reporter, runs)
         article_results = content.search(
             connection, {"reporter_id": identity, "limit": 20, "page": articles_page}
         )
@@ -213,13 +214,19 @@ def reporter_state(identity, action):
 
 
 @pages.get("/newsroom/schedule-preview")
+@pages.post("/newsroom/schedule-preview")
 def preview():
-    schedule = schedules.parse(request.args)
+    values = request.form if request.method == "POST" else request.args
+    schedule = schedules.parse(values)
+    with transaction(database()) as connection:
+        reporter = (
+            reporters.get(connection, values["reporter_id"])
+            if values.get("reporter_id") else None
+        )
+    schedules.validate_change(schedule, reporter["schedule"] if reporter else None)
     tomorrow = clock.today() + timedelta(days=1)
     day = schedules.next_date(schedule, tomorrow)
-    if day is None:
-        raise Problem("Choose a one-time date of tomorrow or later.")
-    return jsonify(next_date=day.isoformat(), cadence_label=schedules.label(schedule))
+    return jsonify(next_date=day.isoformat() if day else None, cadence_label=schedules.label(schedule))
 
 
 @pages.get("/newsroom/trash")
@@ -281,7 +288,7 @@ def history(identity):
     page = v.integer(request.args.get("page", 1), "page", 1, 100_000)
     limit = v.integer(request.args.get("limit", 30), "limit", 1, 100)
     with transaction(database()) as connection:
-        reporters.get(connection, identity)
+        reporter = reporters.get(connection, identity)
         total = connection.execute(
             "SELECT count(*) FROM runs WHERE reporter_id=?", (identity,)
         ).fetchone()[0]
@@ -298,6 +305,7 @@ def history(identity):
                 reason,error_code,error_message,retryable FROM run_attempts WHERE run_id=? ORDER BY attempt_number""",
                 (run["id"],),
             )
+        contractors.annotate_history(connection, reporter, runs)
     return jsonify(
         runs=runs, page=page, limit=limit, total=total, has_more=page * limit < total
     )
