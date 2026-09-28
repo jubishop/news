@@ -24,9 +24,9 @@
     <p class="status-line"><span class="status-dot warning"></span>{{ overdue }} {% if overdue == 1 %}scheduled report is{% else %}scheduled reports are{% endif %} late. The edition will update when reporting arrives.</p>
 {% endif %}
 {% if articles %}
-    <div class="story-grid">
+    <div class="story-list">
         {% for article in articles %}
-            <article class="story {% if loop.first and page == 1 %}lead-story{% endif %}">
+            <article class="story">
                 <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a><span>{{ article.article_date }}</span></div>
                 <h2><a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a></h2>
                 <p>{{ article.summary }}</p>
