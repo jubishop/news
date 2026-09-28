@@ -9,6 +9,11 @@ from preview import preview
 
 
 class BrowserJourney(unittest.TestCase):
+    def assert_assignment_dates(self, page, dates):
+        expect(page.locator('input[type="date"][name="dates"]')).to_have_count(len(dates))
+        for index, day in enumerate(dates, 1):
+            expect(page.get_by_label(f"Assignment date {index}", exact=True)).to_have_value(day)
+
     def test_contractor_dates_edit_catch_up_and_retained_history(self):
         with preview() as fixture, sync_playwright() as playwright:
             browser = playwright.chromium.launch()
@@ -23,20 +28,45 @@ class BrowserJourney(unittest.TestCase):
                 page.get_by_label("Reporter name").fill("A finite assignment")
                 page.get_by_label("Beat & instructions").fill("Report useful changes.")
                 page.get_by_label("How often").select_option(label="Contractor")
-                page.get_by_label("Assignment dates", exact=True).fill("2026-10-05\n2026-10-01\n2026-10-03")
-                page.get_by_label("Reporter name").click()
+                page.get_by_label("Assignment date 1", exact=True).fill("2026-10-05")
+                for index, day in enumerate(("2026-10-01", "2026-10-03"), 2):
+                    page.get_by_role("button", name="Add another", exact=True).click()
+                    field = page.get_by_label(f"Assignment date {index}", exact=True)
+                    expect(field).to_be_focused()
+                    field.fill(day)
                 expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-01")
                 page.get_by_role("button", name="Add reporter", exact=True).click()
                 expect(page.get_by_role("heading", name="A finite assignment")).to_be_visible()
                 reporter = page.url.rsplit("/", 1)[-1]
-                expect(page.get_by_label("Assignment dates", exact=True)).to_have_value("2026-10-01\n2026-10-03\n2026-10-05")
+                page.reload()
+                self.assert_assignment_dates(page, ["2026-10-01", "2026-10-03", "2026-10-05"])
                 fixture.at("2026-10-04T06:00:00-07:00")
                 page.reload()
                 expect(page.get_by_text("Original dates already due", exact=True)).to_be_visible()
-                expect(page.get_by_label("Future assignment dates")).to_have_value("2026-10-05")
-                page.get_by_label("Future assignment dates").fill("2026-10-06\n2026-10-08")
+                self.assert_assignment_dates(page, ["2026-10-05"])
+                expect(page.get_by_role("button", name="Delete assignment date")).to_have_count(1)
+                expect(page.get_by_text("Dates already due cannot be changed or deleted.", exact=False)).to_be_visible()
+                page.get_by_label("Assignment date 1", exact=True).fill("2026-10-06")
+                for index, day in enumerate(("2026-10-07", "2026-10-08"), 2):
+                    page.get_by_role("button", name="Add another", exact=True).click()
+                    page.get_by_label(f"Assignment date {index}", exact=True).fill(day)
+                page.get_by_role("button", name="Delete assignment date 2", exact=True).click()
+                self.assert_assignment_dates(page, ["2026-10-06", "2026-10-08"])
+                expect(page.get_by_label("Assignment date 2", exact=True)).to_be_focused()
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-06")
+                for width in (1280, 390):
+                    page.set_viewport_size({"width": width, "height": 900})
+                    self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                    for control in page.locator('input[type="date"], [data-delete-date], [data-add-date]').all():
+                        box = control.bounding_box()
+                        self.assertGreaterEqual(box["height"], 40)
+                        self.assertGreaterEqual(box["x"], 0)
+                        self.assertLessEqual(box["x"] + box["width"], width)
+                    Path("test-results").mkdir(exist_ok=True)
+                    page.screenshot(path=f"test-results/contractor-editor-{width}.png", full_page=True)
                 page.get_by_role("button", name="Save changes", exact=True).click()
-                expect(page.get_by_label("Future assignment dates")).to_have_value("2026-10-06\n2026-10-08")
+                page.reload()
+                self.assert_assignment_dates(page, ["2026-10-06", "2026-10-08"])
                 job = next(run for run in fixture.work() if run["reporter_id"] == reporter)
                 self.assertEqual(job["assignment_dates"], ["2026-10-01", "2026-10-03"])
                 fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"])))
@@ -58,6 +88,103 @@ class BrowserJourney(unittest.TestCase):
                 self.assertEqual(errors, [])
                 self.assertTrue(previews)
                 self.assertTrue(all(request.method == "POST" and "?" not in request.url for request in previews))
+            finally:
+                browser.close()
+
+    def test_contractor_date_validation_and_keyboard_controls(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            fixture.at("2026-10-01T01:00:00+00:00")  # Still September 30 in Pacific Time.
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner, timezone_id="Asia/Tokyo")
+                page.goto(fixture.base_url + "/newsroom/reporters/new")
+                original_url = page.url
+                page.get_by_label("Reporter name").fill("One chosen date")
+                page.get_by_label("Beat & instructions").fill("Report useful changes.")
+                page.get_by_label("How often").select_option("once")
+                first = page.get_by_label("Assignment date 1", exact=True)
+                expect(first).to_have_attribute("min", "2026-10-01")
+                first.fill("2026-09-30")
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("tomorrow or later")
+                page.get_by_role("button", name="Add reporter", exact=True).click()
+                self.assertEqual(page.url, original_url)
+                self.assertTrue(first.evaluate("input => input.validity.rangeUnderflow"))
+                self.assertTrue(first.evaluate("input => Boolean(input.validationMessage)"))
+                first.fill("2026-10-01")
+                add = page.get_by_role("button", name="Add another", exact=True)
+                add.focus()
+                page.keyboard.press("Enter")
+                second = page.get_by_label("Assignment date 2", exact=True)
+                expect(second).to_be_focused()
+                second.fill("2026-10-01")
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("must be distinct")
+                page.get_by_role("button", name="Add reporter", exact=True).click()
+                self.assertEqual(page.url, original_url)
+                self.assertIn("distinct", second.evaluate("input => input.validationMessage"))
+                second.fill("2026-10-03")
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-01")
+                first.focus()
+                # Native date controls have several keyboard segments before Delete.
+                delete = page.get_by_role("button", name="Delete assignment date 1", exact=True)
+                for _ in range(6):
+                    page.keyboard.press("Tab")
+                    if delete.evaluate("button => button === document.activeElement"):
+                        break
+                expect(delete).to_be_focused()
+                page.keyboard.press("Space")
+                self.assert_assignment_dates(page, ["2026-10-03"])
+                expect(first).to_be_focused()
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-03")
+                page.get_by_role("button", name="Delete assignment date 1", exact=True).click()
+                expect(add).to_be_focused()
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("Choose at least one assignment date")
+                page.get_by_role("button", name="Add reporter", exact=True).click()
+                expect(page.get_by_text("Choose at least one assignment date.", exact=True)).to_be_visible()
+                page.goto(original_url)
+                page.get_by_label("Reporter name").fill("One chosen date")
+                page.get_by_label("Beat & instructions").fill("Report useful changes.")
+                page.get_by_label("How often").select_option("once")
+                page.get_by_label("Assignment date 1", exact=True).fill("2026-10-02")
+                page.get_by_role("button", name="Add reporter", exact=True).click()
+                expect(page.get_by_role("heading", name="One chosen date")).to_be_visible()
+                page.reload()
+                self.assert_assignment_dates(page, ["2026-10-02"])
+            finally:
+                browser.close()
+
+    def test_contractor_delete_last_future_date_retains_due_work_and_history(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            reporter = fixture.reporter("once", dates=["2026-10-01", "2026-10-03"])
+            fixture.at("2026-10-01T06:00:00-07:00")
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner, viewport={"width": 390, "height": 844})
+                page.goto(fixture.base_url + "/newsroom/reporters/" + reporter)
+                page.get_by_role("button", name="Delete assignment date 1", exact=True).click()
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("No future dates")
+                page.get_by_role("button", name="Save changes", exact=True).click()
+                page.reload()
+                self.assert_assignment_dates(page, [])
+                expect(page.locator(".section-heading .badge").first).to_have_text("Active")
+                expect(page.get_by_role("button", name="Delete assignment date")).to_have_count(0)
+                job = next(run for run in fixture.work() if run["reporter_id"] == reporter)
+                self.assertEqual(job["assignment_dates"], ["2026-10-01"])
+                page.get_by_role("button", name="Add another", exact=True).click()
+                page.get_by_label("Assignment date 1", exact=True).fill("2026-10-04")
+                page.get_by_role("button", name="Save changes", exact=True).click()
+                fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"])))
+                page.reload()
+                page.get_by_role("button", name="Delete assignment date 1", exact=True).click()
+                page.get_by_role("button", name="Save changes", exact=True).click()
+                page.reload()
+                expect(page.locator(".section-heading .badge").first).to_have_text("Completed")
+                self.assert_assignment_dates(page, [])
+                expect(page.get_by_role("button", name="Add another", exact=True)).to_have_count(0)
+                expect(page.get_by_role("button", name="Save changes", exact=True)).to_have_count(0)
+                expect(page.get_by_role("link", name="This week in research")).to_be_visible()
+                expect(page.locator(".run-row")).to_have_count(1)
+                page.locator(".run-row > summary").click()
+                expect(page.get_by_text("Assignment dates: 2026-10-01", exact=True)).to_be_visible()
             finally:
                 browser.close()
 
@@ -193,7 +320,7 @@ class BrowserJourney(unittest.TestCase):
                 "Produce one concise report with useful sources."
             )
             page.get_by_label("How often").select_option("once")
-            expect(page.get_by_label("Assignment date")).to_be_visible()
+            expect(page.get_by_label("Assignment date 1", exact=True)).to_be_visible()
             expect(page.locator("[data-schedule-preview]")).to_contain_text(
                 "2026-09-27"
             )

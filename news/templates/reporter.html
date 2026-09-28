@@ -12,6 +12,17 @@
 {% endif %}
 </section>
 {% set retired = reporter and (reporter.deleted_at or reporter.completed_at) %}
+{% macro date_entry(day, index) %}
+    <div class="date-entry" data-date-entry>
+        <label for="assignment-date-{{ index }}">Assignment date {{ index }}</label>
+        <div class="date-controls">
+            <input id="assignment-date-{{ index }}" type="date" name="dates"
+                   value="{{ day }}" min="{{ tomorrow }}" aria-describedby="dates-help">
+            {% if not retired %}<button type="button" class="button quiet" data-delete-date
+                    aria-label="Delete assignment date {{ index }}">Delete</button>{% endif %}
+        </div>
+    </div>
+{% endmacro %}
 <div class="editor-layout">
     <form method="post"
           class="editor-form"
@@ -70,12 +81,23 @@
         <div data-cadence="once">
             {% if reporter and reporter.fixed_dates %}
                 <p class="field-label">Original dates already due</p>
-                <p class="field-help">These dates stay in the assignment. See their results in Reporting history.</p>
+                <p class="field-help">Dates already due cannot be changed or deleted. They stay in the assignment to preserve reporting history. See their results below.</p>
                 <ul>{% for day in reporter.fixed_dates %}<li>{{ day }}<input type="hidden" name="dates" value="{{ day }}"></li>{% endfor %}</ul>
             {% endif %}
-            <label for="dates">{{ 'Future assignment dates' if reporter and reporter.fixed_dates else 'Assignment dates' }}</label>
-            <p class="field-help" id="dates-help">Enter one date per line as YYYY-MM-DD, or separate dates with commas. New dates must be after today in Pacific Time.</p>
-            <textarea id="dates" name="dates" rows="5" aria-describedby="dates-help">{{ reporter.future_dates|join('\n') if reporter and reporter.schedule.cadence == 'once' else tomorrow }}</textarea>
+            <div role="group" aria-labelledby="dates-label">
+                <p class="field-label" id="dates-label">{{ 'Future assignment dates' if reporter and reporter.fixed_dates else 'Assignment dates' }}</p>
+                <p class="field-help" id="dates-help">Choose distinct dates after today in Pacific Time. Add or delete entries, then {{ 'save changes' if reporter else 'add the reporter' }} to keep your choices. Blank entries are ignored.</p>
+                <div data-date-entries>
+                    {% set editable_dates = reporter.future_dates if reporter and reporter.schedule.cadence == 'once' else [tomorrow] %}
+                    {% for day in editable_dates %}
+                        {{ date_entry(day, loop.index) }}
+                    {% endfor %}
+                </div>
+                {% if not retired %}
+                    <template data-date-template>{{ date_entry('', 0) }}</template>
+                    <button type="button" class="button quiet" data-add-date>Add another</button>
+                {% endif %}
+            </div>
         </div>
         <p class="schedule-preview" data-schedule-preview role="status">
         New schedules begin tomorrow. All dates use Pacific Time.</p>

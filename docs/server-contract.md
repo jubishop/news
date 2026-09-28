@@ -126,6 +126,10 @@ Contractor `dates` accepts repeated values or a list separated by whitespace
 or commas. Dates must be distinct; there is no date-count cap. The legacy
 single `date` field remains accepted when `dates` is absent. Saved contractor
 schedules use `{"cadence":"once","dates":["2026-10-01","2026-10-03"]}`.
+The newsroom uses individual native date pickers with **Add another** and
+**Delete** controls. It submits repeated `dates` values, including hidden
+retained due dates. Blank entries are ignored. See the
+[date-entry guide](contractor-schedules.md#editing-dates).
 Only fields relevant to the chosen cadence apply. For edits, preview accepts
 `reporter_id` to validate retained due dates. Its `next_date` is the first future
 date, or null when only due dates remain. Owner history accepts
