@@ -233,7 +233,8 @@ Article search accepts `q` (up to 300 characters), `reporter_id`, `coverage_star
 spans supplied by workers. Search uses literal SQL `LIKE` over title, summary,
 and body, with parameters and escaped wildcards. This intentionally avoids
 another index for the initial small archive; add an index when measured load
-justifies it. There is no embedding or AI search service.
+justifies it. There is no server-side embedding or AI search service. The worker
+builds its own [semantic history index](article-history-search.md) from this API.
 
 History and search default to 30 rows, allow 1–100, and return `page`, `limit`,
 `total`, and `has_more`. Page numbers are bounded to 1–100,000. Articles sort by
@@ -275,5 +276,6 @@ Moving an article to Trash hides it immediately. Restore is allowed for 30
 elapsed days (720 hours), using the same ID and publication timestamp.
 Maintenance then removes its content from the live database. Run history and
 content-free receipts stay. SQLite secure deletion is enabled; retained
-backups can still contain old content until they age out. No separate search
-index or image store needs purging.
+backups can still contain old content until they age out. No separate server
+search index or image store needs purging. The worker's local history index
+reconciles deletions at its next successful batch refresh.

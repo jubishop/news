@@ -1,0 +1,282 @@
+{
+  "articles": [
+    {
+      "id": "obesity",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Weekly injection reduces weight in adults",
+      "summary": "Weekly injection reduces weight in adults",
+      "body_markdown": "A trial of semaglutide, a GLP-1 receptor agonist, reported reduced body mass in adults with obesity. Gastrointestinal adverse events were common. Participants received the medicine by subcutaneous injection.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/obesity"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "obesity-followup",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Weight returns after semaglutide withdrawal",
+      "summary": "Weight returns after semaglutide withdrawal",
+      "body_markdown": "Adults regained much of their lost weight after stopping semaglutide treatment. The extension study suggests continued therapy may be needed to maintain the benefit.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/obesity-followup"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "apnea",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Tirzepatide trial reports fewer breathing interruptions",
+      "summary": "Tirzepatide trial reports fewer breathing interruptions",
+      "body_markdown": "Participants with obesity and obstructive sleep apnea had fewer nighttime breathing interruptions after tirzepatide treatment. The report discusses apnea-hypopnea index and trial limitations.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/apnea"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "local-model",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Compact language model runs without a network connection",
+      "summary": "Compact language model runs without a network connection",
+      "body_markdown": "An open-weight language model can execute entirely on a laptop. Private prompts remain on the device. Quantized weights reduce memory requirements, but the smallest configuration loses accuracy.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/local-model"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "cloud-model",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Hosted model API introduces usage-based billing",
+      "summary": "Hosted model API introduces usage-based billing",
+      "body_markdown": "A remote AI service offers an application programming interface with per-token pricing. Prompts are sent to the provider infrastructure. The model requires an internet connection.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/cloud-model"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "ai-energy",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Data center expands electrical capacity",
+      "summary": "Data center expands electrical capacity",
+      "body_markdown": "A cloud operator will add power capacity for GPU training clusters. The project involves substations, cooling equipment, and grid interconnection.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/ai-energy"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "children-museum",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Science center schedules hands-on weekend workshops",
+      "summary": "Science center schedules hands-on weekend workshops",
+      "body_markdown": "The indoor science center offers Saturday and Sunday experiments for children aged five to twelve. Advance reservations are required. Families can explore exhibits even when the weather is wet.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/children-museum"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "outdoor-hike",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "County trail reopens after bridge repair",
+      "summary": "County trail reopens after bridge repair",
+      "body_markdown": "The riverside footpath is open for hiking. The two-mile walk has uneven ground and little shelter. Visitors should avoid the route during thunderstorms.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/outdoor-hike"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "adult-museum",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Museum hosts evening architecture lecture",
+      "summary": "Museum hosts evening architecture lecture",
+      "body_markdown": "The museum will host an adult lecture about urban design on Friday evening. Wine will be served. This event is not designed for young children.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/adult-museum"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "ev-charging",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Battery preconditioning shortens winter charging stops",
+      "summary": "Battery preconditioning shortens winter charging stops",
+      "body_markdown": "An electric vehicle can warm its traction battery before arrival at a rapid charger. Cold cells accept less current. Owners can use navigation to trigger preconditioning, improving charging speed in freezing weather.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/ev-charging"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "phone-battery",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Phone update adds battery charge limit",
+      "summary": "Phone update adds battery charge limit",
+      "body_markdown": "A smartphone software release adds an eighty-percent maximum charge option to reduce wear on lithium-ion cells during daily use.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/phone-battery"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "heat-pump",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Air-source heat pumps retain output below freezing",
+      "summary": "Air-source heat pumps retain output below freezing",
+      "body_markdown": "A home heating trial measured performance of cold-climate heat pumps during subzero temperatures. Insulation and equipment sizing affect household electricity use.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/heat-pump"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "model-v2",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Orion 2 adds a longer context window",
+      "summary": "Orion 2 adds a longer context window",
+      "body_markdown": "The fictional Orion 2 language model expands the number of input tokens accepted in one request. This article reports the original launch, not the later Orion 2.1 patch.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/model-v2"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    },
+    {
+      "id": "model-v21",
+      "reporter_id": "fixture",
+      "reporter_name": "Fixture reporter",
+      "title": "Orion 2.1 corrects structured-output failures",
+      "summary": "Orion 2.1 corrects structured-output failures",
+      "body_markdown": "The fictional Orion 2.1 release fixes malformed JSON when tools return empty arrays. The change is a patch to Orion 2, with no increase in context length.",
+      "sources": [
+        {
+          "title": "Synthetic example",
+          "url": "https://example.com/model-v21"
+        }
+      ],
+      "article_date": "2026-09-27",
+      "coverage_start": "2026-09-26",
+      "coverage_end": "2026-09-27"
+    }
+  ],
+  "queries": [
+    {
+      "query": "medicines for losing weight",
+      "expected": [
+        "obesity",
+        "obesity-followup",
+        "apnea"
+      ]
+    },
+    {
+      "query": "private offline AI on a personal computer",
+      "expected": [
+        "local-model"
+      ]
+    },
+    {
+      "query": "rainy day activities for young kids",
+      "expected": [
+        "children-museum"
+      ]
+    },
+    {
+      "query": "why electric cars replenish energy slowly in cold weather",
+      "expected": [
+        "ev-charging"
+      ]
+    },
+    {
+      "query": "Orion 2.1 JSON bug fix",
+      "expected": [
+        "model-v21"
+      ]
+    },
+    {
+      "query": "what happens when patients discontinue anti-obesity medication",
+      "expected": [
+        "obesity-followup"
+      ]
+    }
+  ]
+}

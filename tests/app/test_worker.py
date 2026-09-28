@@ -17,6 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from news.worker import run
+from history_support import fake_qmd
 
 ARTICLE = {
     "title": "A verified development",
@@ -155,7 +156,7 @@ class WorkerTests(unittest.TestCase):
         self.addCleanup(self.http.shutdown)
         self.fake = self.root / "codex"
         self.fake.write_text(f"#!{sys.executable}\n" + '''
-import fcntl, json, os, pathlib, signal, subprocess, sys, time
+import fcntl, json, os, pathlib, signal, subprocess, sys, time, urllib.request
 root = pathlib.Path(__file__).parent
 if "--version" in sys.argv:
     print("codex-cli 0.157.1")
@@ -167,7 +168,17 @@ if "login" in sys.argv:
     sys.exit(0)
 config = json.loads((root / "fake.json").read_text())
 prompt = sys.stdin.read()
-(root / ("capture-" + str(os.getpid()) + ".json")).write_text(json.dumps({"prompt": prompt, "argv": sys.argv, "env": dict(os.environ), "cwd": os.getcwd()}))
+time.sleep(config.get("startup_delay", 0))
+endpoint = json.loads(next(arg.split("=",1)[1] for arg in sys.argv if arg.startswith("mcp_servers.news_history.url=")))
+def tool(name, arguments):
+    body = json.dumps({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{"name":name,"arguments":arguments}}).encode()
+    req = urllib.request.Request(endpoint, data=body, headers={"Content-Type":"application/json","Accept":"application/json, text/event-stream"})
+    with urllib.request.urlopen(req, timeout=5) as response:
+        return json.load(response)["result"]
+found = tool("query", {"query":"related prior coverage", "limit":5})
+matches = found["structuredContent"]["results"]
+article = tool("get", {"file":matches[0]["file"], "maxLines":80}) if matches else None
+(root / ("capture-" + str(os.getpid()) + ".json")).write_text(json.dumps({"prompt": prompt, "argv": sys.argv, "env": dict(os.environ), "cwd": os.getcwd(), "search":found,"article":article}))
 if config.get("kill_supervisor"):
     while not (root / "supervisor.pid").exists():
         time.sleep(.01)
@@ -212,6 +223,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
             "server_url": f"http://127.0.0.1:{self.http.server_port}",
             "client_id": "test-id", "client_secret": "test-secret",
             "state_dir": str(self.root / "state"), "codex": str(self.fake),
+            "qmd_command": fake_qmd(self.root),
             "http_retry_delays": [0], "retry_delay_seconds": 0,
         }
 
@@ -243,6 +255,11 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertIn('default_permissions="news_research"', capture["argv"])
         self.assertIn('permissions.news_research.filesystem={":minimal"="read",":workspace_roots"="read"}', capture["argv"])
         self.assertIn("permissions.news_research.network.enabled=false", capture["argv"])
+        self.assertIn('mcp_servers.news_history.enabled_tools=["query", "get"]', capture["argv"])
+        self.assertIn("Search the News history", capture["prompt"])
+        self.assertNotIn("archive.jsonl", capture["prompt"])
+        self.assertIn("id: old", capture["article"]["content"][0]["resource"]["text"])
+        self.assertIn("https://example.com/story", capture["article"]["content"][0]["resource"]["text"])
 
     def test_paused_job_is_acknowledged_without_codex(self):
         self.server.add(paused=True)
@@ -266,6 +283,9 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         assignments = [json.loads(c["prompt"].split("Assignment JSON:\n", 1)[1]) for c in self.captures()]
         self.assertEqual({a["reporter"]["id"] for a in assignments}, {f"reporter{i}" for i in range(10)})
         self.assertEqual(len({c["cwd"] for c in self.captures()}), 10)
+        downloads = [path for _, path, _ in self.server.requests if "/articles/search?" in path]
+        self.assertEqual(len(downloads), 1)
+        self.assertEqual(list((self.root / "state/attempts").rglob("archive.jsonl")), [])
 
     def test_lost_claim_response_reuses_saved_request_and_token_after_restart(self):
         self.server.add()
@@ -314,12 +334,16 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
 
     def test_timeout_kills_codex_and_reports_failure(self):
         self.server.add()
-        self.settings["attempt_timeout_seconds"] = .1
+        self.settings["attempt_timeout_seconds"] = .5
+        self.fake_config["startup_delay"] = .2
         self.fake_config["delay"] = 30
         started = time.monotonic()
-        self.execute()
-        self.assertLess(time.monotonic() - started, 5)
+        self.assertEqual(self.execute(), 1)
+        elapsed = time.monotonic() - started
+        self.assertGreaterEqual(elapsed, 3 * self.settings["attempt_timeout_seconds"])
+        self.assertLess(elapsed, 5)
         self.assertEqual(len(self.captures()), 3)
+        self.assertEqual(len(self.server.results), 3)
         self.assertTrue(all(r["error"]["code"] == "research_timeout" for r in self.server.results))
         for capture_path in self.root.glob("capture-*.json"):
             pid = int(capture_path.stem.split("-")[1])
@@ -441,9 +465,13 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
             self.assertEqual(len(self.server.claims), 1)
 
             def running(pid):
-                state = subprocess.run(
-                    ["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True,
-                ).stdout.strip()
+                try:
+                    state = subprocess.run(
+                        ["ps", "-o", "stat=", "-p", str(pid)],
+                        capture_output=True, text=True, timeout=1,
+                    ).stdout.strip()
+                except subprocess.TimeoutExpired:
+                    self.fail(f"ps timed out while checking PID {pid}")
                 return bool(state) and not state.startswith("Z")
 
             deadline = time.monotonic() + self.settings["attempt_timeout_seconds"] + .5
@@ -578,6 +606,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         with patch.dict(os.environ, {"OPENAI_API_KEY": "paid-key-fixture", "CODEX_API_KEY": "paid-codex-key-fixture", "CF_ACCESS_CLIENT_SECRET": "service-secret-fixture"}):
             self.assertEqual(self.execute(), 0)
         captured = json.dumps(self.captures())
+        captured += (self.root / "qmd-calls.jsonl").read_text()
         for secret in ("paid-key-fixture", "paid-codex-key-fixture", "service-secret-fixture", "test-secret"):
             self.assertNotIn(secret, captured)
         for path in (self.root / "state/attempts").rglob("*"):
@@ -597,8 +626,8 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
             return original(method, path, body)
         self.server.respond = respond
         self.assertEqual(self.execute(), 0)
-        archive, = (self.root / "state/attempts").rglob("archive.jsonl")
-        self.assertEqual([json.loads(line)["id"] for line in archive.read_text().splitlines()], ["old", "older"])
+        archive = self.root / "state/history/articles"
+        self.assertEqual({p.stem for p in archive.glob("*.md")}, {"old", "older"})
         self.assertTrue(any("page=2" in path for _, path, _ in self.server.requests))
 
     def test_expired_codex_login_reports_failure_but_still_acknowledges_paused_work(self):
@@ -610,3 +639,47 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         outcomes = [r["outcome"] for r in self.server.results]
         self.assertEqual(outcomes.count("skipped_paused"), 1)
         self.assertEqual(outcomes.count("failed"), 3)
+
+    def test_history_preparation_claims_no_work_and_calls_no_reporter(self):
+        self.server.add()
+        config = self.root / "worker.json"
+        config.write_text(json.dumps(self.settings))
+        config.chmod(0o600)
+        result = subprocess.run([sys.executable, "-B", "-m", "news.worker", "--config", str(config), "--prepare-history"],
+                                capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("1 articles. No jobs claimed", result.stdout)
+        self.assertEqual(self.captures(), [])
+        self.assertEqual(self.server.claims, {})
+        self.assertTrue(all("/articles/search" in path for _, path, _ in self.server.requests))
+
+    def test_broken_history_is_an_explicit_failure_and_paused_work_still_finishes(self):
+        self.server.add(0)
+        self.server.add(1, paused=True)
+        (self.root / "qmd-settings.json").write_text(json.dumps({"fail": "embed"}))
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(self.captures(), [])
+        outcomes = [r["outcome"] for r in self.server.results]
+        self.assertEqual(outcomes.count("skipped_paused"), 1)
+        self.assertEqual(outcomes.count("failed"), 3)
+
+    def test_hidden_history_model_failure_cannot_be_accepted_as_success(self):
+        for index, diagnostic in enumerate((
+            "Batch embedding error", "Embedding error for text", "Embedding error",
+            "Structured query expansion failed",
+            "Reranker unavailable — skipping reranking",
+        )):
+            with self.subTest(diagnostic=diagnostic):
+                self.server.add(index)
+                self.fake_config["result"] = RESULT if index % 2 == 0 else {
+                    "outcome": "nothing_to_publish", "articles": [],
+                    "reason": "No new stories after searching history.", "error": None,
+                }
+                (self.root / "qmd-settings.json").write_text(json.dumps({"query_failure": diagnostic}))
+                before = len(self.server.results)
+                attempts = len(self.captures())
+                self.assertEqual(self.execute(), 1)
+                results = self.server.results[before:]
+                self.assertEqual(len(results), 3)
+                self.assertTrue(all(r["outcome"] == "failed" and r["error"]["retryable"] and not r["articles"] for r in results))
+                self.assertEqual(len(self.captures()), attempts + 1)

@@ -6,8 +6,9 @@ status: current
 
 The Mac worker runs vanilla Codex CLI with GPT-6 Luna and built-in live web
 research. Python handles the News API, eight concurrent reporters, durable
-results, and retries. There are no worker plugins, MCP servers, paid API keys,
-or separate search services. The [worker decisions](reporting-worker.md) explain
+results, and retries. A private QMD MCP connection provides
+[semantic article history search](article-history-search.md). There are no
+worker plugins or paid search API keys. The [worker decisions](reporting-worker.md) explain
 this choice and the daily 06:00 Pacific startup.
 
 ## Runtime and configuration
@@ -15,7 +16,8 @@ this choice and the daily 06:00 Pacific startup.
 Use Python 3.12–3.14 and Codex CLI >=0.157.1,<1.0. The worker checks the CLI
 version and ChatGPT sign-in before starting research. The CLI executable must
 be available unattended; the inspected standalone Mac binary needs no Node
-runtime. Install from a permanent checkout with `bin/setup` and `bin/app-setup`.
+runtime. QMD has its own [runtime and model setup](article-history-search.md#installation-and-checks).
+Install from a permanent checkout with `bin/setup` and `bin/app-setup`.
 The application adds no new Python dependencies.
 
 Copy [the configuration example](../ops/worker.example.json) to
@@ -34,19 +36,20 @@ CLI major version needs compatibility review. The version bounds permit 0.x
 updates after 0.157.1; the test suite does not prove every future CLI release.
 
 Codex runs with its personal config, project instructions, skills, plugins,
-apps, hooks, memory, browser/computer controls, and subagents disabled. Each
+apps, hooks, memory, browser/computer controls, and subagents disabled. Its only
+MCP tools are News history search and article retrieval. Each
 attempt gets a private directory. Built-in web research and read-only shell
 access remain available. A built-in named permission profile allows shell reads only of the attempt
 workspace and minimal system runtime files. Shell network access is disabled;
 built-in web research remains available. An offline probe with Codex 0.157.1
-verified archive reading and denial of a file outside the workspace.
+verified workspace reading and denial of a file outside the workspace.
 The News credential is never included in the prompt, archive, child environment,
 or diagnostic log. The supervisor alone authenticates to the News API.
 
 ## Daily batch and recovery
 
 Run `bin/worker --config ~/.config/news/worker.json` to process a batch.
-`--check` verifies the CLI version, ChatGPT login, and authenticated API access
+`--check` verifies the CLI and QMD versions, ChatGPT login, and authenticated API access
 without claiming jobs or calling a model. It does not establish that the
 subscription has enough remaining allowance for research.
 
@@ -81,11 +84,11 @@ slots is available and uses the claim response's exact instruction snapshot.
 Paused claims receive `skipped_paused` without starting Codex. A fresh process
 gets the original due date, reporting day, current Pacific timestamp, recent
 run outcomes, and the reporter's latest 20 stored article summaries with their
-coverage dates. It fetches the complete paginated retained archive into a plain
-`archive.jsonl` file for built-in shell search and reading. This includes other
-reporters' articles and excludes Trash at retrieval time. It is a per-attempt
-snapshot, not a live archive connection. Archive download cost grows with the
-archive and concurrency; measure before adding an index or retrieval service.
+coverage dates. The batch downloads the retained archive once and shares one
+private QMD index across all reporters and retries. Reporters search related
+coverage and read selected articles through bounded tool responses. The
+[history-search guide](article-history-search.md) defines snapshot freshness,
+index maintenance, runtime requirements, and failure handling.
 
 The assignment determines coverage. There is no computed lookback or special
 morning cutoff. Best effort permits useful partial reporting. Prompts require
@@ -128,10 +131,12 @@ The default state directory is `~/.local/state/news-worker`, mode 0700:
 
 - `pending/`: mode-0600 claim requests, ownership tokens, and completed results.
   These are durable delivery state and are never removed by log retention.
-- `attempts/`: prompts, local archive snapshots, Codex JSON events, stderr,
+- `attempts/`: prompts, Codex JSON events, stderr,
   final candidate output, and receipts. Startup removes logs older than seven
   days, including abandoned attempts. The API receipt remains authoritative.
 - `worker.lock`: the process lock. Do not remove it to bypass an active worker.
+- `history/`: the latest shared article snapshot, QMD index, and search logs.
+  This derived state can be rebuilt; see [history recovery](article-history-search.md#private-state-and-recovery).
 - `cron.log`: stdout/stderr from the most recent scheduled batch, overwritten
   each day. Detailed per-attempt logs retain the seven-day history.
 
