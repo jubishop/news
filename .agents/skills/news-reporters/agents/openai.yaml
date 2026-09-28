@@ -1,0 +1,5 @@
+interface:
+  display_name: "News Reporters"
+  short_description: "Manage News reporters and contractor schedules"
+policy:
+  allow_implicit_invocation: true
