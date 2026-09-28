@@ -9,20 +9,58 @@ for (const form of document.querySelectorAll("form[data-confirm]")) {
 const editor = document.querySelector("[data-schedule-form]");
 if (editor) {
   let pending;
+  const dateEntries = editor.querySelector("[data-date-entries]");
+  const addDate = editor.querySelector("[data-add-date]");
+
+  function numberDates() {
+    for (const [index, row] of [...dateEntries.children].entries()) {
+      const input = row.querySelector("input");
+      const label = row.querySelector("label");
+      input.id = `assignment-date-${index + 1}`;
+      label.htmlFor = input.id;
+      label.textContent = `Assignment date ${index + 1}`;
+      row.querySelector("button").setAttribute("aria-label", `Delete assignment date ${index + 1}`);
+    }
+  }
+
+  addDate?.addEventListener("click", () => {
+    dateEntries.append(editor.querySelector("[data-date-template]").content.cloneNode(true));
+    numberDates();
+    dateEntries.lastElementChild.querySelector("input").focus();
+    preview();
+  });
+
+  dateEntries.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-delete-date]");
+    if (!button) return;
+    const row = button.closest("[data-date-entry]");
+    const next = row.nextElementSibling || row.previousElementSibling;
+    row.remove();
+    numberDates();
+    (next?.querySelector("input") || addDate).focus();
+    preview();
+  });
+
   async function preview() {
     const cadence = editor.elements.cadence.value;
     for (const section of editor.querySelectorAll("[data-cadence]")) {
       section.hidden = section.dataset.cadence !== cadence;
-      for (const input of section.querySelectorAll("input, select, textarea")) {
+      for (const input of section.querySelectorAll("input, select, textarea, button")) {
         input.disabled = section.hidden;
       }
     }
     if (editor.hasAttribute("data-fixed-schedule")) return;
     pending?.abort();
+    const dates = new Set();
+    for (const input of dateEntries.querySelectorAll("input")) {
+      input.setCustomValidity(input.value && dates.has(input.value) ? "Assignment dates must be distinct." : "");
+      if (input.value) dates.add(input.value);
+    }
     pending = new AbortController();
     const params = new URLSearchParams();
+    const fields = new FormData(editor);
     for (const name of ["cadence", "weekdays", "day_of_month", "dates", "reporter_id", "csrf_token"]) {
-      for (const value of new FormData(editor).getAll(name)) params.append(name, value);
+      for (const value of fields.getAll(name)) params.append(name, value);
     }
     const output = editor.querySelector("[data-schedule-preview]");
     try {
@@ -40,7 +78,10 @@ if (editor) {
     }
   }
   editor.addEventListener("change", (event) => {
-    if (["cadence", "weekdays", "day_of_month", "dates"].includes(event.target.name)) preview();
+    if (["cadence", "weekdays", "day_of_month"].includes(event.target.name)) preview();
+  });
+  editor.addEventListener("input", (event) => {
+    if (event.target.name === "dates") preview();
   });
   preview();
 }

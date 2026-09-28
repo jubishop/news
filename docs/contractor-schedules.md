@@ -18,12 +18,25 @@ single-date restriction and retirement after the first successful result.
 
 ## Editing dates
 
-Create, view, and edit the date list in the newsroom. Enter dates as
-`YYYY-MM-DD`, separated by lines or commas. Duplicate dates are rejected and
-saved dates are sorted. Each new date must be after today in Pacific Time.
-Future dates can change or be removed. Once a date is due, retain it and its
-history; only its instructions can change. Due dates appear separately from
-the editable future list. The preview shows the first future date.
+Create, view, and edit the date list in the newsroom with one native calendar
+picker per future date. **Add another** adds a blank entry and focuses its
+picker. **Delete** removes that entry and moves focus to the next entry, the
+previous entry, or **Add another** when none remain. Both controls work with
+the keyboard and change only the form. Use **Add reporter** or **Save changes**
+to persist the dates. This interface implements
+[issue #18](https://github.com/jubishop/news/issues/18).
+
+Duplicate dates are rejected and saved dates are sorted. Blank entries are
+ignored; a new contractor still needs at least one date. Each new date must be
+after today in Pacific Time, regardless of the browser's timezone. Future dates
+can change or be removed. Once a date is due, retain it and its history; only
+its instructions can change. Due dates appear separately with an explanation
+and no edit or delete controls. Removing the last future entry is allowed when
+due dates remain; the completion rules below still apply.
+
+The preview updates when a date changes or an entry is added or removed. It
+shows the first future date, a validation message, or the existing explanation
+that unfinished assignments remain due when no future dates remain.
 
 The September 25 schedule rule remains: edits preserve today's work and take
 effect tomorrow. This avoids requiring a result before the daily worker can
@@ -96,6 +109,7 @@ cursor. History reports the satisfying run separately from earlier outcomes.
 
 The [server contract](server-contract.md) specifies the form and API fields.
 HTTP journeys cover catch-up, retries, edits, pause, retained history, legacy
-data, and idempotency. A browser journey covers date entry, preview, future
-edits, and completed history at desktop and mobile widths. A worker integration
+data, and idempotency. Browser journeys cover calendar entries, keyboard
+add/delete controls, validation, preview, future edits, removal of the last
+future date, and retained history at desktop and mobile widths. A worker integration
 test uses the real supervisor and server with fake external research.
