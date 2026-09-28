@@ -477,7 +477,7 @@ hand-written project knowledge.
 The [GitHub Actions workflow](../.github/workflows/check.yml) runs
 `bin/check --full` on Ubuntu 24.04 for pull requests and pushes to `main`.
 It installs ShellCheck, Restic, locked Python dependencies, and Chromium; it
-checks Python 3.12–3.14, uses read-only repository permissions, and does not
+checks Python 3.14, uses read-only repository permissions, and does not
 persist checkout credentials. This initial setup does not enforce branch
 protection, so full local validation is required before delivery. Verify the
 workflow result for the exact pushed commit.

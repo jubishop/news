@@ -26,7 +26,7 @@ daylight-saving changes. Report unknown event dates instead of inventing them.
 
 ## Run the helper
 
-Run from the repository root with Python 3.12–3.14. The local application
+Run from the repository root with Python 3.14. The local application
 environment supplies a supported interpreter:
 
 ```sh

@@ -11,9 +11,12 @@ releases validated pushes to `main`, including migrations and maintenance.
 
 ## Runtime and local setup
 
-Application support: Python 3.12–3.14, tested on Ubuntu 24.04 in CI and macOS
-for development. The production target uses Ubuntu's Python 3.12. Foundation
-commands retain their separate Python 3.9+ policy. Shell scripts use POSIX sh.
+Application support: Python 3.14, tested on Ubuntu 24.04 in CI and macOS
+for development. On September 28, 2026, the owner selected one Python minor
+version for development, CI, the worker, and production to reduce redundant
+validation. This replaces the previous 3.12–3.14 support range. Older minor
+versions are no longer supported. Foundation commands retain their separate
+Python 3.9+ policy. Shell scripts use POSIX sh.
 Restic 0.16–0.19 is supported for backup operations (Ubuntu 24.04 packages 0.16).
 ShellCheck and Restic must be on PATH for full validation.
 
@@ -24,9 +27,10 @@ bin/check-app
 bin/preview
 ```
 
-`bin/app-setup` uses `python3.12` by default; set `NEWS_PYTHON` to another
-supported executable if needed. It creates a checkout-local `.venv`, installs
-the hash-locked production and test requirements, and installs Chromium.
+`bin/app-setup` uses `python3.14` by default; set `NEWS_PYTHON` to another
+Python 3.14 executable if needed. It recreates the checkout-local `.venv`,
+installs the hash-locked production and test requirements, and installs Chromium.
+Stop any worker using that environment before running setup.
 On Linux, install Chromium system packages with
 `.venv/bin/python -m playwright install --with-deps chromium`.
 
@@ -61,8 +65,45 @@ two requests against one temporary SQLite database.
 
 `bin/check --full` first runs all foundation checks, then `bin/check-app`.
 The default and `--documents-only` modes do not run application tools. CI runs
-full validation on Python 3.12, 3.13, and 3.14. Source discovery and output stay
+full validation on Python 3.14. Source discovery and output stay
 inside the active checkout; `.venv`, `var`, and nested worktrees are excluded.
+
+## Production Python
+
+News uses a dedicated interpreter at `/opt/news/python3.14`. Keep Ubuntu's
+system Python unchanged because other host services can depend on it. Use
+Astral's managed CPython build to avoid compiling and maintaining a separate
+source build on the small shared VPS. This adds trust in Astral's binary
+distribution; production does not require uv to run the application.
+
+Provision as root before installing the release receiver or deploying News:
+
+```sh
+umask 022
+curl --fail --silent --show-error --location \
+  https://astral.sh/uv/0.12.18/install.sh --output /tmp/news-uv-install.sh
+UV_UNMANAGED_INSTALL=/opt/news/tools sh /tmp/news-uv-install.sh
+UV_PYTHON_INSTALL_DIR=/opt/news/python /opt/news/tools/uv python install 3.14.7 --no-bin
+runtime=$(UV_PYTHON_INSTALL_DIR=/opt/news/python /opt/news/tools/uv python find \
+  --managed-python --no-project 3.14.7)
+ln -s "$runtime" /opt/news/python3.14
+runuser -u news -- /opt/news/python3.14 --version
+```
+
+On initial provisioning, verify the executable as root if the `news` account
+does not yet exist; the installer creates that account. Keep the runtime tree
+root-owned and readable/executable by `news`. The unmanaged uv installation
+does not modify shell profiles or the system interpreter. See Astral's
+[installer options](https://docs.astral.sh/uv/reference/installer/) and
+[Python installation guide](https://docs.astral.sh/uv/guides/install-python/),
+checked September 28, 2026.
+
+For a patch upgrade, install the new 3.14 patch alongside the old runtime,
+verify it, and replace only the `/opt/news/python3.14` link. Deploy a fresh
+release to rebuild its environment. Keep the prior runtime while any retained
+release uses it, so recovery remains possible. The standalone SSH receiver
+also uses this interpreter; update it explicitly from `ops/receive-release`
+when its code changes. Application releases do not replace the receiver.
 
 ## Provisioning prerequisites
 
@@ -92,8 +133,8 @@ found port 3070 free; confirm this before rollout.
    Set the sender to `News <news@jubishop.com>` and put the privately selected
    owner recipient in configuration. Coordinate rotation with other consumers
    of the shared key.
-5. Install `python3.12-venv`, `restic`, and `curl` on the server. Create root-owned
-   `/etc/news/app.env` and `/etc/news/backup.env`, mode 0600. Copy the shapes from
+5. Install `restic` and `curl`, and provision the [dedicated Python runtime](#production-python).
+   Create root-owned `/etc/news/app.env` and `/etc/news/backup.env`, mode 0600. Copy the shapes from
    [.env.example](../.env.example) and [backup example](../ops/backup.env.example).
    Use `/var/lib/news/news.sqlite3` for `NEWS_DATABASE` and
    `/var/lib/news-backup/size.json` for `NEWS_BACKUP_STATE`. Generate a private

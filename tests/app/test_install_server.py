@@ -69,9 +69,10 @@ exit 0
         shim.chmod(0o755)
         for name in (
             "id", "realpath", "readlink", "systemctl", "systemd-run", "curl",
-            "flock", "python3.12", "restic", "install", "useradd", "chown", "chmod",
+            "flock", "restic", "install", "useradd", "chown", "chmod",
         ):
             (self.root / "bin" / name).symlink_to("boundary")
+        (self.root / "opt/news/python3.14").symlink_to("/bin/boundary")
         (self.root / "opt/news/releases/fixture/.venv/bin/python").symlink_to("/bin/boundary")
         installer = Path(os.environ.get("TEST_INSTALLER_SOURCE", ROOT / "ops/install-server"))
         self.copy(installer, "/installer")

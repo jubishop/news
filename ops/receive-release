@@ -1,4 +1,4 @@
-#!/usr/bin/python3.12
+#!/opt/news/python3.14
 """Restricted SSH entry point. Install at /usr/local/sbin/news-receive-release."""
 
 import io
@@ -13,8 +13,8 @@ import uuid
 
 
 def main():
-    if not (3, 12) <= sys.version_info[:2] < (3, 15):
-        raise ValueError("News requires Python 3.12–3.14.")
+    if sys.version_info[:2] != (3, 14):
+        raise ValueError("News requires Python 3.14.")
     if os.geteuid() != 0:
         raise ValueError("Run as root through the restricted deploy key.")
     match = re.fullmatch(r"deploy ([0-9a-f]{40})", os.environ.get("SSH_ORIGINAL_COMMAND", ""))

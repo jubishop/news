@@ -3,8 +3,8 @@
 import os
 import sys
 
-if not (3, 12) <= sys.version_info[:2] < (3, 15):
-    raise RuntimeError("News requires Python 3.12, 3.13, or 3.14.")
+if sys.version_info[:2] != (3, 14):
+    raise RuntimeError("News requires Python 3.14.")
 
 from flask import Flask, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException

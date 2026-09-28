@@ -81,6 +81,12 @@ class DeployClientTests(unittest.TestCase):
 
 
 class ReceiveReleaseTests(unittest.TestCase):
+    def test_unsupported_python_stops_before_accepting_a_release(self):
+        with patch("sys.version_info", (3, 13, 0)):
+            code, calls, _ = self.receive(self.archive())
+        self.assertNotEqual(code, 0)
+        self.assertFalse(calls)
+
     def archive(self, extra=None):
         data = io.BytesIO()
         with tarfile.open(fileobj=data, mode="w") as archive:
