@@ -199,8 +199,11 @@ Research permits three attempts per run/retry generation. A retryable reported
 failure waits 15 minutes before another claim; a deliberate crash replacement
 can proceed immediately. Exhaustion or `retryable:false` closes the run and
 opens an incident. Paused acknowledgment-only attempts do not spend this
-research allowance. Changed contractor instructions reopen failed, unresolved
-assignments with a new bounded generation, retaining due dates and attempts.
+research allowance. Changed contractor instructions reopen only the final
+retained date when its run has failed, with a new bounded generation. Earlier
+failed dates wait for later work, including a future date or an active run;
+they keep their outcomes and are included in the later run's scope. Original
+due dates and attempts remain.
 A later scheduled contractor run has its own allowance. Its success satisfies
 earlier failed dates, including exhausted ones. Repeated checks alone never
 replenish an exhausted allowance, and satisfied failures never reopen.

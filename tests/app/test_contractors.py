@@ -122,6 +122,63 @@ class ContractorTests(ServerFixture):
         self.assertEqual(len(self.history(reporter)[0]["attempts"]), 4)
         self.assert_active(reporter, False)
 
+    def test_instruction_recovery_waits_for_later_scheduled_dates(self):
+        reporter = self.reporter("once", dates=self.dates)
+        self.at("2026-10-01T06:00:00-07:00")
+        first, = self.work()
+        for hour in (6, 7, 8):
+            self.at(f"2026-10-01T{hour:02}:00:00-07:00")
+            self.fail_run(first["id"])
+        self.at("2026-10-02T06:00:00-07:00")
+        self.assertEqual(self.edit(
+            reporter, cadence="once", dates=self.dates, prompt="Use a replacement source"
+        ).status_code, 303)
+        self.assertEqual(self.work(), [])
+        failed, = self.history(reporter)
+        self.assertEqual(failed["state"], "failed")
+        self.assertEqual(len(failed["attempts"]), 3)
+        self.assertEqual(self.edit(
+            reporter, cadence="once", dates=self.dates[:1], prompt="Only finish the first date"
+        ).status_code, 303)
+        reopened, = self.work()
+        self.assertEqual(reopened["id"], first["id"])
+        self.empty(reopened["id"])
+        self.assert_active(reporter, False)
+
+    def test_instruction_edit_during_later_work_keeps_earlier_failure_closed(self):
+        for dates in (self.dates[:2], self.dates):
+            with self.subTest(dates=dates):
+                self.at("2026-09-30T06:00:00-07:00")
+                reporter = self.reporter("once", dates=dates)
+                self.at("2026-10-01T06:00:00-07:00")
+                first, = self.work()
+                response = self.result(first["id"], self.envelope(
+                    self.claim(first["id"]), outcome="failed", articles=[],
+                    error={"code": "research_failed", "message": "Source unavailable", "retryable": False},
+                ))
+                self.assertEqual(response.status_code, 200)
+                self.at("2026-10-03T06:00:00-07:00")
+                later, = self.work()
+                claim = self.claim(later["id"])
+                self.assertEqual(self.edit(
+                    reporter, cadence="once", dates=dates, prompt="Use a replacement source"
+                ).status_code, 303)
+                self.assertEqual(self.result(later["id"], self.envelope(
+                    claim, outcome="nothing_to_publish", articles=[], reason="No useful update"
+                )).status_code, 200)
+                self.assertEqual(self.work(), [])
+                failed = next(r for r in self.history(reporter) if r["id"] == first["id"])
+                self.assertEqual(failed["state"], "failed")
+                self.assertEqual(failed["satisfied_by_run_id"], later["id"])
+                self.assertEqual([a["outcome"] for a in failed["attempts"]], ["failed"])
+                self.assert_active(reporter, len(dates) == 3)
+                response = self.client.post(
+                    f"/api/v1/worker/runs/{first['id']}/claim", headers=self.worker,
+                    json={"request_id": "stale-claim", "ownership_token": "x" * 40},
+                )
+                self.assertEqual(response.status_code, 409)
+                self.assertEqual(response.json["error"], "run_closed")
+
     def test_pause_acknowledgment_then_resume_combines_unfinished_dates(self):
         reporter = self.reporter("once", dates=self.dates)
         self.form(f"/newsroom/reporters/{reporter}/pause")

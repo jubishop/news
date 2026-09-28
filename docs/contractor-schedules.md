@@ -67,9 +67,12 @@ Rechecking on another day does not create a new catch-up identity or replenish
 retries. A later scheduled date provides its own bounded allowance; success
 also satisfies earlier failed dates, including exhausted ones.
 
-When no later date remains, changed instructions reopen failed, unresolved
-work with a fresh bounded generation. The original runs and earlier attempts
-remain. Unchanged saves, renames, and pause/resume cannot reset the allowance.
+When no later date remains, changed instructions reopen the final failed,
+unresolved date with a fresh bounded generation. Earlier failed dates keep
+their outcomes and are included in that retry's scope. A later future date or
+an unfinished later run prevents earlier failures from reopening. The original
+runs and earlier attempts remain. Unchanged saves, renames, and pause/resume
+cannot reset the allowance.
 Dates already satisfied by later success do not reopen. The owner accepted
 instruction-edit recovery September 25 without a further stated reason. It
 permits correction without a Run Now control, at the cost of requesting new

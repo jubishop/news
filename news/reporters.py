@@ -129,8 +129,8 @@ def save(connection, values, identity=None):
         if schedule["cadence"] == "once" and prompt != current["prompt"]:
             for run in many(
                 connection,
-                "SELECT id FROM runs WHERE reporter_id=? AND state='failed' AND expected_date>?",
-                (identity, contractors.satisfied_through(connection, identity)),
+                "SELECT id FROM runs WHERE reporter_id=? AND state='failed' AND expected_date=?",
+                (identity, schedule["dates"][-1]),
             ):
                 connection.execute(
                     "UPDATE runs SET state='pending',finished_at=NULL,retry_not_before=NULL,retry_generation=retry_generation+1 WHERE id=?",

@@ -118,7 +118,8 @@ occurrences without changing their histories to successful outcomes.
 Run states: `pending`, `running`, `retry_wait`, `published`,
 `nothing_to_publish`, `skipped_paused`, `failed`, `superseded`, and `cancelled`.
 `published`, `nothing_to_publish`, `failed`, `superseded`, and `cancelled` are
-terminal under the current retry allowance. An exhausted contractor can reopen
+terminal under the current retry allowance. A contractor's final retained date
+can reopen
 under the accepted [instruction-edit recovery rule](product-design.md#recurring-reporters-and-one-time-contractors).
 `skipped_paused` closes a recurring occurrence,
 but suspends an unfinished contractor's assignment. Under the accepted
