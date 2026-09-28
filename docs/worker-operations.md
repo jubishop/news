@@ -84,8 +84,8 @@ slots is available and uses the claim response's exact instruction snapshot.
 Paused claims receive `skipped_paused` without starting Codex. A fresh process
 gets the original due date, reporting day, current Pacific timestamp, recent
 run outcomes, and the reporter's latest 20 stored article summaries with their
-coverage dates. The batch downloads the retained archive once and shares one
-private QMD index across all reporters and retries. Reporters search related
+coverage dates. The batch refreshes the archive manifest once, downloads only changed or missing
+articles, and shares one validated private QMD index across all reporters and retries. Reporters search related
 coverage and read selected articles through bounded tool responses. The
 [history-search guide](article-history-search.md) defines snapshot freshness,
 index maintenance, runtime requirements, and failure handling.

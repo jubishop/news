@@ -15,7 +15,7 @@ from history_support import fake_qmd
 REAL_OPEN = http_request.OpenerDirector.open
 
 
-class WorkerContractTests(ServerFixture):
+class WorkerHTTPFixture(ServerFixture):
     def external_http(self, request, **kwargs):
         url = request if isinstance(request, str) else request.full_url
         prefix = "https://news.example.com"
@@ -33,6 +33,8 @@ class WorkerContractTests(ServerFixture):
             return io.BytesIO(response.data)
         return super().external_http(request, **kwargs)
 
+
+class WorkerContractTests(WorkerHTTPFixture):
     def test_real_api_receives_agent_article_and_renders_it_publicly(self):
         reporter = self.reporter()
         self.at("2026-09-27T06:00:00-07:00")

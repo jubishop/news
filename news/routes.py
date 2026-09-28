@@ -310,8 +310,17 @@ def search():
     return jsonify(result)
 
 
+@api.get("/articles/manifest")
+def archive_manifest():
+    with transaction(database()) as connection:
+        result = content.manifest(connection, request.args)
+    return jsonify(result)
+
+
 @api.get("/articles/<identity>")
 def archived_article(identity):
     with transaction(database()) as connection:
+        if "version" in request.args:
+            content.archive_version(connection, request.args["version"])
         result = content.article(connection, identity)
     return jsonify(result)

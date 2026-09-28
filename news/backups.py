@@ -120,7 +120,8 @@ def restore_check(config):
                     raise ValueError("Restored database failed integrity validation.")
                 if connection.execute("PRAGMA foreign_key_check").fetchall():
                     raise ValueError("Restored database has invalid references.")
-                if connection.execute("PRAGMA user_version").fetchone()[0] != 1:
+                version = connection.execute("PRAGMA user_version").fetchone()[0]
+                if version not in (1, 2):
                     raise ValueError("Restored database schema version is unsupported.")
                 for table in (
                     "reporters",
@@ -131,6 +132,9 @@ def restore_check(config):
                     "incidents",
                 ):
                     connection.execute("SELECT count(*) FROM " + table).fetchone()
+                if version >= 2:
+                    connection.execute("SELECT version FROM archive_state WHERE singleton=1").fetchone()
+                    connection.execute("SELECT revision FROM articles LIMIT 1").fetchone()
             state = {"checked_at": clock.now(), "ok": True}
             r2.save(directory / "restore.json", state)
             return state

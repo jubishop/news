@@ -15,6 +15,8 @@ from urllib import request
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from news.worker_history import History
 from news.worker_io import save_json
+sys.path.insert(0, str(Path(__file__).resolve().parent / "app"))
+from history_support import Archive
 
 
 def call(history, name, arguments):
@@ -42,7 +44,7 @@ def main():
     output = cache / "history-search-smoke.json"
     report = {"status": "running", "started_at": datetime.now(timezone.utc).isoformat(),
               "queries": [], "diagnostics": {}, "errors": []}
-    for check in ("article_read", "model_health", "empty_model_health", "empty_snapshot_and_removal", "cleanup"):
+    for check in ("article_read", "model_health", "empty_model_health", "empty_snapshot_and_removal", "incremental_refresh", "cleanup"):
         report[check] = "not_run"
     # Invalidate any older success before fixture loading or QMD preparation.
     save_json(output, report)
@@ -101,13 +103,6 @@ def main():
         if not missing.get("isError"):
             raise RuntimeError(f"Deleted article still readable: {missing}")
 
-    class API:
-        def __init__(self, articles):
-            self.articles = articles
-
-        def pages(self, route, field):
-            yield from self.articles
-
     try:
         fixture = json.loads(Path(__file__).with_name("fixtures").joinpath("article-history.json").read_text())
         report["corpus_size"] = len(fixture["articles"])
@@ -116,10 +111,11 @@ def main():
             settings = {"state_dir": directory}
             if args.qmd_command:
                 settings["qmd_command"] = args.qmd_command
-            for phase, articles in (("populated", fixture["articles"]), ("empty", [])):
+            for phase, articles in (("populated", fixture["articles"]), ("unchanged", fixture["articles"]), ("empty", [])):
                 history = History(settings)
                 try:
-                    history.prepare(API(articles))
+                    api = Archive(articles)
+                    history.prepare(api)
                     if phase == "populated":
                         # Keep every client's evidence even when another fails.
                         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -133,9 +129,16 @@ def main():
                                     report["errors"].append({"stage": f"client {row['client']}", "traceback": row["error"]})
                                 save_json(output, report)
                         verify("article_read", lambda: read_article(history))
+                    elif phase == "unchanged":
+                        if api.bodies:
+                            raise RuntimeError("Unchanged refresh downloaded article bodies")
+                        read_article(history)
+                        history.check()
+                        report["incremental_refresh"] = "passed"
                     else:
                         verify("empty_snapshot_and_removal", lambda: empty_archive(history))
-                    verify("model_health" if phase == "populated" else "empty_model_health", history.check)
+                    if phase != "unchanged":
+                        verify("model_health" if phase == "populated" else "empty_model_health", history.check)
                 finally:
                     try:
                         history.close()

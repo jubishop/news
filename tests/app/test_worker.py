@@ -17,7 +17,8 @@ import unittest
 from unittest.mock import patch
 
 from news.worker import run
-from history_support import fake_qmd
+from history_support import Archive, fake_qmd
+from news.worker_io import APIError
 
 ARTICLE = {
     "title": "A verified development",
@@ -69,6 +70,11 @@ class Newsroom:
                 return 200, {"reporting_date": "2026-09-27", "runs": deepcopy(self.runs)}
             if route == "/articles/search":
                 return 200, {"articles": self.archive, "has_more": False}
+            if route.startswith("/articles/"):
+                try:
+                    return 200, Archive(self.archive).call(path.removeprefix("/api/v1/worker"))
+                except APIError as exc:
+                    return exc.status, {"error": exc.code}
             if route.endswith("/runs"):
                 return 200, {"runs": [], "has_more": False}
             run_id = route.split("/")[2]
@@ -283,7 +289,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         assignments = [json.loads(c["prompt"].split("Assignment JSON:\n", 1)[1]) for c in self.captures()]
         self.assertEqual({a["reporter"]["id"] for a in assignments}, {f"reporter{i}" for i in range(10)})
         self.assertEqual(len({c["cwd"] for c in self.captures()}), 10)
-        downloads = [path for _, path, _ in self.server.requests if "/articles/search?" in path]
+        downloads = [path for _, path, _ in self.server.requests if "/articles/manifest?" in path and "version=" not in path]
         self.assertEqual(len(downloads), 1)
         self.assertEqual(list((self.root / "state/attempts").rglob("archive.jsonl")), [])
 
@@ -560,7 +566,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
             with self.subTest(page=page):
                 number = len(self.server.claims)
                 self.server.add(number)
-                self.server.respond = lambda method, path, body: (200, page) if "/articles/search" in path else original(method, path, body)
+                self.server.respond = lambda method, path, body: (200, page) if "/articles/manifest" in path else original(method, path, body)
                 self.assertEqual(self.execute(), 1)
                 results = [body for _, path, body in self.server.requests if path == f"/api/v1/worker/runs/run{number}/result"]
                 self.assertEqual(len(results), 3)
@@ -615,19 +621,10 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
 
     def test_archive_download_follows_all_pages_and_supplies_recent_summaries(self):
         self.server.add()
-        original = self.server.respond
-        older = dict(ARTICLE, id="older", reporter_id="another-reporter")
-        def respond(method, path, body):
-            if "/articles/search" in path:
-                self.server.requests.append((method, path, body))
-                if "page=1" in path:
-                    return 200, {"articles": self.server.archive, "has_more": True}
-                return 200, {"articles": [older], "has_more": False}
-            return original(method, path, body)
-        self.server.respond = respond
+        self.server.archive += [dict(ARTICLE, id=f"older{n}", reporter_id="another-reporter") for n in range(101)]
         self.assertEqual(self.execute(), 0)
-        archive = self.root / "state/history/articles"
-        self.assertEqual({p.stem for p in archive.glob("*.md")}, {"old", "older"})
+        archive = self.root / "state/history/current/articles"
+        self.assertEqual({p.stem for p in archive.glob("*.md")}, {a["id"] for a in self.server.archive})
         self.assertTrue(any("page=2" in path for _, path, _ in self.server.requests))
 
     def test_expired_codex_login_reports_failure_but_still_acknowledges_paused_work(self):
@@ -651,7 +648,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertIn("1 articles. No jobs claimed", result.stdout)
         self.assertEqual(self.captures(), [])
         self.assertEqual(self.server.claims, {})
-        self.assertTrue(all("/articles/search" in path for _, path, _ in self.server.requests))
+        self.assertTrue(all("/articles/" in path for _, path, _ in self.server.requests))
 
     def test_broken_history_is_an_explicit_failure_and_paused_work_still_finishes(self):
         self.server.add(0)
