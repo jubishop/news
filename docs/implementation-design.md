@@ -237,7 +237,7 @@ jobs and context and submit articles or explicit run outcomes. The newsroom
 can monitor overdue work without performing the reporting itself.
 
 The [model decision](reporting-worker.md#model-engine) selects vanilla Codex
-with GPT-6 Luna and built-in web research. The [worker host](reporting-worker.md#worker-location)
+with GPT-6.1 Sol, high reasoning, and built-in web research. The [worker host](reporting-worker.md#worker-location)
 is the current Mac. The [operations guide](worker-operations.md) covers the
 implementation. The worker API remains separate from the model interface.
 

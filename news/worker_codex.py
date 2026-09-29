@@ -120,13 +120,13 @@ def research(settings, directory, assignment, lock_fd, history_endpoint):
     command = [
         settings["codex"], "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral",
         "--skip-git-repo-check", "--color", "never",
-        "--model", settings.get("model", "gpt-6-luna"), "--json",
+        "--model", settings.get("model", "gpt-6.1-sol"), "--json",
         "--output-schema", str(schema), "--output-last-message", str(output),
     ]
     overrides = {
         "approval_policy": '"never"', "forced_login_method": '"chatgpt"',
         "web_search": '"live"', "project_doc_max_bytes": "0",
-        "model_reasoning_effort": json.dumps(settings.get("reasoning_effort", "medium")),
+        "model_reasoning_effort": json.dumps(settings.get("reasoning_effort", "high")),
         "mcp_servers": "{}", "shell_environment_policy.inherit": '"none"',
         "mcp_servers.news_history.url": json.dumps(history_endpoint),
         "mcp_servers.news_history.required": "true",
@@ -149,7 +149,7 @@ def research(settings, directory, assignment, lock_fd, history_endpoint):
     for key, value in overrides.items():
         command.extend(["-c", f"{key}={value}"])
     command.append("-")
-    save_json(directory / "invocation.json", {"command": command, "model": settings.get("model", "gpt-6-luna")})
+    save_json(directory / "invocation.json", {"command": command, "model": settings.get("model", "gpt-6.1-sol")})
     timeout = settings.get("attempt_timeout_seconds", 1800)
     deadline = time.monotonic() + timeout
     guardian = [

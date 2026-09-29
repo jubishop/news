@@ -4,7 +4,7 @@ status: current
 
 # Reporting worker operations
 
-The Mac worker runs vanilla Codex CLI with GPT-6 Luna and built-in live web
+The Mac worker runs vanilla Codex CLI with GPT-6.1 Sol and built-in live web
 research. Python handles the News API, eight concurrent reporters, durable
 results, and retries. A private QMD MCP connection provides
 [semantic article history search](article-history-search.md). There are no
@@ -27,11 +27,12 @@ paths for `codex` and `state_dir`. Never commit this file or put credentials in
 cron. Codex uses the owner's existing ChatGPT sign-in; News strips API keys,
 service credentials, and unrelated environment variables from its child.
 
-The shared model defaults to `gpt-6-luna`, medium reasoning, following the
-successful pilot. Change `model` in the private config when a supported Luna
-alias or new generation is available. A cross-generation Luna `latest` alias
-was not documented when implemented; the worker does not invent one or silently
-select another model. Ordinary Codex updates supply tool improvements. A new
+The shared defaults are `gpt-6.1-sol` and high reasoning, following the
+[model decision](reporting-worker.md#model-engine). Existing installations
+must also set `model` and `reasoning_effort` in the private config; explicit
+values override the defaults. Use a documented model identifier when changing
+models. The worker does not invent aliases or silently select another model.
+Ordinary Codex updates supply tool improvements. A new
 CLI major version needs compatibility review. The version bounds permit 0.x
 updates after 0.157.1; the test suite does not prove every future CLI release.
 

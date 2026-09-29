@@ -186,7 +186,7 @@ different models.
 This supersedes the earlier September 24, 2026 decisions to support
 per-reporter model selection, multiple providers at launch, and saving a model
 alongside each run's prompt. The [worker design](reporting-worker.md#model-engine)
-records the selected vanilla Codex CLI with GPT-6 Luna and built-in web
+records the selected vanilla Codex CLI with GPT-6.1 Sol, high reasoning, and built-in web
 research, which supersedes the earlier Qwen/Pi choice.
 
 ### Recurring reporters and one-time contractors

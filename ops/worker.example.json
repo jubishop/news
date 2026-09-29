@@ -8,8 +8,8 @@
     "/Users/REPLACE_ME/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd"
   ],
   "state_dir": "/Users/REPLACE_ME/.local/state/news-worker",
-  "model": "gpt-6-luna",
-  "reasoning_effort": "medium",
+  "model": "gpt-6.1-sol",
+  "reasoning_effort": "high",
   "concurrency": 8,
   "attempt_timeout_seconds": 1800
 }

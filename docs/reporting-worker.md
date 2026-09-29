@@ -121,12 +121,16 @@ Qwen/Ollama and Pi/Exa selections. The owner wants less integration code and
 to benefit from OpenAI's improvements. The tradeoff is cloud processing and
 shared subscription limits.
 
-The owner prefers a moving Luna `latest` alias if supported. On September 26,
-2026, the [official model reference](https://learn.chatgpt.com/docs/models)
-and installed model catalog identify `gpt-6-luna`; no documented moving Luna
-alias was found. Use that configurable model name. Do not invent an alias or
-promise automatic upgrades across model generations. Codex tool improvements
-arrive with ordinary CLI updates; model changes may require a config edit.
+Accepted on September 29, 2026: use GPT-6.1 Sol (`gpt-6.1-sol`) with high
+reasoning for reporting. This supersedes the GPT-6 Luna model choice and
+the earlier preference for a moving Luna alias. The owner requested the
+new model and high reasoning; no further reason was specified. The
+[official model reference](https://developers.openai.com/api/docs/models/gpt-6.1-sol),
+checked on September 29, confirms high reasoning, structured output, web search,
+and MCP support. The existing ChatGPT subscription and Codex tools remain in use.
+The earlier Luna pilot does not establish Sol's reporting quality or runtime.
+Use the explicit configurable model name; do not promise automatic upgrades
+across generations. Codex tool improvements arrive with ordinary CLI updates.
 
 Accepted on September 26, 2026: process up to eight reporters concurrently.
 The owner chose eight because inference runs in the cloud. Claim only when
