@@ -9,6 +9,11 @@ from preview import preview
 
 
 class BrowserJourney(unittest.TestCase):
+    def save_changes(self, page):
+        # Save redirects to the same URL; wait for the new document before reload.
+        with page.expect_event("load"):
+            page.get_by_role("button", name="Save changes", exact=True).click()
+
     def assert_assignment_dates(self, page, dates):
         expect(page.locator('input[type="date"][name="dates"]')).to_have_count(len(dates))
         for index, day in enumerate(dates, 1):
@@ -64,7 +69,7 @@ class BrowserJourney(unittest.TestCase):
                         self.assertLessEqual(box["x"] + box["width"], width)
                     Path("test-results").mkdir(exist_ok=True)
                     page.screenshot(path=f"test-results/contractor-editor-{width}.png", full_page=True)
-                page.get_by_role("button", name="Save changes", exact=True).click()
+                self.save_changes(page)
                 page.reload()
                 self.assert_assignment_dates(page, ["2026-10-06", "2026-10-08"])
                 job = next(run for run in fixture.work() if run["reporter_id"] == reporter)
@@ -162,7 +167,7 @@ class BrowserJourney(unittest.TestCase):
                 page.goto(fixture.base_url + "/newsroom/reporters/" + reporter)
                 page.get_by_role("button", name="Delete assignment date 1", exact=True).click()
                 expect(page.locator("[data-schedule-preview]")).to_contain_text("No future dates")
-                page.get_by_role("button", name="Save changes", exact=True).click()
+                self.save_changes(page)
                 page.reload()
                 self.assert_assignment_dates(page, [])
                 expect(page.locator(".section-heading .badge").first).to_have_text("Active")
@@ -171,11 +176,11 @@ class BrowserJourney(unittest.TestCase):
                 self.assertEqual(job["assignment_dates"], ["2026-10-01"])
                 page.get_by_role("button", name="Add another", exact=True).click()
                 page.get_by_label("Assignment date 1", exact=True).fill("2026-10-04")
-                page.get_by_role("button", name="Save changes", exact=True).click()
+                self.save_changes(page)
                 fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"])))
                 page.reload()
                 page.get_by_role("button", name="Delete assignment date 1", exact=True).click()
-                page.get_by_role("button", name="Save changes", exact=True).click()
+                self.save_changes(page)
                 page.reload()
                 expect(page.locator(".section-heading .badge").first).to_have_text("Completed")
                 self.assert_assignment_dates(page, [])
