@@ -24,6 +24,38 @@ coverage period, useful sources, and expected report. Research event dates
 when the schedule depends on them. Use Pacific calendar dates, including
 daylight-saving changes. Report unknown event dates instead of inventing them.
 
+## Coverage and reporting history
+
+For recurring news and research prompts, prefer coverage since the end of the
+reporter's last successful report's stated coverage period through the current
+research time. Cover gaps from missed or failed runs. Give each prompt an
+explicit first-report window suited to the assignment, such as the past seven
+days for a weekly news review. Use Pacific Time and state the coverage dates.
+Apply this guidance when creating prompts or editing their coverage rules;
+preserve the owner's explicit time windows and unrelated instructions.
+
+Use the researched period, not the publication or run-completion time, as the
+boundary. A successful "nothing to publish" result can establish that boundary
+only if its recorded explanation makes the researched period clear. If the
+boundary is uncertain or only a calendar date is available, search an overlapping
+period and remove repeats. Failed runs and pause acknowledgments do not establish
+coverage.
+The worker interprets these instructions; the server does not compute research
+windows. See the [coverage rules](../../../docs/product-design.md#reporting-memory-and-coverage-window).
+
+Ask reporters to search their available article history before choosing stories.
+Avoid repeating prior coverage, but include material new findings, corrections,
+or other developments and explain what changed. New coverage of an old finding
+does not by itself make the finding new. For recommendation lists, consult prior
+lists and follow the owner's rules about repeats. History search is already part
+of the [worker's shared behavior](../../../docs/article-history-search.md);
+assignment wording should clarify how to use it.
+
+Keep calendar and event windows when they define the task: a previous month's
+book releases, activities for an upcoming weekend, or recaps of assigned games.
+Use history checks within those rules rather than changing eligibility dates
+or replacing them with a rolling news window.
+
 ## Run the helper
 
 Run from the repository root with Python 3.14. The local application
