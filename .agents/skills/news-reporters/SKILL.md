@@ -30,7 +30,11 @@ For recurring news and research prompts, prefer coverage since the end of the
 reporter's last successful report's stated coverage period through the current
 research time. Cover gaps from missed or failed runs. Give each prompt an
 explicit first-report window suited to the assignment, such as the past seven
-days for a weekly news review. Use Pacific Time and state the coverage dates.
+days for a weekly news review. Use Pacific Time and put coverage dates in the
+article's `coverage_start` and `coverage_end` metadata. Do not add coverage
+windows or research cutoff timestamps to article titles, summaries, or bodies.
+Start the body with the story. Keep dates that are part of the story, such as
+event dates, release dates, and the weekend for an activity shortlist.
 Apply this guidance when creating prompts or editing their coverage rules;
 preserve the owner's explicit time windows and unrelated instructions.
 

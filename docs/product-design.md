@@ -485,6 +485,13 @@ while retaining it makes article history more useful. The tradeoff is that
 the server can validate metadata but cannot establish whether the article
 actually covers that period.
 
+Clarified on September 30, 2026: keep coverage windows and research cutoff
+timestamps out of article titles, summaries, and bodies. The owner rejected
+the repeated "Coverage: ... through ..." opening in that day's stories. Use
+the existing coverage metadata and page dateline for coverage dates. Start
+the body with the story, and retain dates that explain the news or define an
+event or recommendation period.
+
 This supersedes earlier proposals for a server-maintained last-covered
 timestamp, automatically supplied research-date ranges, and a first-run
 lookback based on cadence. Ordinary article and run timestamps remain factual
