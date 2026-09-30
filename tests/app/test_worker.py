@@ -266,6 +266,21 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertIn("permissions.news_research.network.enabled=false", capture["argv"])
         self.assertIn('mcp_servers.news_history.enabled_tools=["query", "get"]', capture["argv"])
         self.assertIn("Search the News history", capture["prompt"])
+        instructions = " ".join(capture["prompt"].split("Assignment JSON:\n", 1)[0].split())
+        for requirement in (
+            "intelligent, curious reader who is not a specialist",
+            "Make each title and summary understandable on its own",
+            "identify unfamiliar drugs, products, organizations, or methods by their purpose",
+            "what happened, who is affected, and why it matters",
+            "Explain necessary jargon and acronyms on first use",
+            "Explain what important numbers mean",
+            "Explain limitations in plain language",
+            "Give the body enough space for explanation and context",
+            "Verify explanatory background against sources",
+            "Do not copy the compressed style of past articles",
+        ):
+            with self.subTest(editorial_requirement=requirement):
+                self.assertIn(requirement, instructions)
         self.assertNotIn("archive.jsonl", capture["prompt"])
         self.assertIn("id: old", capture["article"]["content"][0]["resource"]["text"])
         self.assertIn("https://example.com/story", capture["article"]["content"][0]["resource"]["text"])
