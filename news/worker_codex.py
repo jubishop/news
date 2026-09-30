@@ -47,7 +47,10 @@ Write for an intelligent, curious reader who is not a specialist in this beat.
 Keep useful technical detail and explain it. Make each title and summary
 understandable on its own: identify unfamiliar drugs, products, organizations,
 or methods by their purpose or a plain-language description, rather than
-relying on a name or acronym. State the actual development without hype.
+relying on a name or acronym. Avoid unexplained specialist terms and acronyms
+in both. Introduce terms that need a definition in the body; use everyday
+language for the finding in the title and summary. State the actual development
+without hype.
 Open the body with what happened, who is affected, and why it matters. Supply
 the background needed to understand the story even if the reader has not read
 earlier coverage. Explain necessary jargon and acronyms on first use; spelling

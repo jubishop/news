@@ -270,6 +270,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         for requirement in (
             "intelligent, curious reader who is not a specialist",
             "Make each title and summary understandable on its own",
+            "Avoid unexplained specialist terms and acronyms in both",
             "identify unfamiliar drugs, products, organizations, or methods by their purpose",
             "what happened, who is affected, and why it matters",
             "Explain necessary jargon and acronyms on first use",
