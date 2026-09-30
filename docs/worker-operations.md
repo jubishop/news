@@ -122,6 +122,34 @@ acceptable daily discovery behavior; use an explicit local start for earlier
 recovery if needed. A crash during unfinished research creates an explicit
 replacement attempt when the assignment is next offered.
 
+## Shared article writing guidance
+
+The [shared reporter prompt](../news/worker_codex.py) applies to every research
+attempt alongside the reporter's assignment. It addresses
+[issue #21](https://github.com/jubishop/news/issues/21): readers want technical
+detail with enough explanation to understand the subject and its significance.
+
+Titles and summaries must each identify unfamiliar subjects in plain language.
+Bodies introduce the development, affected people, and significance, then give
+the background needed by an intelligent reader outside the specialty. Reporters
+must explain jargon, important numbers and comparisons, and what the evidence
+can and cannot show. Added explanations need source checks too. Length follows
+the story's needs; there is no fixed word count or required section template.
+Past articles supply reporting context, not a requirement to repeat their style.
+
+Review a technical story by checking whether its title identifies the subject,
+its body explains the main finding and why it matters, and its caveats make
+sense without outside lookup. For example, a drug story needs to explain the
+drug's purpose and the meaning of its study measurements; an AI story needs to
+explain what a product does and what a reported benchmark can establish.
+The automated worker test verifies that this guidance reaches the Codex process
+alongside the exact claimed assignment. It does not measure generated prose
+quality or establish medical or technical accuracy.
+
+Updating the permanent worker checkout after merge activates the guidance for
+new attempts. Server deployment alone does not update the Mac worker. Published
+articles and already saved results retain their original text.
+
 ## Private state and diagnostics
 
 Accepted on September 26, 2026: retain detailed research logs for seven days
