@@ -268,17 +268,13 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertIn("Search the News history", capture["prompt"])
         instructions = " ".join(capture["prompt"].split("Assignment JSON:\n", 1)[0].split())
         for requirement in (
-            "intelligent, curious reader who is not a specialist",
-            "Make each title and summary understandable on its own",
-            "Avoid unexplained specialist terms and acronyms in both",
-            "identify unfamiliar drugs, products, organizations, or methods by their purpose",
-            "what happened, who is affected, and why it matters",
-            "Explain necessary jargon and acronyms on first use",
-            "Explain what important numbers mean",
-            "Explain limitations in plain language",
-            "Give the body enough space for explanation and context",
-            "Verify explanatory background against sources",
-            "Do not copy the compressed style of past articles",
+            "intelligent, curious reader who may be unfamiliar with the subject",
+            "Make titles and summaries clear on their own",
+            "Use plain language and explain necessary jargon",
+            "Let the assignment and your editorial judgment guide the coverage, structure, emphasis, and length",
+            "Verify material claims, including background explanations, against reliable sources and link to them",
+            "Distinguish facts, attributed claims, and uncertainty",
+            "If News history search or retrieval fails, return a retryable failed outcome",
         ):
             with self.subTest(editorial_requirement=requirement):
                 self.assertIn(requirement, instructions)
