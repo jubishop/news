@@ -75,7 +75,9 @@ else:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             executable = root / "codex"
-            article = self.article(title="From the reporting worker")
+            article = self.article(title="From the reporting worker",
+                                   coverage_start="2026-09-01T06:00:00-07:00",
+                                   coverage_end="2026-10-01T01:00:00Z")
             executable.write_text(f"#!{sys.executable}\n" + f'''
 import json, pathlib, sys
 if "--version" in sys.argv:
@@ -101,3 +103,7 @@ else:
         history = self.client.get(f"/api/v1/worker/reporters/{reporter}/runs", headers=self.worker).json
         self.assertEqual(history["runs"][0]["state"], "published")
         self.assertEqual(history["runs"][0]["attempts"][0]["attempt_number"], 1)
+        archive = self.client.get("/api/v1/worker/articles/search", headers=self.worker).json
+        published, = archive["articles"]
+        self.assertEqual(published["coverage_start"], "2026-09-01")
+        self.assertEqual(published["coverage_end"], "2026-09-30")
