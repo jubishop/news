@@ -110,7 +110,7 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | --- | --- |
 | `GET /` | Newest-first feed, search, reporter filter, pagination, and concise late-report status. |
 | `GET /articles/{id}` | Full Markdown article and sources. |
-| `GET /newsroom` | Active reporters, worker contact, notices, and backup size; `?view=archive` shows removed/completed reporters. |
+| `GET /newsroom` | Upcoming reporting calendar, active reporters, worker contact, notices, and backup size; `?view=archive` shows removed/completed reporter cards. |
 | `GET /newsroom/reporters/new` | Reporter form with schedule preview. |
 | `GET /newsroom/reporters/{id}` | Settings, paginated stories, and paginated run/attempt history with instruction snapshots. |
 | `POST /newsroom/reporters` | Create a reporter. |
@@ -119,6 +119,10 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | `POST /newsroom/schedule-preview` | Preview a proposed schedule's first future date; legacy GET remains supported. |
 | `GET /newsroom/trash` | Recoverable articles and removal deadlines. |
 | `POST /newsroom/articles/{id}/{delete,restore}` | Move an article to Trash or restore it. |
+
+The [reporting calendar](newsroom-calendar.md) accepts `month=YYYY-MM`, defaulting
+to the current Pacific month. It projects active schedules without creating
+runs and preserves today's saved assignments when schedules change.
 
 Schedule form fields are `cadence` (`daily`, `weekly`, `monthly`, `once`),
 repeated `weekdays` (`mon` through `sun`), `day_of_month` (1–31), and `dates`.

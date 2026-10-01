@@ -9,6 +9,108 @@ from preview import preview
 
 
 class BrowserJourney(unittest.TestCase):
+    def test_calendar_navigation_pacific_dates_keyboard_and_reporter_links(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            fixture.at("2026-10-01T01:00:00+00:00")  # September 30 in Pacific Time.
+            contractor = fixture.reporter("once", dates=["2026-10-01", "2026-10-03"])
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner, timezone_id="Asia/Tokyo")
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                page.on("console", lambda message: errors.append(message.text) if message.type == "error" else None)
+                page.goto(fixture.base_url + "/newsroom")
+                calendar = page.locator("#reporting-calendar")
+                expect(calendar.get_by_role("heading", name="September 2026")).to_be_visible()
+                expect(calendar.locator('[aria-current="date"]')).to_have_attribute("datetime", "2026-09-30")
+                next_month = calendar.get_by_role("link", name="Next month")
+                next_month.focus()
+                page.keyboard.press("Enter")
+                expect(calendar.get_by_role("heading", name="October 2026")).to_be_visible()
+                first = calendar.locator('[data-calendar-date="2026-10-01"]')
+                # October 1, 2026 is Thursday, the fourth column of a Monday-first grid.
+                first_box = first.bounding_box()
+                headings = calendar.locator(".calendar-weekdays span")
+                self.assertAlmostEqual(first_box["x"], headings.nth(3).bounding_box()["x"], delta=2)
+                expect(first.get_by_role("link")).to_have_count(3)
+                links = first.get_by_role("link")
+                for index in range(3):
+                    href = links.nth(index).get_attribute("href")
+                    links.nth(index).focus()
+                    page.keyboard.press("Enter")
+                    expect(page).to_have_url(fixture.base_url + href)
+                    expect(page.get_by_role("button", name="Save changes", exact=True)).to_be_visible()
+                    page.go_back()
+                links.first.focus()
+                page.keyboard.press("Tab")
+                expect(links.nth(1)).to_be_focused()
+                page.keyboard.press("Tab")
+                expect(links.nth(2)).to_be_focused()
+                expect(calendar.locator('[data-calendar-date="2026-10-03"]')
+                       .locator(f'a[href$="/{contractor}"]')).to_have_count(1)
+                page.goto(fixture.base_url + "/newsroom?view=archive&month=2026-12")
+                calendar.get_by_role("link", name="Next month").click()
+                expect(calendar.get_by_role("heading", name="January 2027")).to_be_visible()
+                self.assertIn("view=archive", page.url)
+                calendar.get_by_role("link", name="Previous month").click()
+                expect(calendar.get_by_role("heading", name="December 2026")).to_be_visible()
+                calendar.get_by_role("link", name="Today", exact=True).click()
+                expect(calendar.get_by_role("heading", name="September 2026")).to_be_visible()
+                expect(calendar.locator('[aria-current="date"]')).to_have_attribute("datetime", "2026-09-30")
+                self.assertEqual(errors, [])
+            finally:
+                browser.close()
+
+    def test_calendar_busy_days_long_names_mobile_and_empty_dates(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            fixture.at("2026-09-30T12:00:00-07:00")
+            names = ["A long reporter name about science and our changing world " * 2, "X" * 120]
+            names += [f"Special assignment {number}" for number in range(10)]
+            for name in names:
+                response = fixture.form(
+                    "/newsroom/reporters", name=name, prompt="Report useful changes.",
+                    cadence="once", dates=["2026-10-01"],
+                )
+                self.assertEqual(response.status_code, 303)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner)
+                for width in (1280, 768, 390, 320):
+                    with self.subTest(width=width):
+                        page.set_viewport_size({"width": width, "height": 900})
+                        page.goto(fixture.base_url + "/newsroom?month=2026-10")
+                        calendar = page.locator("#reporting-calendar")
+                        day = calendar.locator('[data-calendar-date="2026-10-01"]')
+                        expect(day.get_by_role("link")).to_have_count(14)
+                        for name in names:
+                            expect(day.get_by_role("link", name=name.strip(), exact=True)).to_be_visible()
+                        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                        previous = None
+                        for link in day.get_by_role("link").all():
+                            box = link.bounding_box()
+                            self.assertGreaterEqual(box["height"], 44)
+                            self.assertGreaterEqual(box["x"], 0)
+                            self.assertLessEqual(box["x"] + box["width"], width)
+                            self.assertTrue(link.evaluate("element => element.scrollWidth <= element.clientWidth"))
+                            if previous:
+                                self.assertGreaterEqual(box["y"], previous["y"] + previous["height"])
+                            previous = box
+                        if width <= 600:
+                            expect(day.get_by_role("heading", name="Thursday, October 1")).to_be_visible()
+                            link = day.get_by_role("link").last
+                            link.focus()
+                            page.keyboard.press("Enter")
+                            expect(page.get_by_role("button", name="Save changes", exact=True)).to_be_visible()
+                            page.go_back()
+                        Path("test-results").mkdir(exist_ok=True)
+                        calendar.screenshot(path=f"test-results/calendar-{width}.png")
+                page.goto(fixture.base_url + "/newsroom?month=2026-08")
+                expect(calendar.get_by_text("No upcoming reports this month.")).to_be_visible()
+                expect(calendar.locator("[data-calendar-date]")).to_have_count(31)
+                expect(calendar.get_by_role("link")).to_have_count(3)  # Navigation only.
+            finally:
+                browser.close()
+
     def save_changes(self, page):
         # Save redirects to the same URL; wait for the new document before reload.
         with page.expect_event("load"):
@@ -344,7 +446,7 @@ class BrowserJourney(unittest.TestCase):
                 page.get_by_role("heading", name="Browser contractor")
             ).to_be_visible()
             page.get_by_role("link", name="Your reporters", exact=True).click()
-            page.get_by_role("link", name="Science desk", exact=True).click()
+            page.locator(".reporter-grid").get_by_role("link", name="Science desk", exact=True).click()
             title = "A little curiosity goes a long way"
             row = page.locator(".history-row").filter(
                 has=page.get_by_role("link", name=title)

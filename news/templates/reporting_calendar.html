@@ -1,0 +1,40 @@
+<section id="reporting-calendar" class="reporting-calendar" aria-labelledby="calendar-month" tabindex="-1">
+    <div class="calendar-heading">
+        <div>
+            <p class="eyebrow">Upcoming reports · Pacific Time</p>
+            <h2 id="calendar-month">{{ calendar.label }}</h2>
+        </div>
+        <nav class="calendar-nav" aria-label="Reporting calendar months">
+            {% if calendar.previous %}
+                <a class="button quiet" aria-label="Previous month" href="{{ url_for('pages.newsroom', month=calendar.previous, view='archive' if archived else none, _anchor='reporting-calendar') }}">← Previous</a>
+            {% endif %}
+            <a class="button quiet" href="{{ url_for('pages.newsroom', month=calendar.current, view='archive' if archived else none, _anchor='reporting-calendar') }}">Today</a>
+            {% if calendar.next %}
+                <a class="button quiet" aria-label="Next month" href="{{ url_for('pages.newsroom', month=calendar.next, view='archive' if archived else none, _anchor='reporting-calendar') }}">Next →</a>
+            {% endif %}
+        </nav>
+    </div>
+    <p class="calendar-note muted">Active schedules from today onward. Paused and retired reporters are not shown. Earlier dates and finished assignments are in reporter history.</p>
+    {% if calendar.empty %}<p class="calendar-empty">No upcoming reports this month.</p>{% endif %}
+    <div class="calendar-weekdays" aria-hidden="true">
+        {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}<span>{{ day }}</span>{% endfor %}
+    </div>
+    <ol class="calendar-days" aria-label="{{ calendar.label }} reporting dates" role="list">
+        {% for unused in calendar.padding %}<li class="calendar-padding" aria-hidden="true"></li>{% endfor %}
+        {% for day in calendar.days %}
+            <li class="calendar-day{% if day.today %} calendar-today{% endif %}{% if day.past %} calendar-past{% endif %}" data-calendar-date="{{ day.date.isoformat() }}">
+                <h3>
+                    <time datetime="{{ day.date.isoformat() }}" {% if day.today %}aria-current="date"{% endif %}>
+                        <span class="calendar-date-full">{{ day.date.strftime('%A, %B') }} </span>{{ day.date.day }}
+                    </time>
+                    {% if day.today %}<span class="calendar-today-label">Today</span>{% endif %}
+                </h3>
+                {% for reporter in day.entries %}
+                    <a class="calendar-entry" href="{{ url_for('pages.reporter_detail', identity=reporter.id) }}">{{ reporter.name }}</a>
+                {% else %}
+                    <p class="calendar-day-empty">{{ 'Past date' if day.past else 'No upcoming reports' }}</p>
+                {% endfor %}
+            </li>
+        {% endfor %}
+    </ol>
+</section>

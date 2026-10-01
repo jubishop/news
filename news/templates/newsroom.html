@@ -31,6 +31,7 @@
     {% endfor %}
     </section>
 {% endif %}
+{% include "reporting_calendar.html" %}
 <div class="section-nav">
     <div><a href="/newsroom" {% if not archived %}aria-current="page"{% endif %}>Your reporters</a><a href="/newsroom?view=archive"
    {% if archived %}aria-current="page"{% endif %}>Retired & completed</a></div>
