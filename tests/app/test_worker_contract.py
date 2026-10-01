@@ -75,9 +75,16 @@ else:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             executable = root / "codex"
-            article = self.article(title="From the reporting worker",
-                                   coverage_start="2026-09-01T06:00:00-07:00",
-                                   coverage_end="2026-10-01T01:00:00Z")
+            article = self.article(
+                title="From the reporting worker",
+                coverage_start="2026-09-01T06:00:00-07:00",
+                coverage_end="2026-10-01T01:00:00Z",
+                body_markdown=(
+                    "A family outing at the museum.\n\n"
+                    "![Families exploring the museum](https://example.com/museum.jpg)\n\n"
+                    "Photo: [Museum](https://example.com/visit)."
+                ),
+            )
             executable.write_text(f"#!{sys.executable}\n" + f'''
 import json, pathlib, sys
 if "--version" in sys.argv:
@@ -99,11 +106,16 @@ else:
                 "codex": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
             }), 0)
         self.assertIn("From the reporting worker", self.client.get("/").get_data(as_text=True))
+        stored, = self.client.get("/api/v1/worker/articles/search", headers=self.worker).json["articles"]
+        self.assertEqual(stored["body_markdown"], article["body_markdown"])
+        self.assertEqual(stored["coverage_start"], "2026-09-01")
+        self.assertEqual(stored["coverage_end"], "2026-09-30")
+        html = self.client.get("/articles/" + stored["id"]).get_data(as_text=True)
+        self.assertIn('src="https://example.com/museum.jpg"', html)
+        self.assertIn('alt="Families exploring the museum"', html)
+        self.assertIn('referrerpolicy="no-referrer"', html)
+        self.assertIn('href="https://example.com/visit"', html)
         self.assertEqual(self.work(), [])
         history = self.client.get(f"/api/v1/worker/reporters/{reporter}/runs", headers=self.worker).json
         self.assertEqual(history["runs"][0]["state"], "published")
         self.assertEqual(history["runs"][0]["attempts"][0]["attempt_number"], 1)
-        archive = self.client.get("/api/v1/worker/articles/search", headers=self.worker).json
-        published, = archive["articles"]
-        self.assertEqual(published["coverage_start"], "2026-09-01")
-        self.assertEqual(published["coverage_end"], "2026-09-30")

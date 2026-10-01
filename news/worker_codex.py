@@ -32,6 +32,13 @@ necessary jargon. Give enough context and useful detail to understand the story
 and why it matters, without padding. Distinguish facts, attributed claims, and
 uncertainty.
 
+Include relevant photos or illustrations when they help the reader. Look for
+them during research and embed them with Markdown
+![descriptive alt text](https://...) in body_markdown, using direct, absolute
+HTTPS image URLs. Verify the image URL and what it depicts; never invent image
+URLs. Credit and link the image source nearby. If no suitable image can be
+verified, publish useful text without image placeholders.
+
 Publish useful partial coverage when warranted and explain material gaps; never
 invent facts to fill them. Research or tool failure is not evidence that there
 is nothing to publish. If News history search or retrieval fails, return a
