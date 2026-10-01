@@ -317,6 +317,14 @@ Apply the accepted [alert grouping policy](reporting-worker.md#alert-grouping)
 when a worker outage affects several reporters. Keep their individual missing
 results visible while sending one outage email without daily reminders.
 
+Accepted on October 1, 2026 (td-07237e): add immediate, local macOS notices for
+final reporter failures and worker operational errors caught by the Mac worker.
+Keep the existing server email alerts. The local worker does not poll for server
+incidents, send desktop notices for server-only alerts, retry notifications in
+the background, or replay notices for old result receipts. The owner's reason
+for this scope was not stated. This is an accepted worker design; it does not
+change the server alert policy above.
+
 ### Structured article storage
 
 Accepted on September 24, 2026: stories are stored as structured records in a
