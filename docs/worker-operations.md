@@ -125,26 +125,21 @@ replacement attempt when the assignment is next offered.
 ## Shared article writing guidance
 
 The [shared reporter prompt](../news/worker_codex.py) applies to every research
-attempt alongside the reporter's assignment. It addresses
-[issue #21](https://github.com/jubishop/news/issues/21): readers want technical
-detail with enough explanation to understand the subject and its significance.
+attempt alongside the reporter's assignment. On September 30, 2026, the owner
+requested a shorter, general wrapper that trusts the writer's judgment. Beat
+requirements belong in each reporter's prompt; the wrapper leaves coverage,
+structure, emphasis, and length to the assignment and editorial judgment.
 
-Titles and summaries must each identify unfamiliar subjects in plain language.
-Bodies introduce the development, affected people, and significance, then give
-the background needed by an intelligent reader outside the specialty. Reporters
-must explain jargon, important numbers and comparisons, and what the evidence
-can and cannot show. Added explanations need source checks too. Length follows
-the story's needs; there is no fixed word count or required section template.
-Past articles supply reporting context, not a requirement to repeat their style.
+The shared principles retain the clarity goal from
+[issue #21](https://github.com/jubishop/news/issues/21): clear titles and summaries,
+plain language, useful context, checked sources, and honest uncertainty. Past
+articles supply context without dictating style. History search, failure
+handling, workspace boundaries, and the output contract remain shared rules.
+Search tactics and article structure are not prescribed.
 
-Review a technical story by checking whether its title identifies the subject,
-its body explains the main finding and why it matters, and its caveats make
-sense without outside lookup. For example, a drug story needs to explain the
-drug's purpose and the meaning of its study measurements; an AI story needs to
-explain what a product does and what a reported benchmark can establish.
 The automated worker test verifies that this guidance reaches the Codex process
 alongside the exact claimed assignment. It does not measure generated prose
-quality or establish medical or technical accuracy.
+quality or establish factual accuracy.
 
 Updating the permanent worker checkout after merge activates the guidance for
 new attempts. Server deployment alone does not update the Mac worker. Published
