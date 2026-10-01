@@ -1,5 +1,6 @@
 """Vanilla Codex subprocess and its article output contract."""
 
+from datetime import datetime
 import json
 import os
 from pathlib import Path
@@ -7,6 +8,7 @@ import re
 import subprocess
 import sys
 import time
+from zoneinfo import ZoneInfo
 
 from . import validation as v
 from .errors import Problem
@@ -47,7 +49,8 @@ The supervisor handles News API access and publication.
 Return JSON matching the supplied schema: published with 1–20 articles,
 nothing_to_publish with a reason, or failed with a code, message, and retryable
 boolean. Set error to null for success and reason to an empty string when it
-does not apply.
+does not apply. article_date, coverage_start, and coverage_end must be Pacific
+calendar dates in YYYY-MM-DD format, without a time or timezone.
 """
 
 
@@ -56,8 +59,14 @@ def object_schema(properties):
 
 
 TEXT = {"type": "string"}
+DATE_FIELDS = ("article_date", "coverage_start", "coverage_end")
+DATE = {
+    "type": "string", "format": "date", "pattern": r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+    "description": "Pacific calendar date in YYYY-MM-DD format; no time or timezone.",
+}
 ARTICLE_SCHEMA = object_schema({
-    **{key: TEXT for key in ("title", "summary", "body_markdown", "article_date", "coverage_start", "coverage_end")},
+    **{key: TEXT for key in ("title", "summary", "body_markdown")},
+    **{key: DATE for key in DATE_FIELDS},
     "sources": {"type": "array", "items": object_schema({"title": TEXT, "url": TEXT})},
 })
 RESULT_SCHEMA = object_schema({
@@ -68,6 +77,26 @@ RESULT_SCHEMA = object_schema({
 })
 
 
+def article_dates(article):
+    if not isinstance(article, dict):
+        return article
+    article = article.copy()
+    for name in DATE_FIELDS:
+        value = article.get(name)
+        if not isinstance(value, str) or value.endswith("-00:00") or not re.fullmatch(
+            r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}"
+            r"(?:\.[0-9]{1,6})?(?:Z|[+-](?:[01][0-9]|2[0-3]):[0-5][0-9])", value
+        ):
+            continue
+        try:
+            article[name] = datetime.fromisoformat(value).astimezone(
+                ZoneInfo("America/Los_Angeles")
+            ).date().isoformat()
+        except (ValueError, OverflowError):
+            pass
+    return article
+
+
 def validate_result(value):
     v.object_fields(value, ("outcome", "articles", "reason", "error"), ("outcome", "articles", "reason", "error"))
     outcome, articles = value["outcome"], value["articles"]
@@ -75,6 +104,7 @@ def validate_result(value):
         raise Problem("Invalid agent outcome.")
     if not isinstance(articles, list) or len(articles) > 20 or bool(articles) != (outcome == "published"):
         raise Problem("Published results require 1–20 articles; other outcomes require none.")
+    articles = [article_dates(article) for article in articles]
     for article in articles:
         v.article(article)
     v.text(value["reason"], "reason", 4000, empty=True)

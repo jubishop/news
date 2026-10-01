@@ -266,6 +266,11 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertIn("permissions.news_research.network.enabled=false", capture["argv"])
         self.assertIn('mcp_servers.news_history.enabled_tools=["query", "get"]', capture["argv"])
         self.assertIn("Search the News history", capture["prompt"])
+        self.assertIn("YYYY-MM-DD", capture["prompt"])
+        schema = json.loads((Path(capture["cwd"]) / "schema.json").read_text())
+        fields = schema["properties"]["articles"]["items"]["properties"]
+        for name in ("article_date", "coverage_start", "coverage_end"):
+            self.assertEqual(fields[name]["format"], "date")
         instructions = " ".join(capture["prompt"].split("Assignment JSON:\n", 1)[0].split())
         for requirement in (
             "intelligent, curious reader who may be unfamiliar with the subject",
@@ -354,6 +359,33 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual(len(self.captures()), 3)
         self.assertEqual(len(self.server.results), 3)
         self.assertTrue(all(r["outcome"] == "failed" and r["articles"] == [] for r in self.server.results))
+
+    def test_timestamp_dates_publish_without_repeating_research(self):
+        self.server.add()
+        self.fake_config["result"] = deepcopy(RESULT)
+        article = self.fake_config["result"]["articles"][0]
+        article.update(coverage_start="2026-09-26T07:17:31-07:00",
+                       coverage_end="2026-09-28T01:17:31Z")
+        self.assertEqual(self.execute(), 0)
+        capture, = self.captures()
+        delivered, = self.server.results
+        self.assertEqual(delivered["articles"], [ARTICLE])
+        saved = json.loads((Path(capture["cwd"]) / "result.json").read_text())
+        self.assertEqual(saved, self.fake_config["result"])
+
+    def test_invalid_dates_report_the_validation_error_to_later_attempts(self):
+        self.server.add()
+        self.fake_config["result"] = deepcopy(RESULT)
+        self.fake_config["result"]["articles"][0]["coverage_end"] = "2026-09-27T06:00:00"
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(len(self.server.results), 3)
+        for result in self.server.results:
+            self.assertEqual(result["articles"], [])
+            self.assertEqual(result["error"], {
+                "code": "invalid_result",
+                "message": "coverage_end must be a YYYY-MM-DD date.",
+                "retryable": True,
+            })
 
     def test_invalid_article_and_agent_process_failure_become_explicit_failures(self):
         for mode in ("invalid_article", "nonzero"):

@@ -103,6 +103,27 @@ distinct from a failed search. Complete valid results are saved before delivery.
 The server's six-hour claim duration exceeds the research limit; expiry alone
 does not revoke a valid result, so routine renewals are unnecessary.
 
+The output schema and shared instructions require `article_date`,
+`coverage_start`, and `coverage_end` as Pacific calendar dates (`YYYY-MM-DD`).
+If a completed draft instead supplies an ISO timestamp with an explicit UTC
+offset or `Z`, the worker converts that instant to a Pacific date before
+validation. It retains the original draft in `result.json`. Missing offsets,
+unknown `-00:00` offsets, invalid dates, and reversed coverage ranges still fail.
+Validation failures include the specific contract error in the run history so
+later attempts can correct it. Other research failures retain private diagnostics.
+The server continues to accept dates only.
+
+An exhausted recurring run does not reopen on worker restart. For operator-led
+recovery of a retained draft, first validate the corrected result and confirm
+its reporter, original assignment, and failed-run receipt. Acquire the worker
+lock, preserve pending state, and take a consistent private server database
+backup. Reopen only the verified failed run with a new retry generation, keeping
+all prior attempts. Claim a fresh attempt through the worker API, save its
+ownership and corrected result durably, and submit through the normal result
+endpoint. Verify the receipt, article contents, and resolved incident. Reuse
+the saved claim and submission IDs after an uncertain response; never replay a
+different result against a finished attempt or insert articles directly.
+
 HTTP calls have a 30-second timeout and up to three attempts with the same
 payload. Redirects are refused so credentials do not follow an unexpected
 origin. After an unsuccessful delivery, pending state remains on disk and the

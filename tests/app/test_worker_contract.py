@@ -77,6 +77,8 @@ else:
             executable = root / "codex"
             article = self.article(
                 title="From the reporting worker",
+                coverage_start="2026-09-01T06:00:00-07:00",
+                coverage_end="2026-10-01T01:00:00Z",
                 body_markdown=(
                     "A family outing at the museum.\n\n"
                     "![Families exploring the museum](https://example.com/museum.jpg)\n\n"
@@ -106,6 +108,8 @@ else:
         self.assertIn("From the reporting worker", self.client.get("/").get_data(as_text=True))
         stored, = self.client.get("/api/v1/worker/articles/search", headers=self.worker).json["articles"]
         self.assertEqual(stored["body_markdown"], article["body_markdown"])
+        self.assertEqual(stored["coverage_start"], "2026-09-01")
+        self.assertEqual(stored["coverage_end"], "2026-09-30")
         html = self.client.get("/articles/" + stored["id"]).get_data(as_text=True)
         self.assertIn('src="https://example.com/museum.jpg"', html)
         self.assertIn('alt="Families exploring the museum"', html)

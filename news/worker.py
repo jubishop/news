@@ -168,7 +168,8 @@ class Batch:
                 candidate = failure("research_timeout", "Codex exceeded the reporting attempt time limit.")
             except (WorkerError, Problem, ValueError, UnicodeError) as exc:
                 save_json(directory / "failure.json", {"type": type(exc).__name__, "message": str(exc)})
-                candidate = failure("research_failed", "Research or result validation failed; inspect the private attempt log.")
+                candidate = (failure("invalid_result", str(exc)) if isinstance(exc, Problem) else
+                             failure("research_failed", "Research or result validation failed; inspect the private attempt log."))
         record["result"] = {
             "submission_id": secrets.token_hex(16), "attempt_id": claim["attempt_id"],
             "ownership_token": record["claim_request"]["ownership_token"], **candidate,
