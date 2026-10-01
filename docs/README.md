@@ -75,6 +75,8 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   payloads, browser routes, worker API, and submission validation.
 - [Server operations](server-operations.md): local setup, validation, release
   prerequisites, monitoring, backups, and recovery.
+- [Local failure notifications](failure-alerts.md): immediate macOS alerts for
+  final reporter failures and local worker errors.
 - [Automatic deployment](deployment.md): main-branch releases, deployment
   credentials, migrations, maintenance, and failure handling.
 - [Database schema](database-schema.md): accepted table and field baseline,

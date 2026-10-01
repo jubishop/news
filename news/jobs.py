@@ -419,28 +419,6 @@ def result(connection, run_id, worker, values):
                 clock.now(),
             ),
         )
-    receipt = {
-        "run_id": run_id,
-        "submission_id": submission,
-        "outcome": outcome,
-        "article_ids": ids,
-    }
-    connection.execute(
-        """UPDATE run_attempts SET outcome=?,finished_at=?,reason=?,error_code=?,
-        error_message=?,retryable=?,submission_id=?,payload_hash=?,receipt_json=? WHERE id=?""",
-        (
-            outcome,
-            clock.now(),
-            reason,
-            error["code"] if error else None,
-            error["message"] if error else None,
-            int(error["retryable"]) if error else None,
-            submission,
-            digest,
-            v.canonical(receipt),
-            attempt["id"],
-        ),
-    )
     state, retry_at, finished = outcome, None, clock.now()
     if outcome == "failed":
         count = connection.execute(
@@ -463,6 +441,29 @@ def result(connection, run_id, worker, values):
         finished = None
         if not reporter["paused"] and not reporter["deleted_at"]:
             state = "pending"
+    receipt = {
+        "run_id": run_id,
+        "submission_id": submission,
+        "outcome": outcome,
+        "article_ids": ids,
+        "run_state": state,
+    }
+    connection.execute(
+        """UPDATE run_attempts SET outcome=?,finished_at=?,reason=?,error_code=?,
+        error_message=?,retryable=?,submission_id=?,payload_hash=?,receipt_json=? WHERE id=?""",
+        (
+            outcome,
+            clock.now(),
+            reason,
+            error["code"] if error else None,
+            error["message"] if error else None,
+            int(error["retryable"]) if error else None,
+            submission,
+            digest,
+            v.canonical(receipt),
+            attempt["id"],
+        ),
+    )
     connection.execute(
         "UPDATE runs SET state=?,retry_not_before=?,finished_at=? WHERE id=?",
         (state, retry_at, finished, run_id),
