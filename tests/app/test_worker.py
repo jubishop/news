@@ -274,6 +274,11 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
             "Let the assignment and your editorial judgment guide the coverage, structure, emphasis, and length",
             "Verify material claims, including background explanations, against reliable sources and link to them",
             "Distinguish facts, attributed claims, and uncertainty",
+            "Include relevant photos or illustrations when they help the reader",
+            "![descriptive alt text](https://...) in body_markdown",
+            "Verify the image URL and what it depicts; never invent image URLs",
+            "Credit and link the image source nearby",
+            "If no suitable image can be verified, publish useful text without image placeholders",
             "If News history search or retrieval fails, return a retryable failed outcome",
         ):
             with self.subTest(editorial_requirement=requirement):

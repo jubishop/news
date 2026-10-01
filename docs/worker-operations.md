@@ -137,9 +137,19 @@ articles supply context without dictating style. History search, failure
 handling, workspace boundaries, and the output contract remain shared rules.
 Search tactics and article structure are not prescribed.
 
+For [issue #25](https://github.com/jubishop/news/issues/25), the shared prompt
+also asks reporters to find and include photos or illustrations when they help
+the reader. Use the existing [inline image format](server-contract.md#inline-images):
+direct HTTPS image URLs in the Markdown body, descriptive alt text, and a nearby
+source credit and link. Reporters must verify the URL and depicted subject.
+If no suitable image can be verified, useful text can still be published without
+image placeholders. Image selection remains an editorial judgment.
+
 The automated worker test verifies that this guidance reaches the Codex process
-alongside the exact claimed assignment. It does not measure generated prose
-quality or establish factual accuracy.
+alongside the exact claimed assignment. The worker/server integration test also
+verifies that image Markdown and credits survive publication and render on the
+public article page. These tests do not measure generated prose or image quality,
+establish factual accuracy, or guarantee external image availability.
 
 Updating the permanent worker checkout after merge activates the guidance for
 new attempts. Server deployment alone does not update the Mac worker. Published
