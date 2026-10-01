@@ -15,6 +15,7 @@ import time
 from zoneinfo import ZoneInfo
 
 from . import validation as v
+from .desktop_alerts import notify
 from .errors import Problem
 from .worker_codex import preflight, research
 from .worker_history import History, preflight as history_preflight
@@ -85,6 +86,8 @@ class Batch:
         print(f'Run {record["run"]["id"]}: {receipt["outcome"]}', flush=True)
         if result["outcome"] == "failed":
             self.failed_runs.add(record["run"]["id"])
+            if receipt.get("run_state") == "failed" or not result["error"]["retryable"]:
+                notify(self.settings, record=record)
         else:
             self.failed_runs.discard(record["run"]["id"])
         return result["outcome"] == "failed" and result["error"]["retryable"]
@@ -106,6 +109,7 @@ class Batch:
         self.errors = True
         message = str(exc) if isinstance(exc, (WorkerError, Problem)) else "Local state or API data is invalid or inaccessible; inspect private state."
         print(f"Run {run_id}: {message}", file=sys.stderr, flush=True)
+        notify(self.settings, worker_failed=True)
 
     def discover(self):
         path = self.root / "checkin.json"
@@ -237,7 +241,10 @@ def run(settings):
         except BlockingIOError:
             print("News worker is already running; this start was skipped.", flush=True)
             return 0
-        return Batch(settings, lock.fileno()).execute()
+        batch = Batch(settings, lock.fileno())
+        result = batch.execute()
+        notify(settings, worker_failed=batch.errors)
+        return result
 
 
 def main():
@@ -246,6 +253,7 @@ def main():
     parser.add_argument("--check", action="store_true", help="Check Codex login and API access without claiming work or invoking a model.")
     parser.add_argument("--prepare-history", action="store_true", help="Refresh and verify local history search without claiming or publishing work.")
     args = parser.parse_args()
+    settings = {}
     try:
         if args.config.stat().st_mode & 0o077:
             raise WorkerError("Worker config contains credentials: set its permissions to 0600.")
@@ -276,6 +284,8 @@ def main():
     except (WorkerError, OSError, ValueError, KeyError, Problem) as exc:
         # Do not print config contents, credentials, or remote response bodies.
         print(str(exc) if isinstance(exc, WorkerError) else "Worker setup or local state is invalid; inspect the private configuration and state.", file=sys.stderr)
+        if not args.check and not args.prepare_history:
+            notify(settings, worker_failed=True)
         return 1
 
 

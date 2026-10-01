@@ -8,6 +8,7 @@
     "/Users/REPLACE_ME/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd"
   ],
   "state_dir": "/Users/REPLACE_ME/.local/state/news-worker",
+  "terminal_notifier": "/opt/homebrew/bin/terminal-notifier",
   "model": "gpt-6.1-sol",
   "reasoning_effort": "high",
   "concurrency": 8,

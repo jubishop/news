@@ -11,6 +11,10 @@ results, and retries. A private QMD MCP connection provides
 worker plugins or paid search API keys. The [worker decisions](reporting-worker.md) explain
 this choice and the daily 06:00 Pacific startup.
 
+The worker can also send immediate [macOS failure notifications](failure-alerts.md)
+for final reporter failures and local operational errors. This optional local
+delivery adds no server polling and leaves server email alerts unchanged.
+
 ## Runtime and configuration
 
 Use Python 3.14 and Codex CLI >=0.157.1,<1.0. The worker checks the CLI

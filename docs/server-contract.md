@@ -246,8 +246,12 @@ If a contractor resumes before its pause acknowledgment arrives, the server
 records that acknowledgment and reoffers the same assignment for research.
 Replaying the acknowledgment returns its receipt without changing the new attempt.
 
-Success returns `run_id`, `submission_id`, `outcome`, and `article_ids`. The
+Success returns `run_id`, `submission_id`, `outcome`, `article_ids`, and
+`run_state`. The last field records the run state at acceptance, distinguishing
+`retry_wait` from final `failed` for immediate local worker notifications. The
 server saves this receipt and a canonical payload hash in the same transaction.
+Replayed receipts retain their original state; older receipts can omit
+`run_state`. This field does not describe later run transitions.
 Identical delivery retries return it without republishing. Different content
 under the same submission ID is a conflict. Later requests cannot amend a
 published result. Receipt retention prevents retries from restoring deleted
