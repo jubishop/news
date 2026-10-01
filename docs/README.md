@@ -91,6 +91,9 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   provider trials, and source-based assessment.
 - [Codex worker evaluation](worker-codex-evaluation.md): GPT-6 Luna through the
   existing Pro subscription, compared with the local Qwen reporting runs.
+- [Sleep and fitness writing comparison](worker-writing-evaluation.md): shared
+  research, Sol/Qwen/Hemmingway drafts, measured runtimes, factual review, and
+  evidence for retaining the current Sol approach.
 - [Codex research additions](worker-research-addons.md): reader, literature,
   discussion, and browser tools that could complement built-in web search.
 - [Evaluation reports](evaluations/README.md): preserved candidate outputs from

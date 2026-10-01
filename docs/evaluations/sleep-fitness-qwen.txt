@@ -1,0 +1,15 @@
+# Trials leave sleep-pressure therapy and workout timing uncertain
+
+Two studies find main heart and muscle endpoints unchanged, while established sleep-treatment and exercise guidance still matters.
+
+## Sleep therapy after stroke
+
+In a small trial of 71 stroke survivors with sleep apnea, 12 months of CPAP did not clearly change a body-size-adjusted heart-chamber measure or a blood strain marker, though more completers reported full recovery (46.9% versus 22.6%) and the chamber difference was 0.5 milliliters per square meter, not a clear benefit ([trial report](https://pubmed.ncbi.nlm.nih.gov/42786612/)). CPAP, a mask that delivers steady air to keep the airway open, is used for obstructive sleep apnea, a condition in which the airway repeatedly narrows during sleep ([patient page](https://www.nhlbi.nih.gov/health/cpap)).
+
+Established outpatient guidance strongly recommends pressure therapy for adults with obstructive sleep apnea and excessive sleepiness, and conditionally recommends it for impaired sleep-related quality of life or blood-pressure concerns, with follow-up to check fit, comfort, and results ([2019 sleep-treatment guideline](https://pmc.ncbi.nlm.nih.gov/articles/PMC6374094/)). A hospital-care guideline adds that established sleep-breathing treatment generally continues unless contraindicated, while screening and treating previously untreated cases needs individualized judgment ([hospital sleep-breathing guideline](https://link.springer.com/article/10.5664/jcsm.11864)). Side effects can include nasal congestion, dry mouth, and mask irritation, so troubleshooting matters ([patient page](https://www.nhlbi.nih.gov/health/cpap)). People may notice less snoring, better sleep quality, and less daytime sleepiness. Finding a comfortable mask and adjusting the device can require provider help. Secondary results like this usually need confirmation in larger trials.
+
+## Strength timing in older adults
+
+In a Swiss trial of relatively healthy older adults, 12 weeks of training at a tested personal peak did not clearly beat training at their tested personal low, with a 0.06 newton-per-kilogram difference in force per body weight and no serious adverse events ([study paper](https://onlinelibrary.wiley.com/doi/10.1002/jcsm.70390)).
+
+That fits an older review finding little general support for one best workout time, especially when studies were biased or performance was tested at the same time as training ([systematic review](https://pubmed.ncbi.nlm.nih.gov/37208462/)). The review included 26 articles, with seven in statistical summaries, but most had high risk of bias. Some performance benefit appeared when training and testing occurred at the same time of day. Regular activity still matters: health agencies say any movement beats none and that muscle strengthening benefits people, without requiring a particular clock time ([World Health Organization fact sheet](https://www.who.int/news-room/fact-sheets/detail/physical-activity)). For most people, keeping a workable routine matters more than chasing a clock time.

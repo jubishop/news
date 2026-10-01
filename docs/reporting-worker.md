@@ -132,6 +132,12 @@ The earlier Luna pilot does not establish Sol's reporting quality or runtime.
 Use the explicit configurable model name; do not promise automatic upgrades
 across generations. Codex tool improvements arrive with ordinary CLI updates.
 
+Reaffirmed on September 30, 2026: retain GPT-6.1 Sol with high reasoning and
+the existing Codex research-and-writing flow after the private
+[Sleep & Fitness writing comparison](worker-writing-evaluation.md). The owner
+found Sol's draft acceptable and chose to keep the current approach. The
+comparison does not introduce a local Qwen or Hemmingway writing stage.
+
 Accepted on September 26, 2026: process up to eight reporters concurrently.
 The owner chose eight because inference runs in the cloud. Claim only when
 capacity is available. Each attempt keeps its own context and durable state.

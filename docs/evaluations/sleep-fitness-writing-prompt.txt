@@ -1,0 +1,68 @@
+Write a Sleep & Fitness news briefing from the supplied research. Research and archive checks are complete. Your task is writing only: use no tools and add no facts from memory. Cover both selected new studies, with a headline, one-sentence summary, and connected article prose. Cite the supplied sources with inline Markdown links. Output only the finished draft, without research notes or metadata. Clearly distinguish newly published findings from older background evidence. Explain what was found, why it matters, and any practical implications, with uncertainty intact.
+
+For this side-by-side reading sample, aim for approximately 350–450 words. Paraphrase without direct quotes. Keep material derived from either individual new study to at most 90 words in total, including the headline and summary, and use the other verified sources for explanatory background and practical context. Do not include coverage windows or research cutoff dates in the headline, summary, or body; publication dates may appear where useful.
+
+Write for an intelligent, curious reader who is not a specialist in this beat.
+Keep useful technical detail and explain it. Make each title and summary
+understandable on its own: identify unfamiliar drugs, products, organizations,
+or methods by their purpose or a plain-language description, rather than
+relying on a name or acronym. Avoid unexplained specialist terms and acronyms
+in both. Introduce terms that need a definition in the body; use everyday
+language for the finding in the title and summary. State the actual development
+without hype.
+Open the body with what happened, who is affected, and why it matters. Supply
+the background needed to understand the story even if the reader has not read
+earlier coverage. Explain necessary jargon and acronyms on first use; spelling
+out an acronym alone may not explain the concept. Use concrete examples or
+comparisons when they clarify how something works, and label analogies as such.
+Explain what important numbers mean, including the comparison, population,
+time period, and absolute scale when sources provide them. Select figures that
+help the reader understand the result instead of reciting every measurement.
+Explain limitations in plain language: what the evidence supports, what it
+cannot establish, and how that changes the practical meaning. Distinguish early
+or experimental results from established benefits and real-world availability.
+Write a connected news story with clear sentences and paragraphs. Use headings
+or lists when they help the assignment. Give the body enough space for
+explanation and context; brevity should remove repetition, not necessary
+reasoning. Match the depth to the story without padding or a fixed word count.
+Check explanatory background against the supplied research packet, just as you check new findings.
+Do not invent mechanisms, comparisons, implications, or certainty to make a
+story more engaging. Do not copy the compressed style of past articles.
+Before returning an article, check that a new reader can tell what the subject
+is from its title, understand the main result, explain why it matters, and
+recognize the important uncertainties without looking up unexplained terms.
+
+SUPPLIED RESEARCH
+PRIVATE WRITING COMPARISON — SAME RESEARCH FOR BOTH WRITERS
+
+Assignment: Sleep & Fitness, production reporter 2826d77436ec64ea148149a3a5bf1b2d, configuration version 3, scheduled for Thursday 2026-10-01 at the normal 06:00 Pacific batch. Test research performed Wednesday 2026-09-30 evening PDT. This is an early rehearsal using evidence currently available, not a completed October 1 production run. Use coverage_start=2026-09-24 and coverage_end=2026-09-30 for this test. Dates are metadata only.
+
+History: A read-only production-database query found no runs or articles for this reporter. All 12 retained newsroom articles were checked by title, summary, and source URLs. None covers either selected study. Related incidental vigorous-activity/diabetes and time-restricted-eating/interval-training stories have already been covered by Metabolic; do not repeat them. This test does not claim or submit a newsroom assignment.
+
+Selection: Write one readable Sleep & Fitness briefing using the two new studies below, with background from the older sources clearly treated as background. Research was conducted once by the supervising agent. Do not conduct additional research or use facts from model memory. No requirement to fill a quota. Several other leads were excluded because their original publication dates were before this test window, including the sleep-partners CPAP trial (September 22), the USleep app trial (June 1), and an expiratory-pressure-relief trial (September 3).
+
+NEW STUDY A — CPAP after stroke: the primary heart measurement was inconclusive; a recovery finding merits follow-up.
+Primary source, published September 24, 2026, Journal of the American Heart Association. Chou-Han Lin and colleagues. https://pubmed.ncbi.nlm.nih.gov/42786612/ (DOI 10.1161/JAHA.126.050964). The PubMed primary-study abstract was opened and read. The publisher's full text was inaccessible. Do not claim full-text verification.
+Randomized trial of 71 people with stroke and obstructive sleep apnea: 35 assigned standard care plus CPAP and 36 standard care alone. Follow-up 12 months. Coprimary measurements included changes and time trajectories of left atrial volume index (a heart-chamber size measure adjusted for body size) and NT-proBNP (a cardiac biomarker). The 12-month between-group difference in change in the atrial measure was 0.5 mL/m2, 95% confidence interval -3.2 to 4.1, P=.804: no clear difference. Different time trajectories were detected, but those do not erase the inconclusive endpoint. Among 63 people completing follow-up, complete neurologic recovery was reported in 46.9% with CPAP versus 22.6% with control (P=.043). This is a secondary/completer finding in a small trial, not definitive evidence that CPAP doubles recovery or prevents another stroke. This abstract does not establish fewer heart attacks, recurrent strokes, or deaths. Adherence details and adverse-event counts were not available in the retrieved abstract; do not invent them. It is not evidence that CPAP is useless for treating sleep apnea.
+
+NEW STUDY B — Choosing a personal peak strength time did not improve the measured training response.
+Primary source, first published September 25, 2026, Journal of Cachexia, Sarcopenia and Muscle. Fabienne Bruggisser and colleagues. https://onlinelibrary.wiley.com/doi/10.1002/jcsm.70390 . Full paper opened and read, including methods, results and limitations.
+Single-centre Swiss randomized trial: 108 adults aged 60–80, mean age 67, 41% women; 93 included in the analyses. Participants were assigned to exercise at their individually measured peak strength time, their trough time, or no training. Peak/trough were identified by testing at 08:00, 12:00, 16:00 and 20:00 over four days. The 12-week program included two supervised resistance sessions and one 30-minute moderate cycling session per week (first two weeks familiarization, then 10 weeks progressive training). Peak versus trough training showed no clear differences in measured maximal pulling strength, grip strength or limb lean mass. Main strength estimate 0.06 N/kg (95% confidence interval -0.76 to 0.88). No intervention-related serious adverse events were reported. Fifteen randomized participants were absent from outcome analyses; the paper reports musculoskeletal complaints among dropout reasons, so do not call the program risk-free. Participants were relatively healthy, high-functioning older adults; do not extrapolate to frail people or competitive athletes. No clear superiority is not proof that timing never matters for every outcome. Practical inference: these results offer little reason to rearrange a workable exercise schedule merely to chase a measured personal strength peak. This trial did not test improved adherence from flexible scheduling.
+
+BACKGROUND C — What a CPAP machine does and practical treatment context (not new evidence).
+NHLBI patient information, updated March 24, 2022; opened and read: https://www.nhlbi.nih.gov/health/cpap . CPAP supplies mild air pressure through a mask to keep the airway open during sleep. People may notice less snoring, better sleep quality and less daytime sleepiness. Finding a comfortable mask and adjusting the device can require help from a healthcare provider. Side effects can include nasal congestion, dry mouth and mask irritation. Do not use this general page as evidence that the new stroke trial proved stroke prevention. Do not provide personal device-setting instructions.
+
+BACKGROUND D — Established outpatient treatment guidance (not new evidence).
+American Academy of Sleep Medicine 2019 clinical practice guideline, opened and read: https://pmc.ncbi.nlm.nih.gov/articles/PMC6374094/ . The guideline strongly recommends PAP for adults with obstructive sleep apnea and excessive sleepiness, and conditionally recommends it for impaired sleep-related quality of life or comorbid hypertension. It stresses follow-up, checking treatment efficacy/adherence, and troubleshooting. Established symptom-management reasons for treatment are distinct from proving additional cardiovascular benefits in a particular trial.
+
+BACKGROUND E — Broader exercise-timing evidence (not new evidence).
+Bruggisser et al., Sports Medicine - Open, May 19, 2023; primary systematic-review abstract opened and read: https://pubmed.ncbi.nlm.nih.gov/37208462/ . Review included 26 articles, seven in meta-analyses. It found little evidence for or against a generally superior training time; risk of bias was high in most studies. Some performance benefit was found when training and testing happened at the same time of day. This contextualizes the new trial, not a new release and not proof of universal equivalence.
+
+BACKGROUND F — Why regular activity remains useful (not new evidence).
+WHO physical-activity fact sheet, June 26, 2024, opened and read: https://www.who.int/news-room/fact-sheets/detail/physical-activity . Physical activity contributes to physical and mental health; any amount is better than none, all activity counts, and muscle strengthening benefits everyone. The guidance describes frequency, intensity and duration, rather than requiring a particular clock time. Do not invent an exact weekly strengthening prescription from this fact sheet.
+
+ADDITIONAL BACKGROUND G — Hospital care guidance (optional background, not a new release).
+AASM guideline on medically hospitalized adults, primary publication opened and read: https://link.springer.com/article/10.5664/jcsm.11864 . It says established sleep-disordered-breathing treatment should generally continue in hospital unless contraindicated. Recommendations for screening/treating previously untreated OSA in medically hospitalized adults are conditional, with low-certainty evidence, and need individualized clinical judgment. Do not present this as an instruction for every outpatient.
+
+EVIDENCE BOUNDARIES
+These are separate trials in separate populations; do not imply the same participants received CPAP and exercise, or that one study explains the other. A nonsignificant difference is not proof of equivalence. Preserve null primary findings when discussing positive secondary findings. Avoid unsupported mechanisms, invented quotes, patient stories, or new claims. Practical implications must be cautious interpretations of supplied evidence, not individualized medical advice.

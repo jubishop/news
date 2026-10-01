@@ -1,0 +1,23 @@
+# Two New Trials, Two Careful Lessons: Stroke-Sleep Therapy and Strength Training Time
+
+**Stroke survivors on CPAP may recover better — but the heart outcome was inconclusive, and researchers say more testing is needed.**
+
+A small new trial in the *Journal of the American Heart Association* found no clear difference between stroke survivors with obstructive sleep apnea who used CPAP (a machine that pushes air through a mask to keep the airway open at night) and those who did not, for its main heart measures — though a secondary analysis suggested better neurologic recovery with treatment.
+
+A companion finding from the *Journal of Cachexia, Sarcopenia and Muscle* found that choosing to lift weights at your personal peak strength time offered no measurable advantage over training at your lowest-energy time.
+
+## CPAP after stroke: recovery finding awaits confirmation
+
+The Swiss-based stroke study randomized 71 people with stroke and sleep-disordered breathing, most using continuous positive airway pressure in standard care plus a CPAP unit against standard care alone, over 12 months. The two pre-specified heart endpoints — a measure of left atrial size and a cardiac biomarker called NT-proBNP — showed no clear between-group difference; the atrial-size gap was 0.5 mL/m², far inside its wide margin of uncertainty ([Lin et al., JAHA, September 24, 2026](https://pubmed.ncbi.nlm.nih.gov/42786612/)).
+
+The encouraging result was secondary: among 63 people who completed follow-up, 46.9% with CPAP reported complete neurologic recovery versus 22.6% without it. That is a smaller, unblinded completer analysis, not proof that CPAP doubles recovery, prevents further strokes, or reduces heart attacks or death. The abstract also did not report how faithfully patients used the machines or how many had side effects.
+
+## Training at your peak time adds nothing
+
+In a Swiss randomized trial of 108 adults aged 60 to 80, researchers first measured when each person was strongest, testing at 8 a.m., noon, 4 p.m., and 8 p.m. over four days, then gave 12 weeks of resistance and cycling training either at peak or trough time ([Bruggisser et al., September 25, 2026](https://onlinelibrary.wiley.com/doi/10.1002/jcsm.70390)). Maximal pulling strength differed by only 0.06 N/kg between schedules, an estimate whose range crosses zero. No serious exercise-related injuries were reported, though musculoskeletal complaints contributed to dropouts. The sample was healthy, high-functioning; frail adults were excluded.
+
+## What older evidence says
+
+Sleep medicine guidance is clear on one point independent of the new trial: the American Academy of Sleep Medicine [strongly recommends pressure-airway therapy](https://pmc.ncbi.nlm.nih.gov/articles/PMC6374094/) for people with sleep apnea and excessive sleepiness, with follow-up and troubleshooting ([NHLBI patient information](https://www.nhlbi.nih.gov/health/cpap)). That established benefit is separate from proving added cardiovascular protection. Similarly, a 2023 systematic review found little evidence that any training hour is universally better, though performance improved when training matched the test time ([review summary](https://pubmed.ncbi.nlm.nih.gov/37208462/)). And the WHO's guidance notes that any amount of activity helps and does not specify a clock time ([fact sheet](https://www.who.int/news-room/fact-sheets/detail/physical-activity)).
+
+In short: keep CPAP consistent with your clinician's advice, and keep exercising whenever you can — but do not rearrange your day chasing a measured personal peak, and treat the recovery signal in the stroke trial as promising, not settled.

@@ -1,0 +1,15 @@
+# Trials find uncertain heart benefits from sleep apnea treatment and no clear exercise-timing advantage
+
+Sleep apnea treatment after stroke did not clearly improve a heart measure; older adults gained no clear training advantage from exercising at their personal strength peak.
+
+A [new trial published September 24](https://pubmed.ncbi.nlm.nih.gov/42786612/) followed 71 people with stroke and obstructive sleep apnea for 12 months. Adding CPAP to standard care produced no clear difference in a main heart-chamber size measure. Complete neurological recovery occurred in 46.9% versus 22.6% of follow-up completers, but this secondary finding needs confirmation. The small trial does not establish protection against another stroke.
+
+The distinction matters because treating sleep apnea has established purposes beyond any possible cardiovascular benefit. CPAP, meaning continuous positive airway pressure, supplies mild air pressure through a mask to keep the airway open during sleep. According to [patient guidance updated in 2022](https://www.nhlbi.nih.gov/health/cpap), people may notice less snoring, better sleep quality and less daytime sleepiness. These benefits provide separate reasons to treat the condition; they do not demonstrate that treatment prevents another stroke.
+
+The [American Academy of Sleep Medicine’s 2019 guideline](https://pmc.ncbi.nlm.nih.gov/articles/PMC6374094/) strongly recommends positive airway pressure treatment for adults with obstructive sleep apnea and excessive sleepiness. Its recommendations for impaired sleep-related quality of life or accompanying high blood pressure are conditional. Follow-up should check whether treatment works and whether patients use it. A comfortable mask can require adjustment with a healthcare provider, while congestion, dry mouth and mask irritation can complicate use.
+
+A separate [trial published September 25](https://onlinelibrary.wiley.com/doi/10.1002/jcsm.70390) assigned 108 relatively healthy adults aged 60–80 to train at their measured strongest or weakest time, or not train. After 12 weeks, strength and limb muscle mass showed no clear timing advantage. Only 93 entered the analyses. The findings offer little reason to rearrange a workable exercise schedule, but do not prove timing never matters.
+
+Older evidence helps put that result in perspective. A [2023 systematic review](https://pubmed.ncbi.nlm.nih.gov/37208462/) covering 26 articles found little evidence for or against a generally superior training time. Most studies had a high risk of bias, which reduces confidence in their conclusions. Some performance benefits appeared when training and testing occurred at the same time of day—a narrower finding than identifying one best hour for everyone.
+
+The broader practical context remains regular activity. The [World Health Organization’s 2024 guidance](https://www.who.int/news-room/fact-sheets/detail/physical-activity) says activity contributes to physical and mental health, any amount is better than none, and muscle strengthening benefits everyone. Its advice focuses on frequency, intensity and duration, without requiring a particular clock time.

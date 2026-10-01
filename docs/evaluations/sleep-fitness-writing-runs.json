@@ -1,0 +1,77 @@
+{
+  "test_date_pacific": "2026-09-30",
+  "prompt_sha256": "646016b3fc35a16fedcd0ef49999067c7efa76573b3e5b632916ec4a11b93bc7",
+  "notes": [
+    "Elapsed seconds include loading, prompt processing, reasoning, and writing, but exclude shared research.",
+    "Ollama duration fields are nanoseconds. Generated token counts include reasoning.",
+    "An earlier medium-reasoning trial was superseded before the final shared prompt and settings; it is excluded from the completed comparison."
+  ],
+  "attempts": [
+    {
+      "attempt": "sol",
+      "model": "gpt-6.1-sol",
+      "reasoning": "high",
+      "prompt_sha256": "646016b3fc35a16fedcd0ef49999067c7efa76573b3e5b632916ec4a11b93bc7",
+      "elapsed_seconds": 60.41,
+      "returncode": 0
+    },
+    {
+      "attempt": "qwen-timeout-600s",
+      "model": "qwen3.8:27b-mlx",
+      "reasoning": "xhigh",
+      "elapsed_seconds": 600,
+      "status": "timeout",
+      "note": "The original wrapper stopped at its configured 600-second limit without final article text."
+    },
+    {
+      "attempt": "qwen",
+      "model": "qwen3.8:27b-mlx",
+      "reasoning": "xhigh",
+      "think_parameter": "xhigh",
+      "transport": "Ollama /api/generate",
+      "prompt_sha256": "646016b3fc35a16fedcd0ef49999067c7efa76573b3e5b632916ec4a11b93bc7",
+      "elapsed_seconds": 797.02,
+      "returncode": 0,
+      "done_reason": "stop",
+      "first_thinking_seconds": 0.54,
+      "first_answer_seconds": 779.53,
+      "load_duration": 10492083,
+      "prompt_eval_count": 2554,
+      "prompt_eval_cached_count": 2549,
+      "prompt_eval_duration": 412683834,
+      "eval_count": 24493,
+      "eval_duration": 796558522417
+    },
+    {
+      "attempt": "hemmingway-thinking-timeout-1800s",
+      "model": "hemmingway:27b-q6",
+      "reasoning": "enabled; model template defaults to xhigh",
+      "think_parameter": true,
+      "transport": "Ollama /api/generate",
+      "prompt_sha256": "646016b3fc35a16fedcd0ef49999067c7efa76573b3e5b632916ec4a11b93bc7",
+      "elapsed_seconds": 1800.01,
+      "returncode": 1,
+      "error": "Writer exceeded the 1800-second reporting-attempt limit",
+      "first_response_field_seconds": 14.33,
+      "note": "Reasoning arrived in the main response field. No final article was produced before timeout."
+    },
+    {
+      "attempt": "hemmingway",
+      "model": "hemmingway:27b-q6",
+      "reasoning": "disabled",
+      "think_parameter": false,
+      "transport": "Ollama /api/generate",
+      "prompt_sha256": "646016b3fc35a16fedcd0ef49999067c7efa76573b3e5b632916ec4a11b93bc7",
+      "elapsed_seconds": 90.03,
+      "returncode": 0,
+      "done_reason": "stop",
+      "first_answer_seconds": 14.39,
+      "load_duration": 7377045667,
+      "prompt_eval_count": 2514,
+      "prompt_eval_cached_count": 0,
+      "prompt_eval_duration": 6976465000,
+      "eval_count": 832,
+      "eval_duration": 75634936000
+    }
+  ]
+}
