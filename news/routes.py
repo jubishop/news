@@ -16,7 +16,7 @@ from flask import (
     url_for,
 )
 
-from . import clock, content, contractors, jobs, reporters, schedules, validation as v
+from . import calendar_view, clock, content, contractors, jobs, reporters, schedules, validation as v
 from .db import many, one, transaction
 from .errors import Problem
 
@@ -76,6 +76,7 @@ def health():
 def newsroom():
     archived = request.args.get("view") == "archive"
     with transaction(database()) as connection:
+        calendar = calendar_view.month_view(connection, request.args.get("month"))
         condition = (
             "(deleted_at IS NOT NULL OR completed_at IS NOT NULL)"
             if archived
@@ -122,6 +123,7 @@ def newsroom():
         pass
     return render_template(
         "newsroom.html",
+        calendar=calendar,
         reporters=roster,
         archived=archived,
         alerts=alerts,

@@ -65,6 +65,8 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   questions for the first useful version.
 - [Contractor assignment dates](contractor-schedules.md): finite date lists,
   catch-up, completion, retained failures, and retry recovery.
+- [Upcoming reporting calendar](newsroom-calendar.md): unified newsroom dates,
+  Pacific month navigation, lifecycle rules, and accessible layouts.
 - [Implementation design](implementation-design.md): server-first implementation
   sequence, selected stack, deployment context, and remaining technical choices.
 - [Backups](backups.md): encrypted recovery snapshots, retention, restore
