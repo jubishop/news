@@ -29,6 +29,7 @@ class LaunchAgentTests(unittest.TestCase):
         self.enterContext(patch.dict(os.environ, {"HOME": str(self.root / "home")}))
         self.crontab = "MAILTO=owner@example.com\n17 3 * * * /existing/backup\n" + LEGACY
         self.loaded = None
+        self.stuck = False
         self.calls = []
         self.enterContext(patch("news.worker_install.subprocess.run", side_effect=self.command))
         self.readlink = os.readlink
@@ -48,6 +49,8 @@ class LaunchAgentTests(unittest.TestCase):
             self.assertEqual(args[2], f"gui/{os.getuid()}")
             self.loaded = plistlib.loads(Path(args[3]).read_bytes())
         if args[:2] == ["launchctl", "bootout"]:
+            if self.stuck:
+                return subprocess.CompletedProcess(args, 5, "", "Boot-out failed: 5: Input/output error")
             was_loaded, self.loaded = self.loaded is not None, None
             return subprocess.CompletedProcess(args, 0 if was_loaded else 3, "", "")
         if args[:2] == ["launchctl", "print"]:
@@ -93,6 +96,22 @@ class LaunchAgentTests(unittest.TestCase):
         install(self.config, self.root, apply=True)
         self.assertIsNone(self.crontab)
         self.assertEqual(self.changes(), [["crontab", "-r"], ["launchctl", "bootstrap"]])
+
+    def test_failed_unload_keeps_the_old_agent_and_a_later_install_reloads(self):
+        install(self.config, self.root, apply=True)
+        installed = self.agent.read_bytes()
+        old = installed.replace(b"<integer>6</integer>", b"<integer>1</integer>")
+        self.agent.write_bytes(old)
+        self.loaded = plistlib.loads(old)
+        self.stuck = True
+        with self.assertRaisesRegex(Exception, "unload"):
+            install(self.config, self.root, apply=True)
+        self.assertEqual(self.agent.read_bytes(), old)
+        self.assertEqual(self.loaded["StartCalendarInterval"], {"Hour": 1, "Minute": 0})
+        self.stuck = False
+        install(self.config, self.root, apply=True)
+        self.assertEqual(self.agent.read_bytes(), installed)
+        self.assertEqual(self.loaded["StartCalendarInterval"], {"Hour": 6, "Minute": 0})
 
     def test_install_without_any_crontab_leaves_crontab_alone(self):
         self.crontab = None

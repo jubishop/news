@@ -51,9 +51,18 @@ def remove_legacy_cron(original):
 
 def load(path, content):
     target = f"gui/{os.getuid()}/{LABEL}"
-    loaded = subprocess.run(["launchctl", "print", target], capture_output=True, check=False).returncode == 0
-    if loaded and path.is_file() and path.read_bytes() == content:
-        return
+
+    def loaded():
+        return subprocess.run(["launchctl", "print", target], capture_output=True, check=False).returncode == 0
+
+    if loaded():
+        # The file is replaced only after the previous job unloads, so a
+        # matching file means launchd loaded this definition.
+        if path.is_file() and path.read_bytes() == content:
+            return
+        subprocess.run(["launchctl", "bootout", target], capture_output=True, check=False)
+        if loaded():
+            raise WorkerError("launchd did not unload the previous worker agent; inspect launchctl print " + target + ".")
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".news-worker-")
     try:
@@ -64,10 +73,8 @@ def load(path, content):
     except BaseException:
         Path(temporary).unlink(missing_ok=True)
         raise
-    if loaded:
-        subprocess.run(["launchctl", "bootout", target], capture_output=True, check=False)
     result = subprocess.run(["launchctl", "bootstrap", f"gui/{os.getuid()}", str(path)], capture_output=True, text=True, check=False)
-    if result.returncode or subprocess.run(["launchctl", "print", target], capture_output=True, check=False).returncode:
+    if result.returncode or not loaded():
         raise WorkerError("launchd did not load the worker agent; inspect launchctl print " + target + ".")
 
 
