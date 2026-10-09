@@ -23,7 +23,7 @@ ShellCheck and Restic must be on PATH for full validation.
 ```sh
 bin/setup
 bin/app-setup
-bin/check-app
+bin/check-application
 bin/preview
 ```
 
@@ -55,7 +55,7 @@ locally generated signing key and a fake external JWKS response. There is no
 production authentication bypass. Stop it with Ctrl-C; its database is removed.
 Do not bind this fixture to a public interface.
 
-`bin/check-app` runs API/lifecycle tests, a real local Restic backup and restore,
+`bin/check-application` runs API/lifecycle tests, a real local Restic backup and restore,
 a browser journey, and deployment shell lint. Tests fake Cloudflare, R2, and
 Resend at their network boundaries. Browser tests cover reporter controls,
 Trash/restore, public reading, and mobile layout. Screenshots go under ignored
@@ -63,7 +63,7 @@ Trash/restore, public reading, and mobile layout. Screenshots go under ignored
 email. Test runs are sequential; the concurrency case alone deliberately races
 two requests against one temporary SQLite database.
 
-`bin/check --full` first runs all foundation checks, then `bin/check-app`.
+`bin/check --full` first runs all foundation checks, then `bin/check-application`.
 The default and `--documents-only` modes do not run application tools. CI runs
 full validation on Python 3.14. Source discovery and output stay
 inside the active checkout; `.venv`, `var`, and nested worktrees are excluded.

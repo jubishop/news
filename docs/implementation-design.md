@@ -148,7 +148,7 @@ a production worker:
   from the owner's real reporting history.
 
 Automated tests must run real server logic with fakes only at external-system
-boundaries, following the [testing workflow](development-workflow.md#test-driven-development).
+boundaries, following the [testing workflow](foundation/engineering-policy.md#test-driven-development).
 The deployed server and representative fixtures give the owner a concrete v1
 to assess. Worker implementation starts after the owner is satisfied with that
 server milestone. The [server contract](server-contract.md) now specifies the

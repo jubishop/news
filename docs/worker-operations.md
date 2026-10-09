@@ -307,7 +307,7 @@ later delivery.
 
 ## Tests
 
-`bin/check-app` includes worker tests. A local mock HTTP server and fake
+`bin/check-application` includes worker tests. A local mock HTTP server and fake
 Claude Code executable exercise real worker networking, prompts, concurrency,
 subprocess handling, persistence, validation, and delivery. Another test uses
 the actual Flask/SQLite protocol with fake Cloudflare verification data and a

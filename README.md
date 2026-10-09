@@ -26,7 +26,7 @@ QMD and direnv are optional; setup reports skipped features.
 
 The application requires Python 3.14. Install ShellCheck and Restic, then
 run `bin/app-setup` to create the local environment and browser test dependency.
-Run `bin/check-app` for application checks and `bin/preview` for a disposable
+Run `bin/check-application` for application checks and `bin/preview` for a disposable
 local edition at `http://127.0.0.1:3071`. The preview uses test data and fixture
 Access credentials; it does not contact a production worker. See
 [local setup](docs/server-operations.md#runtime-and-local-setup).
@@ -37,11 +37,12 @@ Run `bin/check --full` locally after setup, test/build infrastructure changes,
 or when focused checks leave material uncertainty. Require successful full
 validation before merge or release; an enforced full CI gate can provide it
 for ordinary changes. Without that gate, run the full check locally before
-delivery. See the [validation policy](docs/development-workflow.md#checks-and-project-extensions).
+delivery. See the [validation policy](docs/foundation/engineering-policy.md#checks).
 The fast and full checks require ShellCheck.
 Use `bin/doctor` for diagnostics. See the
-[development workflow](docs/development-workflow.md) for search, worktrees,
-hook integration, and recovery.
+[development workflow](docs/development-workflow.md) for project commands and
+the [knowledge search guide](docs/foundation/knowledge-search.md) for search,
+worktrees, hook integration, and recovery.
 
 ## Knowledge
 
@@ -52,9 +53,9 @@ The [GitHub Actions workflow](.github/workflows/check.yml) runs the full
 foundation and application checks for pull requests and pushes to `main`.
 
 The foundation comes from
-[Project Starter](https://github.com/jubishop/project-starter), with its exact
-source revision in [.project-starter.json](.project-starter.json) and its
-license notice in [LICENSE.project-starter](LICENSE.project-starter).
+[Project Starter](https://github.com/jubishop/project-starter), with its
+release and managed-file hashes in [.project-starter.json](.project-starter.json)
+and its license notice in [LICENSE.project-starter](LICENSE.project-starter).
 
 ## License
 
@@ -65,6 +66,6 @@ starter notice is retained with the copied foundation.
 
 Use `td` for local tasks, progress, blockers, and session handoffs. After cloning,
 install td and run `td init` in the primary checkout. Use `td status` or
-`td monitor` to inspect progress. Follow the [task workflow](docs/task-tracking.md)
+`td monitor` to inspect progress. Follow the [task workflow](docs/foundation/task-tracking.md)
 for setup, review, worktrees, and local data. Keep GitHub Issues for shared scope
 and acceptance criteria, linked from related td tasks.

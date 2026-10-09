@@ -1,4 +1,5 @@
 #!/bin/sh
+# Run News application checks; bin/check --full calls this after the foundation checks.
 set -eu
 root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
