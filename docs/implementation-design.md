@@ -27,8 +27,8 @@ integration tests cover these rules; recurring scheduling remains unchanged.
 Accepted on September 25, 2026: implement and deploy the newsroom server on
 the VPS first. Bring that server to a v1 the owner is happy with before
 separately implementing the reporting worker on one of the owner's local
-machines. The [worker design](reporting-worker.md#model-engine) now selects vanilla
-Codex with Luna on the current Mac, starting daily at 06:00 Pacific. See
+machines. The [worker design](reporting-worker.md#model-engine) now selects Claude
+Code with Claude Haiku 5.5 on the current Mac, starting daily at 06:00 Pacific. See
 [worker operations](worker-operations.md) for implementation and commissioning.
 
 The owner narrowed the initial implementation task: use a worktree under
@@ -236,8 +236,8 @@ data and coordination service with no AI execution. Workers poll its API for
 jobs and context and submit articles or explicit run outcomes. The newsroom
 can monitor overdue work without performing the reporting itself.
 
-The [model decision](reporting-worker.md#model-engine) selects vanilla Codex
-with GPT-6.1 Sol, high reasoning, and built-in web research. The [worker host](reporting-worker.md#worker-location)
+The [model decision](reporting-worker.md#model-engine) selects Claude Code
+with Claude Haiku 5.5, high effort, and built-in web search and fetch. The [worker host](reporting-worker.md#worker-location)
 is the current Mac. The [operations guide](worker-operations.md) covers the
 implementation. The worker API remains separate from the model interface.
 

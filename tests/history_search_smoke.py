@@ -27,7 +27,7 @@ def call(history, name, arguments):
     })
     with request.urlopen(req, timeout=180) as response:
         raw = response.read().decode()
-    # QMD supports JSON and the legacy SSE transport used by Codex.
+    # QMD can answer with JSON or the legacy SSE transport.
     value = json.loads(next(line[6:] for line in raw.splitlines() if line.startswith("data: "))) if raw.startswith("event:") else json.loads(raw)
     if "error" in value:
         raise RuntimeError(value["error"])

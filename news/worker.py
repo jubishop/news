@@ -1,4 +1,4 @@
-"""Daily reporting batches with durable API operations and bounded Codex attempts."""
+"""Daily reporting batches with durable API operations and bounded Claude Code attempts."""
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from . import validation as v
 from .desktop_alerts import notify
 from .errors import Problem
-from .worker_codex import preflight, research
+from .worker_claude import preflight, research
 from .worker_history import History, preflight as history_preflight
 from .worker_io import APIError, NewsAPI, WorkerError, read_json, remove_file, save_json
 
@@ -42,22 +42,22 @@ class Batch:
         self.lock_fd = lock_fd
         self.errors = False
         self.failed_runs = set()
-        self.codex_lock = threading.Lock()
-        self.codex_checked = False
-        self.codex_error = None
+        self.claude_lock = threading.Lock()
+        self.claude_checked = False
+        self.claude_error = None
         self.history = History(settings, lock_fd)
 
-    def check_codex(self):
-        with self.codex_lock:
-            if not self.codex_checked:
-                self.codex_error = None
+    def check_claude(self):
+        with self.claude_lock:
+            if not self.claude_checked:
+                self.claude_error = None
                 try:
-                    preflight(self.settings["codex"])
+                    preflight(self.settings)
                 except WorkerError as exc:
-                    self.codex_error = exc
-                self.codex_checked = True
-            if self.codex_error:
-                raise self.codex_error
+                    self.claude_error = exc
+                self.claude_checked = True
+            if self.claude_error:
+                raise self.claude_error
 
     def cleanup(self):
         cutoff = time.time() - RETENTION_SECONDS
@@ -150,7 +150,7 @@ class Batch:
             candidate = {"outcome": "skipped_paused", "articles": [], "reason": "Nothing to submit because the reporter is paused."}
         else:
             try:
-                self.check_codex()
+                self.check_claude()
                 reporter = claim["reporter"]
                 reporter_id = v.identifier(reporter["id"], "reporter id")
                 self.history.prepare(self.api)
@@ -169,7 +169,7 @@ class Batch:
                 candidate = research(self.settings, directory, assignment, self.lock_fd, self.history.endpoint)
                 self.history.check()
             except subprocess.TimeoutExpired:
-                candidate = failure("research_timeout", "Codex exceeded the reporting attempt time limit.")
+                candidate = failure("research_timeout", "Claude Code exceeded the reporting attempt time limit.")
             except (WorkerError, Problem, ValueError, UnicodeError) as exc:
                 save_json(directory / "failure.json", {"type": type(exc).__name__, "message": str(exc)})
                 candidate = (failure("invalid_result", str(exc)) if isinstance(exc, Problem) else
@@ -201,7 +201,7 @@ class Batch:
         allowed = {job["id"] for job in jobs} | recovered_retries
         for round_number in range(3):
             retry = set()
-            self.codex_checked = False
+            self.claude_checked = False
             with ThreadPoolExecutor(max_workers=self.settings.get("concurrency", 8)) as pool:
                 futures = {pool.submit(self.process, job, discovery["reporting_date"]): job["id"] for job in jobs}
                 for future in as_completed(futures):
@@ -225,7 +225,7 @@ class Batch:
 def run(settings):
     settings = dict(settings)
     settings.setdefault("state_dir", str(Path.home() / ".local/state/news-worker"))
-    settings.setdefault("codex", shutil.which("codex") or "codex")
+    settings.setdefault("claude", shutil.which("claude") or "claude")
     concurrency = settings.get("concurrency", 8)
     if type(concurrency) is not int or not 1 <= concurrency <= 8:
         raise WorkerError("concurrency must be between 1 and 8.")
@@ -250,7 +250,7 @@ def run(settings):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path.home() / ".config/news/worker.json")
-    parser.add_argument("--check", action="store_true", help="Check Codex login and API access without claiming work or invoking a model.")
+    parser.add_argument("--check", action="store_true", help="Check Claude Code login and API access without claiming work or invoking a model.")
     parser.add_argument("--prepare-history", action="store_true", help="Refresh and verify local history search without claiming or publishing work.")
     args = parser.parse_args()
     settings = {}
@@ -275,10 +275,11 @@ def main():
                     history.close()
             return 0
         if args.check:
-            preflight(settings.get("codex", shutil.which("codex") or "codex"))
+            settings.setdefault("claude", shutil.which("claude") or "claude")
+            preflight(settings)
             history_preflight(settings)
             NewsAPI(settings).call("/articles/search?limit=1")
-            print("Codex ChatGPT login, QMD version, and News API access verified. No model was called.")
+            print("Claude Code subscription login, QMD version, and News API access verified. No model was called.")
             return 0
         return run(settings)
     except (WorkerError, OSError, ValueError, KeyError, Problem) as exc:

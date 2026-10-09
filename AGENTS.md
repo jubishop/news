@@ -3,7 +3,7 @@
 Read the [concept](docs/concept.md) for the project's direction and the
 [implementation design](docs/implementation-design.md) for the selected
 Python, Flask, and SQLite stack. Read the [server contract](docs/server-contract.md)
-and [operations guide](docs/server-operations.md) for server v1. Read [worker operations](docs/worker-operations.md) for the vanilla Codex worker
+and [operations guide](docs/server-operations.md) for server v1. Read [worker operations](docs/worker-operations.md) for the Claude Code worker
 and its required after-merge commissioning.
 
 Keep designs, decisions, and research in [docs](docs/README.md). Use the

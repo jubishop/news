@@ -87,32 +87,35 @@ tries preparation again. Up to eight reporters share the same fixed generation.
 
 The worker starts one QMD HTTP process on a selected loopback port. Its index
 contains only News articles. Personal QMD collections and the repository's
-knowledge index are separate. Codex receives only `query` and `get`; it receives
-no News credentials and no full archive file. Its existing read-only shell
-sandbox and disabled shell networking remain unchanged.
+knowledge index are separate. Claude Code receives only `query` and `get`; the
+worker hides QMD's other tools. It receives no News credentials and no full
+archive file. It has no shell, and its file tools are confined to the attempt
+directory.
 
 Prompts request five results, at most ten, and article reads of 80 lines with
-further pages as needed. Codex enforces tool-output budgets of 3,000 tokens for
-search and 5,000 for reading, before its standard serialization allowance.
-Result counts and read lengths are agent instructions; the output token caps
-are the enforced context bound. Reporters are instructed to return a retryable
+further pages as needed. Claude Code applies one MCP output budget to every
+tool; the worker sets it to 5,000 tokens. Codex had a separate 3,000-token
+budget for search, so search results can now use more context. Result counts
+and read lengths are agent instructions; the output token cap is the enforced
+context bound. Reporters are instructed to return a retryable
 failure for explicit tool errors. QMD can also hide embedding, expansion, or
 reranker failures behind ordinary results. Before accepting each research result,
 the supervisor checks the search process and its known model-failure diagnostics.
 A detected failure rejects that result and prevents further research for the
 batch. Concurrent attempts can finish, but their results also become retryable
 failures; already saved results remain valid. The diagnostic strings are part
-of the QMD compatibility check when upgrading. Required MCP startup prevents
-research when the connection cannot initialize. Tests cannot guarantee that a
-model obeys every instruction.
+of the QMD compatibility check when upgrading. Claude Code continues when the
+history server cannot connect, so the supervisor rejects any result whose
+startup event does not show the connection. That failure costs one attempt.
+Tests cannot guarantee that a model obeys every instruction.
 
 QMD setup commands have a 30-minute limit. Search startup has a 60-second limit;
-each Codex history tool call has a 180-second limit inside the existing
-30-minute research deadline. The search process and indexing commands run
-under a small watcher that stops their process groups when the supervisor's
-pipe closes. The watcher retains the worker lock until cleanup finishes, so a
+Claude Code allows 30 seconds to connect, and each history tool call has a
+180-second limit inside the existing 30-minute research deadline. The search
+process and indexing commands run under a small watcher that stops their
+process groups when the supervisor's pipe closes. The watcher retains the worker lock until cleanup finishes, so a
 replacement batch cannot mutate the index while the old search process stops.
-Each Codex attempt has a separate guardian that enforces its original deadline
+Each Claude Code attempt has a separate guardian that enforces its original deadline
 even after supervisor death; see [worker recovery](worker-operations.md#daily-batch-and-recovery).
 Shared history stops when the supervisor dies, so surviving research cannot
 rely on further history calls. Its guardian still bounds its remaining lifetime.
@@ -139,8 +142,8 @@ Bun and QMD's JavaScript launcher, for example:
 ```
 
 The runtime directory is added to QMD's child PATH so its launcher works under
-cron. Without this setting the worker finds `qmd` on PATH; that is suitable for
-an interactive shell but must not be assumed to work under cron.
+launchd. Without this setting the worker finds `qmd` on PATH; that is suitable
+for an interactive shell but must not be assumed to work under launchd.
 
 Run QMD's `pull` command with the configured executable to download its models
 before unattended use. The inspected default files total about 2.1 GB: a 300M
@@ -154,20 +157,20 @@ bin/worker --config ~/.config/news/worker.json --check
 bin/worker --config ~/.config/news/worker.json --prepare-history
 ```
 
-`--check` verifies the QMD version, Codex login, and API access without calling
+`--check` verifies the QMD version, Claude Code login, and API access without calling
 a model. `--prepare-history` synchronizes the archive, updates embeddings, and
 verifies search-service startup without claiming jobs or publishing. It obtains
 the same worker lock and refuses to run during a reporting batch. It can call
-local embedding models and download missing model files. It does not run Codex
-or prove query-expansion/reranking quality; use the smoke test below for that.
+local embedding models and download missing model files. It does not run
+Claude Code or prove query-expansion/reranking quality; use the smoke test below for that.
 
 After the manifest change merges, verify successful server deployment and its
 schema migration before updating the permanent worker checkout. The new worker
 requires the manifest endpoint; it fails explicitly against an older server.
 Preserve its QMD command and models, then run these two checks twice. The second
 preparation should download no bodies and reuse embeddings. Run
-the synthetic smoke test with the same configured command. Preserve the cron
-entry and pending delivery state. This immediate verification does not require
+the synthetic smoke test with the same configured command. Preserve the
+scheduled LaunchAgent and pending delivery state. This immediate verification does not require
 waiting for tomorrow's batch or claiming a real reporter.
 
 ## Private state and recovery
@@ -242,7 +245,10 @@ The September 27 pilot ranked the intended primary article first in all six
 queries. All three expected articles were returned for the broader medicine
 query. A real Codex CLI 0.157.1 / GPT-6 Luna probe also searched the fictional
 Orion 2.1 story and retrieved its identity and coverage dates through these
-MCP tools, without a production API call. These small synthetic checks do not
+MCP tools, without a production API call. On October 9, 2026, two real Claude
+Code 2.1.296 / Haiku 5.5 attempts searched the same fictional coverage through
+the worker's MCP configuration before reporting; see
+[worker tests](worker-operations.md#tests). These small synthetic checks do not
 establish recall on a large archive or guarantee that reporters avoid repeats.
 
 
