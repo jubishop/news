@@ -1,4 +1,4 @@
-"""Compatibility with the real server protocol; Cloudflare and Codex stay fake."""
+"""Compatibility with the real server protocol; Cloudflare and Claude Code stay fake."""
 
 import io
 import json
@@ -41,27 +41,27 @@ class WorkerContractTests(WorkerHTTPFixture):
         self.at("2026-10-05T06:00:00-07:00")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            executable = root / "codex"
+            executable = root / "claude"
             executable.write_text(f"#!{sys.executable}\n" + f'''
 import json, pathlib, sys
 if "--version" in sys.argv:
-    print("codex-cli 0.157.1")
-elif "login" in sys.argv:
-    print("Logged in using ChatGPT")
+    print("2.1.296 (Claude Code)")
+elif sys.argv[1:3] == ["auth", "status"]:
+    print(json.dumps({{"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty"}}))
 else:
     assignment = json.loads(sys.stdin.read().split("Assignment JSON:\\n", 1)[1])
     assert assignment["reporter"]["assignment_dates"] == {dates!r}
     assert assignment["reporter"]["schedule"] == {{"cadence": "once", "dates": {dates!r}}}
     assert assignment["expected_date"] == "2026-10-05"
     assert assignment["run_kind"] == "catch_up"
-    output = pathlib.Path(sys.argv[sys.argv.index("--output-last-message") + 1])
-    output.write_text(json.dumps({{"outcome": "nothing_to_publish", "articles": [], "reason": "Nothing useful", "error": None}}))
+    print(json.dumps({{"type": "system", "subtype": "init", "mcp_servers": [{{"name": "news_history", "status": "connected"}}]}}))
+    print(json.dumps({{"type": "result", "subtype": "success", "is_error": False, "structured_output": {{"outcome": "nothing_to_publish", "articles": [], "reason": "Nothing useful", "error": None}}}}))
 ''')
             executable.chmod(0o700)
             settings = {
                 "server_url": "https://news.example.com", "client_id": "fixture-id",
                 "client_secret": "fixture-secret", "state_dir": str(root / "state"),
-                "codex": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
+                "claude": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
             }
             self.assertEqual(run(settings), 0)
             self.assertEqual(run(settings), 0)
@@ -74,7 +74,7 @@ else:
         self.at("2026-09-27T06:00:00-07:00")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            executable = root / "codex"
+            executable = root / "claude"
             article = self.article(
                 title="From the reporting worker",
                 coverage_start="2026-09-01T06:00:00-07:00",
@@ -88,22 +88,22 @@ else:
             executable.write_text(f"#!{sys.executable}\n" + f'''
 import json, pathlib, sys
 if "--version" in sys.argv:
-    print("codex-cli 0.157.1")
-elif "login" in sys.argv:
-    print("Logged in using ChatGPT")
+    print("2.1.296 (Claude Code)")
+elif sys.argv[1:3] == ["auth", "status"]:
+    print(json.dumps({{"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty"}}))
 else:
     prompt = sys.stdin.read()
     assignment = json.loads(prompt.split("Assignment JSON:\\n", 1)[1])
     assert assignment["reporter"]["id"] == {reporter!r}
     assert assignment["expected_date"] == "2026-09-27"
-    output = pathlib.Path(sys.argv[sys.argv.index("--output-last-message") + 1])
-    output.write_text(json.dumps({{"outcome": "published", "articles": [{article!r}], "reason": "", "error": None}}))
+    print(json.dumps({{"type": "system", "subtype": "init", "mcp_servers": [{{"name": "news_history", "status": "connected"}}]}}))
+    print(json.dumps({{"type": "result", "subtype": "success", "is_error": False, "structured_output": {{"outcome": "published", "articles": [{article!r}], "reason": "", "error": None}}}}))
 ''')
             executable.chmod(0o700)
             self.assertEqual(run({
                 "server_url": "https://news.example.com", "client_id": "fixture-id",
                 "client_secret": "fixture-secret", "state_dir": str(root / "state"),
-                "codex": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
+                "claude": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
             }), 0)
         self.assertIn("From the reporting worker", self.client.get("/").get_data(as_text=True))
         stored, = self.client.get("/api/v1/worker/articles/search", headers=self.worker).json["articles"]

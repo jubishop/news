@@ -15,7 +15,7 @@ from urllib import request
 
 from .worker_archive import ArchiveCache
 from .errors import Problem
-from .worker_codex import child_environment
+from .worker_claude import child_environment
 from .worker_io import NoRedirect, WorkerError, save_json
 
 
@@ -39,7 +39,7 @@ def preflight(settings):
 
 def environment(settings):
     env = child_environment()
-    # An explicit runtime remains available to QMD's launcher under cron's PATH.
+    # An explicit runtime remains available to QMD's launcher under launchd's PATH.
     command = qmd_command(settings)
     if os.path.isabs(command[0]):
         env["PATH"] = str(Path(command[0]).parent) + os.pathsep + env.get("PATH", os.defpath)

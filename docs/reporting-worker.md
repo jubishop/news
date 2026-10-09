@@ -89,7 +89,16 @@ Accepted on September 26, 2026: start the worker daily at 06:00 Pacific Time
 on the current Mac. This supersedes the earlier 01:00 choice. The owner wants
 to schedule reporters for the following day and inspect the results after
 waking. This is a startup time, with no strict coverage cutoff or completion
-deadline. The Mac must be awake for cron to run.
+deadline.
+
+Accepted on October 9, 2026: a per-user launchd LaunchAgent starts the worker,
+replacing the original cron entry. The owner prefers launchd for scheduled jobs
+on the Mac, even without a material improvement. It also matters here: Claude
+Code keeps the owner's subscription login in the macOS keychain. A probe that
+day found the login unreadable from cron and usable from a LaunchAgent, which
+runs in the owner's login session. launchd starts a 06:00 run missed during
+sleep after the Mac wakes. Neither scheduler replays a start missed while the
+Mac is off or the owner is logged out; server catch-up handles that work.
 
 Clarified by the owner on September 25, 2026: the worker checks for new work
 once a day, at a time chosen on the worker side. The server does not need to
@@ -111,6 +120,18 @@ and retry behavior. Extra runs, if needed, are initiated on
 the worker's machine rather than requested through the newsroom.
 
 ## Model engine
+
+Accepted on October 9, 2026: run reporting research with the Claude Code CLI
+and Claude Haiku 5.5 (`claude-haiku-5-5`) through the owner's existing Claude
+subscription. This supersedes the Codex CLI engine and the GPT-6.1 Sol model
+choice below. The owner requested Claude Code and Haiku 5.5; no further reason
+was specified. High effort carries forward the previous high-reasoning setting;
+the owner did not specify an effort level. Claude Code's built-in web search
+and fetch replace Codex's built-in research. The private QMD history
+connection, the shared reporter prompt, and the output contract are unchanged.
+The earlier Luna and Sol evaluations do not establish Haiku's reporting
+quality or runtime. Use the explicit configurable model name; the worker
+selects no fallback model.
 
 Accepted on September 26, 2026: use vanilla Codex CLI with GPT-6 Luna and
 the existing ChatGPT subscription for v1. Use built-in research tools, with

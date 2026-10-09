@@ -1,4 +1,4 @@
-"""Vanilla Codex subprocess and its article output contract."""
+"""Claude Code subprocess and its article output contract."""
 
 from datetime import datetime
 import json
@@ -126,66 +126,91 @@ def validate_result(value):
     return result
 
 
+MODEL = "claude-haiku-5-5"
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+TOOLS = ("Read", "Glob", "Grep", "WebSearch", "WebFetch")
+HISTORY_TOOLS = ("mcp__news_history__query", "mcp__news_history__get")
+# QMD also serves these; reporters receive only search and article reading.
+HIDDEN_HISTORY_TOOLS = ("mcp__news_history__multi_get", "mcp__news_history__status")
+
+
 def child_environment():
     return {key: value for key, value in os.environ.items() if key in (
-        "HOME", "PATH", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CODEX_HOME",
+        "HOME", "PATH", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "CLAUDE_CONFIG_DIR",
         "SSL_CERT_FILE", "SSL_CERT_DIR",
     )}
 
 
-def preflight(executable):
+def claude_environment():
+    # Credential variables would replace the owner's subscription login, so
+    # only the allowlist above passes through. The flags below keep personal
+    # instructions, memory, and the home Git repository out of the context.
+    return child_environment() | {
+        "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
+        "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1", "DISABLE_AUTOUPDATER": "1",
+        "MCP_TIMEOUT": "30000", "MCP_TOOL_TIMEOUT": "180000", "MAX_MCP_OUTPUT_TOKENS": "5000",
+    }
+
+
+def preflight(settings):
+    if "codex" in settings or "reasoning_effort" in settings:
+        raise WorkerError("Worker config still has Codex settings. Replace codex and reasoning_effort with claude and effort.")
+    if settings.get("effort", "high") not in EFFORTS:
+        raise WorkerError("effort must be one of: " + ", ".join(EFFORTS) + ".")
+    executable = settings["claude"]
     try:
-        result = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=15, env=child_environment(), check=True)
-        match = re.fullmatch(r"codex-cli (\d+)\.(\d+)\.(\d+)\s*", result.stdout)
-        if not match or not ( (0, 157, 1) <= tuple(map(int, match.groups())) < (1, 0, 0)):
-            raise WorkerError("News supports Codex CLI >=0.157.1,<1.0. Update Codex or review a new major version.")
-        result = subprocess.run([executable, "login", "status"], capture_output=True, text=True, timeout=15, env=child_environment(), check=True)
-        if "ChatGPT" not in result.stdout + result.stderr:
-            raise WorkerError("Sign in to Codex with ChatGPT before starting the worker.")
-    except (OSError, subprocess.SubprocessError):
-        raise WorkerError("Codex preflight failed. Check its executable and ChatGPT login.") from None
+        result = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=15, env=claude_environment(), check=True)
+        match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+) \(Claude Code\)\s*", result.stdout)
+        if not match or not ( (2, 1, 296) <= tuple(map(int, match.groups())) < (3, 0, 0)):
+            raise WorkerError("News supports Claude Code >=2.1.296,<3.0. Update Claude Code or review a new major version.")
+        result = subprocess.run([executable, "auth", "status", "--json"], capture_output=True, text=True, timeout=15, env=claude_environment(), check=False)
+        status = json.loads(result.stdout)
+        if not isinstance(status, dict) or status.get("loggedIn") is not True or status.get("authMethod") != "claude.ai":
+            raise WorkerError("Sign in to Claude Code with a Claude subscription before starting the worker.")
+    except (OSError, subprocess.SubprocessError, ValueError):
+        raise WorkerError("Claude Code preflight failed. Check its executable and subscription login.") from None
+
+
+def final_result(events_path):
+    history = final = None
+    with events_path.open("rb") as events:
+        for line in events:
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            if not isinstance(event, dict):
+                raise ValueError("Claude Code emitted an invalid event.")
+            if event.get("type") == "system" and event.get("subtype") == "init":
+                servers = event.get("mcp_servers")
+                history = next((server.get("status") for server in servers if isinstance(server, dict)
+                                and server.get("name") == "news_history"), None) if isinstance(servers, list) else None
+            elif event.get("type") == "result":
+                final = event
+    if history != "connected":
+        raise WorkerError("Claude Code could not connect to News history search.")
+    if not isinstance(final, dict) or final.get("subtype") != "success" or final.get("is_error"):
+        raise WorkerError("Claude Code did not finish successfully; inspect the private attempt log.")
+    if not isinstance(final.get("structured_output"), dict):
+        raise WorkerError("Claude Code did not return a structured final result.")
+    return final["structured_output"]
 
 
 def research(settings, directory, assignment, lock_fd, history_endpoint):
     directory = Path(directory)
-    schema = directory / "schema.json"
-    output = directory / "result.json"
-    save_json(schema, RESULT_SCHEMA)
+    save_json(directory / "schema.json", RESULT_SCHEMA)
+    save_json(directory / "mcp.json", {"mcpServers": {"news_history": {"type": "http", "url": history_endpoint}}})
     prompt = INSTRUCTIONS + "\nAssignment JSON:\n" + json.dumps(assignment, ensure_ascii=False)
     (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
+    model = settings.get("model", MODEL)
     command = [
-        settings["codex"], "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral",
-        "--skip-git-repo-check", "--color", "never",
-        "--model", settings.get("model", "gpt-6.1-sol"), "--json",
-        "--output-schema", str(schema), "--output-last-message", str(output),
+        settings["claude"], "--print", "--model", model, "--effort", settings.get("effort", "high"),
+        "--output-format", "stream-json", "--verbose", "--json-schema", json.dumps(RESULT_SCHEMA),
+        "--no-session-persistence", "--restricted", "--disable-slash-commands",
+        "--tools", ",".join(TOOLS), "--permission-mode", "dontAsk",
+        "--allowedTools", ",".join(TOOLS + HISTORY_TOOLS), "--disallowedTools", ",".join(HIDDEN_HISTORY_TOOLS),
+        "--strict-mcp-config", "--mcp-config", str(directory / "mcp.json"),
     ]
-    overrides = {
-        "approval_policy": '"never"', "forced_login_method": '"chatgpt"',
-        "web_search": '"live"', "project_doc_max_bytes": "0",
-        "model_reasoning_effort": json.dumps(settings.get("reasoning_effort", "high")),
-        "mcp_servers": "{}", "shell_environment_policy.inherit": '"none"',
-        "mcp_servers.news_history.url": json.dumps(history_endpoint),
-        "mcp_servers.news_history.required": "true",
-        "mcp_servers.news_history.enabled_tools": '["query", "get"]',
-        "mcp_servers.news_history.startup_timeout_sec": "30",
-        "mcp_servers.news_history.tool_timeout_sec": "180",
-        "mcp_servers.news_history.tools.query.output_token_limit": "3000",
-        "mcp_servers.news_history.tools.get.output_token_limit": "5000",
-        "default_permissions": '"news_research"',
-        "permissions.news_research.filesystem": '{":minimal"="read",":workspace_roots"="read"}',
-        "permissions.news_research.network.enabled": "false",
-        "shell_environment_policy.experimental_use_profile": "false",
-        "features.skip_host_skill_discovery": "true",
-        **{f"features.{name}": "false" for name in (
-            "apps", "plugins", "hooks", "memories", "multi_agent", "multi_agent_v2",
-            "browser_use", "browser_use_external", "computer_use", "in_app_browser",
-            "skill_search", "shell_snapshot", "image_generation",
-        )},
-    }
-    for key, value in overrides.items():
-        command.extend(["-c", f"{key}={value}"])
-    command.append("-")
-    save_json(directory / "invocation.json", {"command": command, "model": settings.get("model", "gpt-6.1-sol")})
+    save_json(directory / "invocation.json", {"command": command, "model": model})
     timeout = settings.get("attempt_timeout_seconds", 1800)
     deadline = time.monotonic() + timeout
     guardian = [
@@ -199,11 +224,11 @@ def research(settings, directory, assignment, lock_fd, history_endpoint):
     ):
         try:
             process = subprocess.Popen(
-                guardian + command, cwd=directory, env=child_environment(), stdin=prompt_input,
+                guardian + command, cwd=directory, env=claude_environment(), stdin=prompt_input,
                 stdout=events, stderr=errors, start_new_session=True, pass_fds=(lock_fd,),
             )
         except OSError:
-            raise WorkerError("Codex could not start.") from None
+            raise WorkerError("Claude Code could not start.") from None
         try:
             process.wait()
         except BaseException:
@@ -213,7 +238,8 @@ def research(settings, directory, assignment, lock_fd, history_endpoint):
     if process.returncode == TIMEOUT_EXIT:
         raise subprocess.TimeoutExpired(command, timeout)
     if process.returncode:
-        raise WorkerError("Codex exited unsuccessfully; inspect the private attempt log.")
-    if not output.exists() or output.stat().st_size > 2_000_000:
-        raise WorkerError("Codex did not return a bounded final result.")
-    return validate_result(json.loads(output.read_text(encoding="utf-8")))
+        raise WorkerError("Claude Code exited unsuccessfully; inspect the private attempt log.")
+    draft = final_result(directory / "events.jsonl")
+    # Keep the model's original draft beside the event log for diagnosis.
+    save_json(directory / "result.json", draft)
+    return validate_result(draft)

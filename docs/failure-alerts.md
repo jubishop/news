@@ -72,11 +72,11 @@ Send a clearly labeled setup notification and allow notifications when macOS
 asks. Use `terminal-notifier -diagnose` to inspect permissions. Verify the banner
 and its newsroom link from the logged-in desktop. This check does not need a
 real failed reporter. The worker uses the default notification sound and respects
-Focus; it does not request a bypass. The existing 06:00 cron schedule is unchanged.
+Focus; it does not request a bypass. The existing 06:00 LaunchAgent schedule is unchanged.
 
 ## Automated checks
 
-The tests run the real worker against the Flask/SQLite server with fake Codex,
+The tests run the real worker against the Flask/SQLite server with fake Claude Code,
 QMD, and notifier executables. They verify that retryable attempts stay quiet,
 final failure notifies, result receipts replay consistently, local startup errors
 deduplicate and rearm, and notifier errors do not escape into reporting. They do

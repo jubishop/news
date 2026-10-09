@@ -1,4 +1,4 @@
-"""The real supervisor between a mock HTTP newsroom and a fake Codex executable."""
+"""The real supervisor between a mock HTTP newsroom and a fake Claude Code executable."""
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
@@ -160,22 +160,23 @@ class WorkerTests(unittest.TestCase):
         thread.start()
         self.addCleanup(self.http.server_close)
         self.addCleanup(self.http.shutdown)
-        self.fake = self.root / "codex"
+        self.fake = self.root / "claude"
         self.fake.write_text(f"#!{sys.executable}\n" + '''
 import fcntl, json, os, pathlib, signal, subprocess, sys, time, urllib.request
 root = pathlib.Path(__file__).parent
 if "--version" in sys.argv:
-    print("codex-cli 0.157.1")
+    print("2.1.296 (Claude Code)")
     sys.exit(0)
-if "login" in sys.argv:
-    if json.loads((root / "fake.json").read_text()).get("login_failure"):
-        sys.exit(1)
-    print("Logged in using ChatGPT")
-    sys.exit(0)
+if sys.argv[1:3] == ["auth", "status"]:
+    status = json.loads((root / "fake.json").read_text())
+    logged_in = not status.get("login_failure")
+    print(json.dumps({"loggedIn": logged_in, "authMethod": status.get("auth_method", "claude.ai") if logged_in else "none", "apiProvider": "firstParty"}))
+    sys.exit(0 if logged_in else 1)
 config = json.loads((root / "fake.json").read_text())
 prompt = sys.stdin.read()
 time.sleep(config.get("startup_delay", 0))
-endpoint = json.loads(next(arg.split("=",1)[1] for arg in sys.argv if arg.startswith("mcp_servers.news_history.url=")))
+endpoint = json.loads(pathlib.Path(sys.argv[sys.argv.index("--mcp-config") + 1]).read_text())["mcpServers"]["news_history"]["url"]
+print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": config.get("history_status", "connected")}]}), flush=True)
 def tool(name, arguments):
     body = json.dumps({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{"name":name,"arguments":arguments}}).encode()
     req = urllib.request.Request(endpoint, data=body, headers={"Content-Type":"application/json","Accept":"application/json, text/event-stream"})
@@ -219,16 +220,18 @@ with (root / "counts.lock").open("a") as lock:
 if config.get("exit", 0):
     print("Authentication or allowance unavailable", file=sys.stderr)
     sys.exit(config["exit"])
-output = pathlib.Path(sys.argv[sys.argv.index("--output-last-message") + 1])
-output.write_text(config.get("raw", json.dumps(config["result"])))
-print(json.dumps({"type": "turn.completed", "usage": {}}))
+# Claude Code reports the schema-validated draft only on its final result event.
+final = {"type": "result", "subtype": "success", "is_error": False, "result": config.get("raw", json.dumps(config["result"]))}
+if "raw" not in config:
+    final["structured_output"] = config["result"]
+print(json.dumps(final))
 ''')
         self.fake.chmod(0o700)
         self.fake_config = {"result": RESULT}
         self.settings = {
             "server_url": f"http://127.0.0.1:{self.http.server_port}",
             "client_id": "test-id", "client_secret": "test-secret",
-            "state_dir": str(self.root / "state"), "codex": str(self.fake),
+            "state_dir": str(self.root / "state"), "claude": str(self.fake),
             "qmd_command": fake_qmd(self.root),
             "http_retry_delays": [0], "retry_delay_seconds": 0,
         }
@@ -240,7 +243,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
     def captures(self):
         return [json.loads(p.read_text()) for p in self.root.glob("capture-*.json")]
 
-    def test_claimed_instructions_and_dates_reach_codex_and_articles_reach_server(self):
+    def test_claimed_instructions_and_dates_reach_claude_and_articles_reach_server(self):
         reporter = self.server.add()
         self.assertEqual(self.execute(), 0)
         capture, = self.captures()
@@ -256,18 +259,28 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual(delivered["attempt_id"], claim["attempt_id"])
         self.assertEqual(delivered["ownership_token"], claim["ownership_token"])
         self.assertNotIn("test-secret", json.dumps(capture))
-        self.assertEqual(capture["argv"][capture["argv"].index("--model") + 1], "gpt-6.1-sol")
-        self.assertIn('model_reasoning_effort="high"', capture["argv"])
+        argv = capture["argv"]
+        option = lambda name: argv[argv.index(name) + 1]
+        self.assertEqual(option("--model"), "claude-haiku-5-5")
+        self.assertEqual(option("--effort"), "high")
         invocation = json.loads((Path(capture["cwd"]) / "invocation.json").read_text())
-        self.assertEqual(invocation["model"], "gpt-6.1-sol")
-        self.assertIn("--ignore-user-config", capture["argv"])
-        self.assertIn('default_permissions="news_research"', capture["argv"])
-        self.assertIn('permissions.news_research.filesystem={":minimal"="read",":workspace_roots"="read"}', capture["argv"])
-        self.assertIn("permissions.news_research.network.enabled=false", capture["argv"])
-        self.assertIn('mcp_servers.news_history.enabled_tools=["query", "get"]', capture["argv"])
+        self.assertEqual(invocation["model"], "claude-haiku-5-5")
+        for flag in ("--print", "--restricted", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"):
+            self.assertIn(flag, argv)
+        self.assertEqual(option("--tools"), "Read,Glob,Grep,WebSearch,WebFetch")
+        self.assertEqual(option("--permission-mode"), "dontAsk")
+        self.assertEqual(option("--allowedTools"), "Read,Glob,Grep,WebSearch,WebFetch,mcp__news_history__query,mcp__news_history__get")
+        self.assertEqual(option("--disallowedTools"), "mcp__news_history__multi_get,mcp__news_history__status")
+        servers = json.loads(Path(option("--mcp-config")).read_text())["mcpServers"]
+        self.assertEqual(list(servers), ["news_history"])
+        self.assertEqual(servers["news_history"]["type"], "http")
+        environment = capture["env"]
+        for name in ("CLAUDE_CODE_DISABLE_CLAUDE_MDS", "CLAUDE_CODE_DISABLE_AUTO_MEMORY", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"):
+            self.assertEqual(environment[name], "1")
         self.assertIn("Search the News history", capture["prompt"])
         self.assertIn("YYYY-MM-DD", capture["prompt"])
-        schema = json.loads((Path(capture["cwd"]) / "schema.json").read_text())
+        schema = json.loads(option("--json-schema"))
+        self.assertEqual(schema, json.loads((Path(capture["cwd"]) / "schema.json").read_text()))
         fields = schema["properties"]["articles"]["items"]["properties"]
         for name in ("article_date", "coverage_start", "coverage_end"):
             self.assertEqual(fields[name]["format"], "date")
@@ -292,23 +305,23 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertIn("id: old", capture["article"]["content"][0]["resource"]["text"])
         self.assertIn("https://example.com/story", capture["article"]["content"][0]["resource"]["text"])
 
-    def test_explicit_model_and_reasoning_override_defaults(self):
-        self.settings.update(model="gpt-6-luna", reasoning_effort="medium")
+    def test_explicit_model_and_effort_override_defaults(self):
+        self.settings.update(model="claude-sonnet-5-5", effort="medium")
         self.server.add()
         self.assertEqual(self.execute(), 0)
         capture, = self.captures()
-        self.assertEqual(capture["argv"][capture["argv"].index("--model") + 1], "gpt-6-luna")
-        self.assertIn('model_reasoning_effort="medium"', capture["argv"])
+        self.assertEqual(capture["argv"][capture["argv"].index("--model") + 1], "claude-sonnet-5-5")
+        self.assertEqual(capture["argv"][capture["argv"].index("--effort") + 1], "medium")
         invocation = json.loads((Path(capture["cwd"]) / "invocation.json").read_text())
-        self.assertEqual(invocation["model"], "gpt-6-luna")
+        self.assertEqual(invocation["model"], "claude-sonnet-5-5")
 
-    def test_paused_job_is_acknowledged_without_codex(self):
+    def test_paused_job_is_acknowledged_without_claude(self):
         self.server.add(paused=True)
         self.assertEqual(self.execute(), 0)
         self.assertEqual(self.captures(), [])
         self.assertEqual(self.server.results[0]["outcome"], "skipped_paused")
 
-    def test_empty_day_still_checks_in_without_codex(self):
+    def test_empty_day_still_checks_in_without_claude(self):
         self.assertEqual(self.execute(), 0)
         self.assertEqual(self.captures(), [])
         self.assertTrue(any(path.endswith("/check-ins") for _, path, _ in self.server.requests))
@@ -352,7 +365,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual(self.server.results[0], self.server.results[1])
         self.assertEqual(len(self.server.receipts), 1)
 
-    def test_invalid_json_does_not_publish_and_stops_at_three_attempts(self):
+    def test_unstructured_output_does_not_publish_and_stops_at_three_attempts(self):
         self.server.add()
         self.fake_config["raw"] = "not JSON"
         self.execute()
@@ -400,7 +413,7 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual(len(self.server.results), 6)
         self.assertTrue(all(r["outcome"] == "failed" for r in self.server.results))
 
-    def test_timeout_kills_codex_and_reports_failure(self):
+    def test_timeout_kills_claude_and_reports_failure(self):
         self.server.add()
         self.settings["attempt_timeout_seconds"] = .5
         self.fake_config["startup_delay"] = .2
@@ -671,11 +684,14 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
     def test_agent_environment_excludes_api_keys_and_worker_credentials(self):
         from unittest.mock import patch
         self.server.add()
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "paid-key-fixture", "CODEX_API_KEY": "paid-codex-key-fixture", "CF_ACCESS_CLIENT_SECRET": "service-secret-fixture"}):
+        with patch.dict(os.environ, {
+            "ANTHROPIC_API_KEY": "paid-key-fixture", "ANTHROPIC_AUTH_TOKEN": "paid-token-fixture",
+            "CLAUDE_CODE_OAUTH_TOKEN": "inherited-token-fixture", "CF_ACCESS_CLIENT_SECRET": "service-secret-fixture",
+        }):
             self.assertEqual(self.execute(), 0)
         captured = json.dumps(self.captures())
         captured += (self.root / "qmd-calls.jsonl").read_text()
-        for secret in ("paid-key-fixture", "paid-codex-key-fixture", "service-secret-fixture", "test-secret"):
+        for secret in ("paid-key-fixture", "paid-token-fixture", "inherited-token-fixture", "service-secret-fixture", "test-secret"):
             self.assertNotIn(secret, captured)
         for path in (self.root / "state/attempts").rglob("*"):
             if path.is_file():
@@ -689,15 +705,31 @@ print(json.dumps({"type": "turn.completed", "usage": {}}))
         self.assertEqual({p.stem for p in archive.glob("*.md")}, {a["id"] for a in self.server.archive})
         self.assertTrue(any("page=2" in path for _, path, _ in self.server.requests))
 
-    def test_expired_codex_login_reports_failure_but_still_acknowledges_paused_work(self):
-        self.server.add(0)
-        self.server.add(1, paused=True)
-        self.fake_config["login_failure"] = True
+    def test_unusable_claude_login_reports_failure_but_still_acknowledges_paused_work(self):
+        for number, problem in enumerate(("expired", "api_key", "codex_settings")):
+            with self.subTest(problem=problem):
+                self.server.add(2 * number)
+                self.server.add(2 * number + 1, paused=True)
+                settings = dict(self.settings)
+                self.fake_config["login_failure"] = problem == "expired"
+                self.fake_config["auth_method"] = "api_key" if problem == "api_key" else "claude.ai"
+                if problem == "codex_settings":
+                    self.settings.update(codex="/mock/codex", reasoning_effort="high")
+                before = len(self.server.results)
+                self.assertEqual(self.execute(), 1)
+                self.settings = settings
+                self.assertEqual(self.captures(), [])
+                outcomes = [r["outcome"] for r in self.server.results[before:]]
+                self.assertEqual(outcomes.count("skipped_paused"), 1)
+                self.assertEqual(outcomes.count("failed"), 3)
+
+    def test_unavailable_history_tools_cannot_publish(self):
+        self.server.add()
+        self.fake_config["history_status"] = "failed"
         self.assertEqual(self.execute(), 1)
-        self.assertEqual(self.captures(), [])
-        outcomes = [r["outcome"] for r in self.server.results]
-        self.assertEqual(outcomes.count("skipped_paused"), 1)
-        self.assertEqual(outcomes.count("failed"), 3)
+        self.assertEqual(len(self.captures()), 3)
+        self.assertEqual(len(self.server.results), 3)
+        self.assertTrue(all(r["outcome"] == "failed" and r["error"]["retryable"] and not r["articles"] for r in self.server.results))
 
     def test_history_preparation_claims_no_work_and_calls_no_reporter(self):
         self.server.add()

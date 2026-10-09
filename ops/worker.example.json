@@ -2,15 +2,15 @@
   "server_url": "https://news.jubishop.com",
   "client_id": "REPLACE_WITH_NEWS_SERVICE_TOKEN_CLIENT_ID",
   "client_secret": "REPLACE_WITH_NEWS_SERVICE_TOKEN_SECRET",
-  "codex": "/Users/REPLACE_ME/.local/bin/codex",
+  "claude": "/Users/REPLACE_ME/.local/bin/claude",
   "qmd_command": [
     "/Users/REPLACE_ME/.bun/bin/bun",
     "/Users/REPLACE_ME/.bun/install/global/node_modules/@tobilu/qmd/bin/qmd"
   ],
   "state_dir": "/Users/REPLACE_ME/.local/state/news-worker",
   "terminal_notifier": "/opt/homebrew/bin/terminal-notifier",
-  "model": "gpt-6.1-sol",
-  "reasoning_effort": "high",
+  "model": "claude-haiku-5-5",
+  "effort": "high",
   "concurrency": 8,
   "attempt_timeout_seconds": 1800
 }

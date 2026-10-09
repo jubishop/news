@@ -81,10 +81,10 @@ searched. Do not exempt hand-written pages merely to bypass failed checks.
   credentials, migrations, maintenance, and failure handling.
 - [Database schema](database-schema.md): accepted table and field baseline,
   relationships, and worker-supplied article coverage metadata.
-- [Reporting worker](reporting-worker.md): newsroom API boundary, shared Codex engine
-  selection, run outcomes, and overdue-work detection.
-- [Worker operations](worker-operations.md): vanilla Codex implementation, private
-  configuration, recovery, tests, and required after-merge cron installation.
+- [Reporting worker](reporting-worker.md): newsroom API boundary, shared Claude Code
+  engine selection, run outcomes, and overdue-work detection.
+- [Worker operations](worker-operations.md): Claude Code implementation, private
+  configuration, recovery, tests, and required after-merge LaunchAgent installation.
 - [Article history search](article-history-search.md): semantic retrieval,
   shared batch snapshots, local QMD setup, and retrieval checks.
 - [Pi research extension comparison](worker-research-comparison.md): package

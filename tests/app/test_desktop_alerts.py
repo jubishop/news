@@ -28,24 +28,25 @@ with pathlib.Path({str(self.sent)!r}).open("a") as output:
     output.write(json.dumps({{"args": sys.argv[1:], "message": sys.stdin.read()}}) + "\\n")
 ''')
         notifier.chmod(0o700)
-        codex = self.root / "codex"
-        codex.write_text(f"#!{sys.executable}\n" + '''
+        claude = self.root / "claude"
+        claude.write_text(f"#!{sys.executable}\n" + '''
 import json, pathlib, sys
 if "--version" in sys.argv:
-    print("codex-cli 0.157.1")
-elif "login" in sys.argv:
-    print("Logged in using ChatGPT")
+    print("2.1.296 (Claude Code)")
+elif sys.argv[1:3] == ["auth", "status"]:
+    print(json.dumps({"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty"}))
 else:
     sys.stdin.read()
-    output = pathlib.Path(sys.argv[sys.argv.index("--output-last-message") + 1])
-    output.write_text(json.dumps({"outcome": "failed", "articles": [], "reason": None,
-                                 "error": {"code": "research_failed", "message": "private detail", "retryable": True}}))
+    print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": "connected"}]}))
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "structured_output": {
+        "outcome": "failed", "articles": [], "reason": None,
+        "error": {"code": "research_failed", "message": "private detail", "retryable": True}}}))
 ''')
-        codex.chmod(0o700)
+        claude.chmod(0o700)
         self.settings = {
             "server_url": "https://news.example.com", "client_id": "fixture-id", "client_secret": "fixture-secret",
             "state_dir": str(self.root / "state"), "terminal_notifier": str(notifier),
-            "codex": str(codex), "qmd_command": fake_qmd(self.root), "concurrency": 1,
+            "claude": str(claude), "qmd_command": fake_qmd(self.root), "concurrency": 1,
         }
 
     def messages(self):

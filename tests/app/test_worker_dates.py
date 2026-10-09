@@ -4,7 +4,7 @@ from copy import deepcopy
 import unittest
 
 from news.errors import Problem
-from news.worker_codex import validate_result
+from news.worker_claude import validate_result
 from test_worker import RESULT
 
 
