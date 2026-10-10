@@ -16,7 +16,7 @@ concurrency:
 jobs:
   deployment-decision:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       deploy: ${{ steps.decision.outputs.deploy }}
@@ -29,15 +29,20 @@ jobs:
         run: bin/deployment-decision "$GITHUB_EVENT_NAME" "$GITHUB_REF" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
 
   check:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.14 is the minimum and production's runtime; 3.x is the latest stable release.
+        python-version: ['3.14', '3.x']
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: '3.14'
+          python-version: ${{ matrix.python-version }}
       - name: Install ShellCheck and Restic
         run: sudo apt-get update && sudo apt-get install --yes shellcheck restic
       - name: Set up application and browser
@@ -51,7 +56,7 @@ jobs:
   deploy:
     needs: [check, deployment-decision]
     if: needs.deployment-decision.outputs.deploy == 'true'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     environment:
       name: production

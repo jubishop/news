@@ -62,7 +62,7 @@ or replacing them with a rolling news window.
 
 ## Run the helper
 
-Run from the repository root with Python 3.14. The local application
+Run from the repository root with Python 3.14 or later. The local application
 environment supplies a supported interpreter:
 
 ```sh

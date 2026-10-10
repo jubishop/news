@@ -11,14 +11,16 @@ releases validated pushes to `main`, including migrations and maintenance.
 
 ## Runtime and local setup
 
-Application support: Python 3.14, tested on Ubuntu 24.04 in CI and macOS
-for development. On September 28, 2026, the owner selected one Python minor
-version for development, CI, the worker, and production to reduce redundant
-validation. This replaces the previous 3.12–3.14 support range. Older minor
-versions are no longer supported. Foundation commands retain their separate
-Python 3.9+ policy. Shell scripts use POSIX sh.
-Restic 0.16–0.19 is supported for backup operations (Ubuntu 24.04 packages 0.16).
-ShellCheck and Restic must be on PATH for full validation.
+Application support: Python 3.14 or later, tested on Ubuntu in CI with
+Python 3.14 and the latest stable Python, and on macOS for development. On
+October 9, 2026, the owner adopted the latest stable
+[version policy](foundation/engineering-policy.md#runtime-and-toolchain-versions),
+superseding the September 28 choice of exactly one Python minor version for
+development, CI, the worker, and production. Python 3.14 remains the minimum
+and [production's runtime](#production-python). Foundation commands retain
+their separate Python 3.9+ policy. Shell scripts use POSIX sh.
+Restic 0.16 or later is supported for backup operations (Ubuntu 24.04 packages
+0.16). ShellCheck and Restic must be on PATH for full validation.
 
 ```sh
 bin/setup
@@ -27,8 +29,8 @@ bin/check-application
 bin/preview
 ```
 
-`bin/app-setup` uses `python3.14` by default; set `NEWS_PYTHON` to another
-Python 3.14 executable if needed. It recreates the checkout-local `.venv`,
+`bin/app-setup` uses `python3` by default; set `NEWS_PYTHON` to another
+Python 3.14 or later executable if needed. It recreates the checkout-local `.venv`,
 installs the hash-locked production and test requirements, and installs Chromium.
 Stop any worker using that environment before running setup.
 On Linux, install Chromium system packages with
@@ -65,7 +67,7 @@ two requests against one temporary SQLite database.
 
 `bin/check --full` first runs all foundation checks, then `bin/check-application`.
 The default and `--documents-only` modes do not run application tools. CI runs
-full validation on Python 3.14. Source discovery and output stay
+full validation on Python 3.14 and the latest stable Python. Source discovery and output stay
 inside the active checkout; `.venv`, `var`, and nested worktrees are excluded.
 
 ## Production Python
@@ -104,6 +106,13 @@ release to rebuild its environment. Keep the prior runtime while any retained
 release uses it, so recovery remains possible. The standalone SSH receiver
 also uses this interpreter; update it explicitly from `ops/receive-release`
 when its code changes. Application releases do not replace the receiver.
+
+Production stays on Python 3.14, the declared minimum, until a newer minor
+release is provisioned deliberately. That move installs the new runtime beside
+3.14, changes the interpreter path in `ops/install-server` and
+`ops/receive-release`, updates the installed receiver, and deploys a fresh
+release through the usual health checks. Keep the 3.14 runtime for recovery
+until no retained release uses it.
 
 ## Provisioning prerequisites
 

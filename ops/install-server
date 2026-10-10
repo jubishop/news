@@ -12,7 +12,7 @@ done
 # This also serializes manual installs with deployments started through SSH.
 exec 9>/run/lock/news-deploy.lock
 flock -n 9 || { echo 'Another News deployment is running.' >&2; exit 1; }
-/opt/news/python3.14 -c 'import sys; sys.exit(0 if sys.version_info[:2] == (3,14) else "News requires Python 3.14.")'
+/opt/news/python3.14 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 14) else "News requires Python 3.14 or later.")'
 command -v restic >/dev/null
 command -v curl >/dev/null
 id news >/dev/null 2>&1 || useradd --system --home /var/lib/news --shell /usr/sbin/nologin news

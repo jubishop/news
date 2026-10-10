@@ -161,8 +161,8 @@ def preflight(settings):
     try:
         result = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=15, env=claude_environment(), check=True)
         match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+) \(Claude Code\)\s*", result.stdout)
-        if not match or not ( (2, 1, 296) <= tuple(map(int, match.groups())) < (3, 0, 0)):
-            raise WorkerError("News supports Claude Code >=2.1.296,<3.0. Update Claude Code or review a new major version.")
+        if not match or tuple(map(int, match.groups())) < (2, 1, 296):
+            raise WorkerError("News requires Claude Code 2.1.296 or later. Update Claude Code.")
         result = subprocess.run([executable, "auth", "status", "--json"], capture_output=True, text=True, timeout=15, env=claude_environment(), check=False)
         status = json.loads(result.stdout)
         if not isinstance(status, dict) or status.get("loggedIn") is not True or status.get("authMethod") != "claude.ai":

@@ -18,7 +18,7 @@ delivery adds no server polling and leaves server email alerts unchanged.
 
 ## Runtime and configuration
 
-Use Python 3.14 and Claude Code >=2.1.296,<3.0. The worker checks the CLI
+Use Python 3.14 or later and Claude Code 2.1.296 or later. The worker checks the CLI
 version and the Claude subscription login before starting research. Install
 Claude Code with its official installer; the native Mac binary needs no Node
 runtime. QMD has its own [runtime and model setup](article-history-search.md#installation-and-checks).
@@ -47,8 +47,9 @@ The worker does not invent aliases or select a fallback model. It rejects a
 config that still contains the Codex-era `codex` or `reasoning_effort` keys.
 Claude Code updates itself through the owner's interactive sessions; the
 worker disables the updater in its own child so the CLI does not change during
-a batch. A new major version needs compatibility review; the test suite does
-not prove every future CLI release.
+a batch. The worker accepts new major versions under the latest stable
+[version policy](foundation/engineering-policy.md#runtime-and-toolchain-versions);
+the test suite does not prove every future CLI release.
 
 Each attempt runs `claude --print` in restricted mode from a private attempt
 directory. Restricted mode ignores user, project, and local settings, so

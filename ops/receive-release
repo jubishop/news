@@ -13,8 +13,8 @@ import uuid
 
 
 def main():
-    if sys.version_info[:2] != (3, 14):
-        raise ValueError("News requires Python 3.14.")
+    if sys.version_info < (3, 14):
+        raise ValueError("News requires Python 3.14 or later.")
     if os.geteuid() != 0:
         raise ValueError("Run as root through the restricted deploy key.")
     match = re.fullmatch(r"deploy ([0-9a-f]{40})", os.environ.get("SSH_ORIGINAL_COMMAND", ""))

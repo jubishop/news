@@ -122,11 +122,13 @@ rely on further history calls. Its guardian still bounds its remaining lifetime.
 
 ## Installation and checks
 
-News requires QMD >=2.8.3,<3 and checks this before downloading history. Version
-2.8.3 was tested with Bun 1.4.2 on this Mac. Install QMD with its supported Node
-or Bun runtime; the tested launcher accepts Bun directly. QMD's upstream Node
-minimum is 22. Review compatibility before a new QMD major version. The allowed
-range is not a claim that every future release has been tested.
+News requires QMD 2.8.3 or later and checks this before downloading history.
+Version 2.8.3 was tested with Bun 1.4.2 on this Mac. Install QMD with its
+supported Node or Bun runtime; the tested launcher accepts Bun directly. QMD's
+upstream Node minimum is 22. Newer releases, including new major versions, are
+accepted under the latest stable
+[version policy](foundation/engineering-policy.md#runtime-and-toolchain-versions);
+acceptance is not a claim that every future release has been tested.
 
 Set `qmd_command` in the private worker configuration. It is an argument list,
 not a shell command. For an unattended Bun installation, use absolute paths to

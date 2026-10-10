@@ -344,11 +344,16 @@ class HistoryTests(unittest.TestCase):
         self.assertEqual([a["id"] for a in history.summaries["reporter"]], [f"story{i}" for i in range(20)])
         self.assertEqual(history.snapshot["article_count"], 25)
 
-    def test_incompatible_qmd_fails_before_fetching_archive(self):
-        (self.root / "qmd-settings.json").write_text(json.dumps({"version": "qmd 3.0.0"}))
-        with self.assertRaisesRegex(WorkerError, "QMD >=2.8.3,<3"):
+    def test_qmd_below_minimum_fails_before_fetching_archive(self):
+        (self.root / "qmd-settings.json").write_text(json.dumps({"version": "qmd 2.8.2"}))
+        with self.assertRaisesRegex(WorkerError, "QMD 2.8.3 or later"):
             self.history().prepare(self.api)
         self.assertEqual(self.api.downloads, 0)
+
+    def test_newer_qmd_major_is_accepted(self):
+        (self.root / "qmd-settings.json").write_text(json.dumps({"version": "qmd 3.0.0"}))
+        self.history().prepare(self.api)
+        self.assertEqual(self.api.downloads, 1)
 
     def test_search_start_failure_is_reported(self):
         (self.root / "qmd-settings.json").write_text(json.dumps({"fail": "mcp"}))

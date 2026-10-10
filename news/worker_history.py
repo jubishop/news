@@ -31,8 +31,8 @@ def preflight(settings):
         result = subprocess.run([*qmd_command(settings), "--version"], env=environment(settings),
                                 capture_output=True, text=True, timeout=15, check=True)
         match = re.fullmatch(r"qmd (\d+)\.(\d+)\.(\d+)(?: \([^\n]+\))?\s*", result.stdout)
-        if not match or not ( (2, 8, 3) <= tuple(map(int, match.groups())) < (3, 0, 0)):
-            raise WorkerError("News history search requires QMD >=2.8.3,<3. Review compatibility before upgrading its major version.")
+        if not match or tuple(map(int, match.groups())) < (2, 8, 3):
+            raise WorkerError("News history search requires QMD 2.8.3 or later. Update QMD.")
     except (OSError, subprocess.SubprocessError):
         raise WorkerError("QMD preflight failed. Check qmd_command and its runtime paths.") from None
 

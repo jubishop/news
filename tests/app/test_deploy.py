@@ -87,6 +87,13 @@ class ReceiveReleaseTests(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertFalse(calls)
 
+    def test_newer_python_accepts_a_release(self):
+        for version in ((3, 15, 0), (4, 0, 0)):
+            with self.subTest(version=version), patch("sys.version_info", version):
+                code, calls, _ = self.receive(self.archive())
+                self.assertEqual(code, 0)
+                self.assertEqual(calls[0].args[0][0], "systemd-run")
+
     def archive(self, extra=None):
         data = io.BytesIO()
         with tarfile.open(fileobj=data, mode="w") as archive:

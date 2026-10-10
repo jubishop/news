@@ -38,19 +38,22 @@ setup, supported Python versions, and test requirements are in the
 [operations guide](server-operations.md).
 
 The [GitHub Actions workflow](../.github/workflows/check.yml) runs
-`bin/check --full` on Ubuntu 24.04 for pull requests and pushes to `main`.
-It installs ShellCheck, Restic, locked Python dependencies, and Chromium; it
-checks Python 3.14, uses read-only repository permissions, and does not
+`bin/check --full` on the latest Ubuntu image for pull requests and pushes to
+`main`. It installs ShellCheck, Restic, locked Python dependencies, and
+Chromium; it checks Python 3.14 and the latest stable Python, uses read-only
+repository permissions, and does not
 persist checkout credentials. This initial setup does not enforce branch
 protection, so full local validation is required before delivery. Verify the
 workflow result for the exact pushed commit.
 
 ## Runtime and toolchain versions
 
-The application, CI, the worker, and production use Python 3.14, declared in
-`pyproject.toml` and checked by `bin/app-setup` and `ops/install-server`.
-Foundation commands keep their Python 3.9 or later requirement. Restic
-0.16–0.19 is supported for backups. See the
+The application and the worker require Python 3.14 or later, declared in
+`pyproject.toml` and checked by `bin/app-setup`, `ops/install-server`, and the
+`news` package. `.python-version` requests the newest available Python that
+meets that minimum. Production runs Python 3.14; CI tests it and the latest
+stable Python. Foundation commands keep their Python 3.9 or later requirement.
+Restic 0.16 or later is supported for backups. See the
 [runtime decision](server-operations.md#runtime-and-local-setup) and the
 [version policy](foundation/engineering-policy.md#runtime-and-toolchain-versions).
 

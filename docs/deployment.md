@@ -12,7 +12,8 @@ This supersedes the earlier PR-only delivery scope for server implementation.
 ## Release workflow
 
 [Repository checks](../.github/workflows/check.yml) runs full validation on
-Python 3.14 for every push and PR. A push to `main`, including
+Python 3.14, production's runtime, and on the latest stable Python for every
+push and PR. Both must pass before deployment. A push to `main`, including
 a merged PR, deploys after validation succeeds unless it carries the
 explicit skip decision described below. PR checks cannot deploy or read
 production credentials. A manual run on `main` requests deployment even when
