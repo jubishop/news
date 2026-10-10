@@ -114,7 +114,7 @@ def main():
     state = {"committed": False}
     try:
         with closing(read_database(request["database"])) as connection:
-            if connection.execute("PRAGMA user_version").fetchone()[0] != 2:
+            if connection.execute("PRAGMA user_version").fetchone()[0] != 3:
                 raise Problem("Unsupported database schema; inspect the deployed release.")
             if request["action"] == "list":
                 condition = "" if request.get("all") else " WHERE deleted_at IS NULL AND completed_at IS NULL"

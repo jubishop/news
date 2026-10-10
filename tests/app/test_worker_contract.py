@@ -1,5 +1,6 @@
 """Compatibility with the real server protocol; Cloudflare and Claude Code stay fake."""
 
+from email.message import Message
 import io
 import json
 from pathlib import Path
@@ -7,6 +8,7 @@ import sys
 import tempfile
 from urllib.error import HTTPError
 from urllib import request as http_request
+from urllib.response import addinfourl
 
 from news.worker import run
 from support import ServerFixture
@@ -31,6 +33,10 @@ class WorkerHTTPFixture(ServerFixture):
             if response.status_code >= 400:
                 raise HTTPError(url, response.status_code, "server error", {}, io.BytesIO(response.data))
             return io.BytesIO(response.data)
+        if url.startswith("https://images.example.com/"):
+            headers = Message()
+            headers["Content-Type"] = "image/jpeg"
+            return addinfourl(io.BytesIO(b"\xff\xd8\xff"), headers, url, 200)
         return super().external_http(request, **kwargs)
 
 
@@ -81,9 +87,13 @@ else:
                 coverage_end="2026-10-01T01:00:00Z",
                 body_markdown=(
                     "A family outing at the museum.\n\n"
-                    "![Families exploring the museum](https://example.com/museum.jpg)\n\n"
+                    "![Families exploring the museum](https://images.example.com/museum.jpg)\n\n"
                     "Photo: [Museum](https://example.com/visit)."
                 ),
+                lead_image={
+                    "url": "https://images.example.com/hall.jpg", "alt": "The museum's main hall",
+                    "credit": "Museum", "credit_url": "https://example.com/press",
+                },
             )
             executable.write_text(f"#!{sys.executable}\n" + f'''
 import json, pathlib, sys
@@ -105,13 +115,18 @@ else:
                 "client_secret": "fixture-secret", "state_dir": str(root / "state"),
                 "claude": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
             }), 0)
-        self.assertIn("From the reporting worker", self.client.get("/").get_data(as_text=True))
+        feed = self.client.get("/").get_data(as_text=True)
+        self.assertIn("From the reporting worker", feed)
+        self.assertIn('src="https://images.example.com/hall.jpg"', feed)
         stored, = self.client.get("/api/v1/worker/articles/search", headers=self.worker).json["articles"]
         self.assertEqual(stored["body_markdown"], article["body_markdown"])
+        self.assertEqual(stored["lead_image"], article["lead_image"])
         self.assertEqual(stored["coverage_start"], "2026-09-01")
         self.assertEqual(stored["coverage_end"], "2026-09-30")
         html = self.client.get("/articles/" + stored["id"]).get_data(as_text=True)
-        self.assertIn('src="https://example.com/museum.jpg"', html)
+        self.assertIn('src="https://images.example.com/museum.jpg"', html)
+        self.assertIn('src="https://images.example.com/hall.jpg"', html)
+        self.assertIn('href="https://example.com/press"', html)
         self.assertIn('alt="Families exploring the museum"', html)
         self.assertIn('referrerpolicy="no-referrer"', html)
         self.assertIn('href="https://example.com/visit"', html)

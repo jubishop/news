@@ -134,8 +134,9 @@ the installed host, Cloudflare scope, and private recovery-copy locations.
 
 `news.cli init-db` is the migration entry point and runs on every release.
 It uses SQLite's `user_version` to apply schema work once and rejects a newer
-database rather than downgrading it. Current schema version 1 needs only the
-initial migration; rerunning it preserves existing data.
+database rather than downgrading it. Current schema version 3 applies the
+initial schema and then each [numbered migration](../news/migrations) in order;
+rerunning it preserves existing data.
 
 When a later feature changes the schema, add and test its forward migration
 in [news/db.py](../news/db.py). Support all older deployed versions, update

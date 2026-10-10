@@ -2,8 +2,10 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from email.message import Message
 import fcntl
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import io
 import json
 import os
 from pathlib import Path
@@ -15,6 +17,8 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.response import addinfourl
 
 from news.worker import run
 from history_support import Archive, fake_qmd
@@ -284,6 +288,10 @@ print(json.dumps(final))
         fields = schema["properties"]["articles"]["items"]["properties"]
         for name in ("article_date", "coverage_start", "coverage_end"):
             self.assertEqual(fields[name]["format"], "date")
+        self.assertIn("lead_image", schema["properties"]["articles"]["items"]["required"])
+        photo, empty = fields["lead_image"]["anyOf"]
+        self.assertEqual(photo["required"], ["url", "alt", "credit", "credit_url"])
+        self.assertEqual(empty, {"type": "null"})
         instructions = " ".join(capture["prompt"].split("Assignment JSON:\n", 1)[0].split())
         for requirement in (
             "intelligent, curious reader who may be unfamiliar with the subject",
@@ -292,11 +300,15 @@ print(json.dumps(final))
             "Let the assignment and your editorial judgment guide the coverage, structure, emphasis, and length",
             "Verify material claims, including background explanations, against reliable sources and link to them",
             "Distinguish facts, attributed claims, and uncertainty",
-            "Include relevant photos or illustrations when they help the reader",
+            "Many stories are better with photos",
+            "Set lead_image to the article's main photo",
+            "beside the summary on the front page and at the top of the article",
+            "Leave lead_image null when a photo would not help the reader",
             "![descriptive alt text](https://...) in body_markdown",
-            "Verify the image URL and what it depicts; never invent image URLs",
+            "do not repeat the lead image in the body",
+            "Use only direct HTTPS image URLs that you found on a page; never invent or guess image URLs",
             "Credit and link the image source nearby",
-            "If no suitable image can be verified, publish useful text without image placeholders",
+            "The supervisor removes images that do not load",
             "If News history search or retrieval fails, return a retryable failed outcome",
         ):
             with self.subTest(editorial_requirement=requirement):
@@ -385,6 +397,48 @@ print(json.dumps(final))
         self.assertEqual(delivered["articles"], [ARTICLE])
         saved = json.loads((Path(capture["cwd"]) / "result.json").read_text())
         self.assertEqual(saved, self.fake_config["result"])
+
+    def test_images_that_do_not_load_are_removed_before_publication(self):
+        self.server.add()
+        good, missing, page = ("https://images.example.com/" + name for name in ("good.jpg", "missing.jpg", "page"))
+        sniffed, limited = "https://cdn.example.com/photo?id=1", "https://images.example.com/busy.jpg"
+        photo = {"url": good, "alt": "A verified photo", "credit": "Example", "credit_url": "https://example.com/gallery"}
+        first = dict(ARTICLE, lead_image=photo, body_markdown=(
+            "Intro.\n\n![Good photo](" + good + ")\n\n![Missing photo](" + missing + ' "Title")\n\n'
+            "Middle.\n\n![A web page](<" + page + ">)\n\n![Untyped photo](" + sniffed + ")\n\nEnd."))
+        second = dict(ARTICLE, title="Second story", lead_image=dict(photo, url=missing))
+        rate_limited = dict(ARTICLE, title="Busy host", lead_image=dict(photo, url=limited))
+        self.fake_config["result"] = dict(RESULT, articles=[
+            first, second, dict(ARTICLE, title="Text only", lead_image=None), rate_limited])
+        requested = []
+
+        def fetch(request, timeout):
+            requested.append(request.full_url)
+            self.assertIsNone(request.get_header("Referer"))
+            self.assertLessEqual(timeout, 10)
+            if request.full_url in (missing, limited):
+                # A rate limit says nothing about whether the image exists.
+                code = 404 if request.full_url == missing else 429
+                raise HTTPError(request.full_url, code, "Unavailable", Message(), io.BytesIO())
+            kind, data = {good: ("image/jpeg", b"\xff\xd8\xff"), page: ("text/html", b"<html>"),
+                          sniffed: ("application/octet-stream", b"\x89PNG\r\n\x1a\n")}[request.full_url]
+            headers = Message()
+            headers["Content-Type"] = kind
+            return addinfourl(io.BytesIO(data), headers, request.full_url, 200)
+
+        with patch("urllib.request.urlopen", side_effect=fetch):
+            self.assertEqual(self.execute(), 0)
+        self.assertEqual(sorted(set(requested)), sorted({good, missing, page, sniffed, limited}))
+        self.assertEqual(len(requested), 5)
+        delivered, = self.server.results
+        first, second, third, fourth = delivered["articles"]
+        self.assertEqual(fourth["lead_image"]["url"], limited)
+        self.assertEqual(first["lead_image"], photo)
+        self.assertEqual(first["body_markdown"], (
+            "Intro.\n\n![Good photo](" + good + ")\n\n\n\nMiddle.\n\n\n\n![Untyped photo](" + sniffed + ")\n\nEnd."))
+        self.assertNotIn("lead_image", second)
+        self.assertNotIn("lead_image", third)
+        self.assertEqual(third["body_markdown"], ARTICLE["body_markdown"])
 
     def test_invalid_dates_report_the_validation_error_to_later_attempts(self):
         self.server.add()

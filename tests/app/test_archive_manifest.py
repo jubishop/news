@@ -22,6 +22,11 @@ class ManifestTests(ServerFixture):
         manifest = self.manifest().json
         self.assertEqual(manifest["articles"][0]["id"], identity)
         self.assertEqual(len(manifest["articles"][0]["revision"]), 32)
+        with sqlite3.connect(old) as connection:
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
+        upgraded = self.client.get(f"/api/v1/worker/articles/{identity}", headers=self.worker).json
+        self.assertEqual(upgraded["title"], "This week in research")
+        self.assertIsNone(upgraded["lead_image"])
         migrate(old)
         self.assertEqual(self.manifest().json, manifest)
         self.form(f"/newsroom/articles/{identity}/delete")
@@ -59,7 +64,9 @@ class ManifestTests(ServerFixture):
                    "reporter_name": "New attribution", "article_date": "2026-09-25",
                    "coverage_start": "2026-08-01", "coverage_end": "2026-10-01",
                    "sources_json": '[{"title":"Changed source","url":"https://example.com/new"}]',
-                   "published_at": 123.0}
+                   "published_at": 123.0,
+                   "lead_image_json": '{"alt":"A photo","credit":"Example","credit_url":"https://example.com/",'
+                                      '"url":"https://example.com/photo.jpg"}'}
         for column, value in changes.items():
             with self.subTest(column=column):
                 with transaction(self.database, write=True) as connection:

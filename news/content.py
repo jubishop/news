@@ -35,6 +35,8 @@ def render_markdown(source):
 def decode(row):
     if row:
         row["sources"] = json.loads(row.pop("sources_json"))
+        image = row.pop("lead_image_json")
+        row["lead_image"] = json.loads(image) if image else None
     return row
 
 

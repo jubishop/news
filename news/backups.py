@@ -121,7 +121,7 @@ def restore_check(config):
                 if connection.execute("PRAGMA foreign_key_check").fetchall():
                     raise ValueError("Restored database has invalid references.")
                 version = connection.execute("PRAGMA user_version").fetchone()[0]
-                if version not in (1, 2):
+                if version not in (1, 2, 3):
                     raise ValueError("Restored database schema version is unsupported.")
                 for table in (
                     "reporters",
@@ -135,6 +135,8 @@ def restore_check(config):
                 if version >= 2:
                     connection.execute("SELECT version FROM archive_state WHERE singleton=1").fetchone()
                     connection.execute("SELECT revision FROM articles LIMIT 1").fetchone()
+                if version >= 3:
+                    connection.execute("SELECT lead_image_json FROM articles LIMIT 1").fetchone()
             state = {"checked_at": clock.now(), "ok": True}
             r2.save(directory / "restore.json", state)
             return state

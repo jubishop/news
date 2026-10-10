@@ -17,6 +17,8 @@ constraints, indexes, and additional operational fields are engineering choices.
 [Migration 2](../news/migrations/002-archive.sql) adds article revisions and a
 single-row `archive_state` metadata table. Transactional triggers update these
 tokens for the [archive synchronization protocol](server-contract.md#archive-manifest-protocol).
+[Migration 3](../news/migrations/003-lead-image.sql) adds the nullable
+`lead_image_json` article column; changing it also changes the archive version.
 The [server contract](server-contract.md) specifies the implemented calendar,
 claims, retry bounds, HTTP operations, and result payloads.
 
@@ -202,6 +204,7 @@ presentation and the reporter's current lifecycle.
 | `title`, `summary` | Worker-supplied plain text. |
 | `body_markdown` | One Markdown body, including inline links and external image URLs. |
 | `sources_json` | Worker-supplied array of source titles and URLs. |
+| `lead_image_json` | Nullable worker-supplied [lead photo](server-contract.md#lead-photo): external URL, alt text, and credit. |
 | `article_date` | Worker-supplied date for the report. |
 | `coverage_start`, `coverage_end` | Worker-supplied dates describing what the article covers. |
 | `published_at` | Server time when the submission is committed and becomes public. |

@@ -1,11 +1,16 @@
 """One real-browser owner journey, plus mobile reading and layout checks."""
 
+import base64
 from contextlib import ExitStack
 from pathlib import Path
 import unittest
 
 from playwright.sync_api import sync_playwright, expect
 from preview import preview
+
+PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+)
 
 
 class BrowserJourney(unittest.TestCase):
@@ -365,6 +370,85 @@ class BrowserJourney(unittest.TestCase):
                 title = story.get_by_role("heading").inner_text()
                 story.get_by_role("link", name="Read the story").click()
                 expect(page.get_by_role("heading", name=title)).to_be_visible()
+            finally:
+                browser.close()
+
+    def test_lead_photos_sit_beside_summaries_and_broken_photos_disappear(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            fixture.at("2026-09-27T12:00:00-07:00")
+            run = fixture.work()[0]["id"]
+
+            def photo(name):
+                return {
+                    "url": f"https://images.example.com/{name}.png",
+                    "alt": f"Photo of the {name} scene",
+                    "credit": "Example Photo Desk",
+                    "credit_url": "https://example.com/photos",
+                }
+
+            response = fixture.result(
+                run,
+                fixture.envelope(
+                    fixture.claim(run),
+                    articles=[
+                        fixture.article(title="Photographed story", lead_image=photo("lead")),
+                        fixture.article(title="Story with a missing photo", lead_image=photo("missing")),
+                        fixture.article(title="Text-only story"),
+                    ],
+                ),
+            )
+            self.assertEqual(response.status_code, 200)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page()
+                page.route(
+                    "https://images.example.com/**",
+                    lambda route: route.fulfill(status=404)
+                    if "missing" in route.request.url
+                    else route.fulfill(content_type="image/png", body=PNG),
+                )
+                for width in (1280, 390):
+                    with self.subTest(width=width):
+                        page.set_viewport_size({"width": width, "height": 900})
+                        page.goto(fixture.base_url + "/")
+                        stories = page.get_by_role("article")
+                        story = stories.filter(has_text="Photographed story")
+                        image = story.locator("img")
+                        expect(image).to_be_visible()
+                        expect(image).to_have_attribute("referrerpolicy", "no-referrer")
+                        page.wait_for_function(
+                            "image => image.complete && image.naturalWidth > 0",
+                            arg=image.element_handle(),
+                        )
+                        picture = image.bounding_box()
+                        heading = story.get_by_role("heading").bounding_box()
+                        summary = story.locator("p").bounding_box()
+                        if width == 1280:
+                            self.assertGreaterEqual(picture["x"], summary["x"] + summary["width"])
+                            self.assertLess(picture["y"], summary["y"] + summary["height"])
+                            self.assertGreater(picture["width"], 150)
+                        else:
+                            self.assertLessEqual(picture["y"] + picture["height"], heading["y"])
+                            self.assertGreater(picture["width"], 300)
+                        missing = stories.filter(has_text="Story with a missing photo")
+                        missing.scroll_into_view_if_needed()
+                        expect(missing.locator("img")).to_have_count(0)
+                        text_only = stories.filter(has_text="Text-only story")
+                        expect(text_only.locator("img")).to_have_count(0)
+                        self.assertAlmostEqual(
+                            missing.locator(".story-text").bounding_box()["width"],
+                            text_only.locator(".story-text").bounding_box()["width"],
+                        )
+                        boxes = [box.bounding_box() for box in stories.all()]
+                        self.assertTrue(all(box["x"] == boxes[0]["x"] and box["width"] == boxes[0]["width"] for box in boxes))
+                        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                story.get_by_role("link", name="Read the story").click()
+                expect(page.get_by_role("heading", name="Photographed story")).to_be_visible()
+                hero = page.get_by_role("img", name="Photo of the lead scene")
+                expect(hero).to_be_visible()
+                credit = page.get_by_role("link", name="Example Photo Desk")
+                expect(credit).to_have_attribute("href", "https://example.com/photos")
+                self.assertLess(hero.bounding_box()["y"], page.locator(".prose").bounding_box()["y"])
             finally:
                 browser.close()
 

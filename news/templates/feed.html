@@ -27,11 +27,23 @@
     <div class="story-list">
         {% for article in articles %}
             <article class="story">
-                <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a><span>{{ article.article_date }}</span></div>
-                <h2><a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a></h2>
-                <p>{{ article.summary }}</p>
-                <a class="read-story"
-                   href="{{ url_for('pages.article',identity=article.id) }}">Read the story <span aria-hidden="true">→</span></a></article>
+                <div class="story-text">
+                    <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a><span>{{ article.article_date }}</span></div>
+                    <h2><a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a></h2>
+                    <p>{{ article.summary }}</p>
+                    <a class="read-story"
+                       href="{{ url_for('pages.article',identity=article.id) }}">Read the story <span aria-hidden="true">→</span></a>
+                </div>
+                {% if article.lead_image %}<a class="story-photo"
+   href="{{ url_for('pages.article',identity=article.id) }}"
+   tabindex="-1"
+   aria-hidden="true"
+   data-photo><img src="{{ article.lead_image.url }}"
+     alt=""
+     loading="lazy"
+     decoding="async"
+     referrerpolicy="no-referrer"></a>{% endif %}
+            </article>
         {% endfor %}
     </div>
     <nav class="pagination" aria-label="Archive pages">

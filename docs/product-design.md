@@ -359,6 +359,21 @@ The tradeoff is that image availability depends on the external host. This
 rejects the proposal to upload and retain copies on the VPS. The
 [image delivery contract](server-contract.md#inline-images) follows that choice.
 
+Accepted on October 9, 2026: an article may carry one optional lead photo,
+shown beside its summary on the front page and at the top of the article.
+The body can still hold further photos. The owner wants photos in many stories,
+such as NFL news, weekend plans, and Apple news, but not in every story. Until
+then, few articles had images and the front page showed none. The owner chose
+an explicit `lead_image` field over using each body's first image, so reporters
+choose the photo, or no photo, deliberately. The tradeoff is a schema migration
+and a payload change; articles published earlier have no lead photo. The photo
+remains an external URL with a credit, as with body images.
+
+Also accepted on October 9, 2026: the reporting worker checks that each lead
+and inline image loads before it saves a result, and removes any that do not.
+Readers' browsers ignore an image that fails later. This keeps unverifiable or
+invented image URLs off the page. The server still never fetches image content.
+
 The owner explicitly preferred a single body and agreed to the recommended
 format; no further reason was stated. This supports headings, lists, tables,
 and links without requiring a separate schema for every assignment type. The

@@ -19,6 +19,7 @@ from .desktop_alerts import notify
 from .errors import Problem
 from .worker_claude import preflight, research
 from .worker_history import History, preflight as history_preflight
+from .worker_images import remove_broken
 from .worker_io import APIError, NewsAPI, WorkerError, read_json, remove_file, save_json
 
 RETENTION_SECONDS = 7 * 24 * 3600
@@ -168,6 +169,7 @@ class Batch:
                 save_json(path, record)
                 candidate = research(self.settings, directory, assignment, self.lock_fd, self.history.endpoint)
                 self.history.check()
+                save_json(directory / "images.json", remove_broken(candidate))
             except subprocess.TimeoutExpired:
                 candidate = failure("research_timeout", "Claude Code exceeded the reporting attempt time limit.")
             except (WorkerError, Problem, ValueError, UnicodeError) as exc:
