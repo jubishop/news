@@ -16,12 +16,16 @@ Track rollout progress and remaining acceptance work in GitHub Issues.
 
 - News runs as the `news` system user on loopback port 3070. Caddy forwards
   the News hostname to that port. Preserve the other applications on this host.
-- On September 28, 2026, CPython 3.14.7 was installed for News under
-  `/opt/news/python`, with `/opt/news/python3.14` pointing to its interpreter.
-  The tree is root-owned and executable by `news`. The provisioning tool is
-  uv 0.12.18 in `/opt/news/tools`; it does not modify shell profiles.
-  Ubuntu's `/usr/bin/python3` remains 3.12.3. Follow the
-  [runtime procedure](../docs/server-operations.md#production-python) for upgrades.
+- Since October 9, 2026 (Pacific), News runs on the shared runtime
+  `/opt/python/current/bin/python3`, then CPython 3.14.8. Release 26ce865 was
+  the first built from it, and `news-rebuild-environment` then moved it to
+  `.venv-3.14.8`. Registering News in `/etc/python-update.json` is the owner's
+  step. Ubuntu's `/usr/bin/python3` remains 3.12.3. See the
+  [runtime procedure](../docs/server-operations.md#production-python).
+- The retired dedicated CPython 3.14.7 remains under `/opt/news/python`, with
+  `/opt/news/python3.14` and uv 0.12.18 in `/opt/news/tools`. On October 9,
+  no process or host configuration used it; 13 older releases' environments,
+  including the previous release 4c38aab, still did.
 - The DNS A record is proxied through Cloudflare. The origin certificate and
   private key are `/etc/caddy/certs/news.pem` and `news.key`, owned by
   `root:caddy`, mode 0640. The certificate covers only `news.jubishop.com`.
@@ -91,7 +95,8 @@ install trusted releases as root, so protect changes to `main`.
 
 The receiver is installed separately from application releases. The selected
 release is `/opt/news/current`; its `REVISION` file records the deployed commit.
-The receiver uses the dedicated News Python interpreter. The prior Python 3.12
-receiver is retained at `/opt/news/receiver-backups/receive-release-before-python314`,
-owned by root with mode 0600, for operator-led recovery.
+The receiver uses the shared Python runtime. Its prior versions are retained
+in `/opt/news/receiver-backups`, owned by root with mode 0600, for operator-led
+recovery: `receive-release-before-python314` (system Python 3.12) and
+`receive-release-before-shared-python` (dedicated 3.14 interpreter).
 Keep provider credentials out of GitHub deployment logs and release archives.
