@@ -1,20 +1,10 @@
-.DS_Store
-.cache/
-.config/qmd/
-.env
-.env.*
-!.env.example
-.envrc.local
-__pycache__/
-*.py[cod]
-worktrees/
 .venv/
 var/
 *.sqlite3*
 test-results/
 
 # Local td task state
-.todos/
+
 # project-starter:begin
 .DS_Store
 .cache/
