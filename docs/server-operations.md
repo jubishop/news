@@ -111,11 +111,10 @@ systemctl restart news.service
 curl --fail http://127.0.0.1:3070/health
 ```
 
-Releases installed before the move keep environments built from the retired
-CPython 3.14.7 at `/opt/news/python3.14`, provisioned with uv in
-`/opt/news/tools`. Relinking one of them needs that interpreter, or the
-rebuild command above. Remove `/opt/news/python`, `/opt/news/python3.14`, and
-`/opt/news/tools` once no retained release you might relink depends on them.
+The retired dedicated CPython 3.14.7 (`/opt/news/python`,
+`/opt/news/python3.14`, and uv in `/opt/news/tools`) was removed on
+October 9, 2026 (Pacific), once no retained release used it. A relinked
+release whose interpreter is gone needs the rebuild command above.
 
 ## Provisioning prerequisites
 

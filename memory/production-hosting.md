@@ -19,13 +19,13 @@ Track rollout progress and remaining acceptance work in GitHub Issues.
 - Since October 9, 2026 (Pacific), News runs on the shared runtime
   `/opt/python/current/bin/python3`, then CPython 3.14.8. Release 26ce865 was
   the first built from it, and `news-rebuild-environment` then moved it to
-  `.venv-3.14.8`. Registering News in `/etc/python-update.json` is the owner's
-  step. Ubuntu's `/usr/bin/python3` remains 3.12.3. See the
+  `.venv-3.14.8`. News is registered in the host's `/etc/python-update.json`.
+  Ubuntu's `/usr/bin/python3` remains 3.12.3. See the
   [runtime procedure](../docs/server-operations.md#production-python).
-- The retired dedicated CPython 3.14.7 remains under `/opt/news/python`, with
-  `/opt/news/python3.14` and uv 0.12.18 in `/opt/news/tools`. On October 9,
-  no process or host configuration used it; 13 older releases' environments,
-  including the previous release 4c38aab, still did.
+- The retired dedicated CPython 3.14.7 under `/opt/news/python`, with
+  `/opt/news/python3.14` and uv in `/opt/news/tools`, was removed on
+  October 9, 2026 (Pacific). Release 72b25c9's deployment first pruned the
+  older releases whose environments used it.
 - The DNS A record is proxied through Cloudflare. The origin certificate and
   private key are `/etc/caddy/certs/news.pem` and `news.key`, owned by
   `root:caddy`, mode 0640. The certificate covers only `news.jubishop.com`.
