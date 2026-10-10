@@ -12,7 +12,7 @@ EnvironmentFile=/etc/news/app.env
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
 UMask=0077
-ExecStart=/opt/news/current/.venv/bin/gunicorn --workers 1 --threads 2 --bind 127.0.0.1:3070 --timeout 30 --access-logfile /dev/null --error-logfile - 'news:create_app()'
+ExecStart=/opt/news/current/.venv/bin/gunicorn --workers 1 --threads 2 --bind 127.0.0.1:3070 --timeout 30 --access-logfile /dev/null --error-logfile - --no-control-socket 'news:create_app()'
 Restart=on-failure
 RestartSec=5
 StateDirectory=news news-backup

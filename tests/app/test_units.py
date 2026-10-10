@@ -1,11 +1,28 @@
-"""Validate systemd syntax on Linux without installing units or starting services."""
+"""Validate systemd units without installing them or starting services."""
 
 from pathlib import Path
 import re
+import shlex
 import shutil
 import subprocess
 import tempfile
 import unittest
+
+from gunicorn.config import Config
+
+
+SOURCE = Path(__file__).resolve().parents[2] / "ops/systemd"
+
+
+class WebUnitTests(unittest.TestCase):
+    def test_gunicorn_opens_no_control_socket(self):
+        # The default socket lives in the account's home. Ubuntu's built-in news
+        # account uses /var/spool/news, which ProtectSystem=strict makes read-only.
+        unit = (SOURCE / "news.service").read_text()
+        command = shlex.split(re.search(r"^ExecStart=(.*)$", unit, re.M)[1])
+        self.assertTrue(command[0].endswith("/gunicorn"))
+        settings = Config().parser().parse_args(command[1:])
+        self.assertTrue(settings.control_socket_disable)
 
 
 @unittest.skipUnless(
@@ -13,10 +30,9 @@ import unittest
 )
 class UnitTests(unittest.TestCase):
     def test_systemd_units_parse(self):
-        source = Path(__file__).resolve().parents[2] / "ops/systemd"
         with tempfile.TemporaryDirectory() as directory:
             targets = []
-            for path in source.iterdir():
+            for path in SOURCE.iterdir():
                 target = Path(directory) / path.name
                 # The target release's interpreter does not exist on a CI host.
                 value = re.sub(
