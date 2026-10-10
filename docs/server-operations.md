@@ -16,9 +16,9 @@ Python 3.14 and the latest stable Python, and on macOS for development. On
 October 9, 2026, the owner adopted the latest stable
 [version policy](foundation/engineering-policy.md#runtime-and-toolchain-versions),
 superseding the September 28 choice of exactly one Python minor version for
-development, CI, the worker, and production. Python 3.14 remains the minimum
-and [production's runtime](#production-python). Foundation commands retain
-their separate Python 3.9+ policy. Shell scripts use POSIX sh.
+development, CI, the worker, and production. Python 3.14 remains the minimum;
+production follows the [shared VPS runtime](#production-python). Foundation
+commands retain their separate Python 3.9+ policy. Shell scripts use POSIX sh.
 Restic 0.16 or later is supported for backup operations (Ubuntu 24.04 packages
 0.16). ShellCheck and Restic must be on PATH for full validation.
 
@@ -72,47 +72,50 @@ inside the active checkout; `.venv`, `var`, and nested worktrees are excluded.
 
 ## Production Python
 
-News uses a dedicated interpreter at `/opt/news/python3.14`. Keep Ubuntu's
-system Python unchanged because other host services can depend on it. Use
-Astral's managed CPython build to avoid compiling and maintaining a separate
-source build on the small shared VPS. This adds trust in Astral's binary
-distribution; production does not require uv to run the application.
+Production uses the shared VPS runtime, `/opt/python/current/bin/python3`, as
+described in `~/projects/vps-infra/docs/python-runtime.md`. That project's
+`python-update` keeps it on the newest final CPython release; the owner chose
+automatic latest-stable updates on October 9, 2026, replacing News's
+dedicated 3.14 interpreter. Keep Ubuntu's system Python unchanged because other
+host services can depend on it. The SSH receiver and `ops/install-server` use
+the shared path, and each release's `.venv` is built from it; installation
+still requires Python 3.14 or later.
 
-Provision as root before installing the release receiver or deploying News:
+Before `python-update` switches the runtime, it runs
+`/usr/local/sbin/news-rebuild-environment` with the new interpreter's versioned
+path. Each release installs that command from
+[rebuild-environment](../ops/rebuild-environment). For the active release, it
+builds `.venv-VERSION` beside the active environment from the hash-locked
+`requirements.txt`, verifies that the `news` account can import News, and then
+atomically points `.venv` at it. It reuses an existing environment for the same
+interpreter, so rolling back to the previous interpreter is immediate. The
+first rebuild of a release swaps the installer's real `.venv` directory for a
+link and keeps that directory as `.venv-VERSION` for rollback unless an
+environment already has that name. Any failure exits nonzero and leaves the
+active environment unchanged. The command takes the deployment lock, waiting up
+to 20 minutes for a running release. Restart `news` to use the new environment;
+timer services use it on their next run.
 
-```sh
-umask 022
-curl --fail --silent --show-error --location \
-  https://astral.sh/uv/0.12.18/install.sh --output /tmp/news-uv-install.sh
-UV_UNMANAGED_INSTALL=/opt/news/tools sh /tmp/news-uv-install.sh
-UV_PYTHON_INSTALL_DIR=/opt/news/python /opt/news/tools/uv python install 3.14.7 --no-bin
-runtime=$(UV_PYTHON_INSTALL_DIR=/opt/news/python /opt/news/tools/uv python find \
-  --managed-python --no-project 3.14.7)
-ln -s "$runtime" /opt/news/python3.14
-runuser -u news -- /opt/news/python3.14 --version
+Register News in the host's `/etc/python-update.json` `apps` list:
+
+```json
+{"name": "news", "rebuild": "/usr/local/sbin/news-rebuild-environment", "units": ["news"], "urls": ["http://127.0.0.1:3070/health"]}
 ```
 
-On initial provisioning, verify the executable as root if the `news` account
-does not yet exist; the installer creates that account. Keep the runtime tree
-root-owned and readable/executable by `news`. The unmanaged uv installation
-does not modify shell profiles or the system interpreter. See Astral's
-[installer options](https://docs.astral.sh/uv/reference/installer/) and
-[Python installation guide](https://docs.astral.sh/uv/guides/install-python/),
-checked September 28, 2026.
+To move the active release by hand, for example after relinking an older
+release during recovery, run as root:
 
-For a patch upgrade, install the new 3.14 patch alongside the old runtime,
-verify it, and replace only the `/opt/news/python3.14` link. Deploy a fresh
-release to rebuild its environment. Keep the prior runtime while any retained
-release uses it, so recovery remains possible. The standalone SSH receiver
-also uses this interpreter; update it explicitly from `ops/receive-release`
-when its code changes. Application releases do not replace the receiver.
+```sh
+/usr/local/sbin/news-rebuild-environment /opt/python/current/bin/python3
+systemctl restart news.service
+curl --fail http://127.0.0.1:3070/health
+```
 
-Production stays on Python 3.14, the declared minimum, until a newer minor
-release is provisioned deliberately. That move installs the new runtime beside
-3.14, changes the interpreter path in `ops/install-server` and
-`ops/receive-release`, updates the installed receiver, and deploys a fresh
-release through the usual health checks. Keep the 3.14 runtime for recovery
-until no retained release uses it.
+Releases installed before the move keep environments built from the retired
+CPython 3.14.7 at `/opt/news/python3.14`, provisioned with uv in
+`/opt/news/tools`. Relinking one of them needs that interpreter, or the
+rebuild command above. Remove `/opt/news/python`, `/opt/news/python3.14`, and
+`/opt/news/tools` once no retained release you might relink depends on them.
 
 ## Provisioning prerequisites
 
@@ -142,7 +145,7 @@ found port 3070 free; confirm this before rollout.
    Set the sender to `News <news@jubishop.com>` and put the privately selected
    owner recipient in configuration. Coordinate rotation with other consumers
    of the shared key.
-5. Install `restic` and `curl`, and provision the [dedicated Python runtime](#production-python).
+5. Install `restic` and `curl`, and confirm the [shared Python runtime](#production-python).
    Create root-owned `/etc/news/app.env` and `/etc/news/backup.env`, mode 0600. Copy the shapes from
    [.env.example](../.env.example) and [backup example](../ops/backup.env.example).
    Use `/var/lib/news/news.sqlite3` for `NEWS_DATABASE` and

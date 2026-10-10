@@ -12,12 +12,14 @@ done
 # This also serializes manual installs with deployments started through SSH.
 exec 9>/run/lock/news-deploy.lock
 flock -n 9 || { echo 'Another News deployment is running.' >&2; exit 1; }
-/opt/news/python3.14 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 14) else "News requires Python 3.14 or later.")'
+# The shared VPS runtime; news-rebuild-environment moves releases to its updates.
+python=/opt/python/current/bin/python3
+"$python" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 14) else "News requires Python 3.14 or later.")'
 command -v restic >/dev/null
 command -v curl >/dev/null
 id news >/dev/null 2>&1 || useradd --system --home /var/lib/news --shell /usr/sbin/nologin news
 install -d -o news -g news -m 0700 /var/lib/news /var/lib/news-backup /var/cache/news-restic
-/opt/news/python3.14 -m venv "$release/.venv"
+"$python" -m venv "$release/.venv"
 "$release/.venv/bin/python" -m pip install --require-hashes -r "$release/requirements.txt"
 chown -R root:root "$release"
 chmod -R go+rX "$release"
@@ -54,6 +56,7 @@ fi
 ln -s "$release" "/opt/news/next.$$"
 mv -Tf "/opt/news/next.$$" /opt/news/current
 install -m 0644 "$release"/ops/systemd/news*.service "$release"/ops/systemd/news*.timer /etc/systemd/system/
+install -m 0755 "$release/ops/rebuild-environment" /usr/local/sbin/news-rebuild-environment
 systemctl daemon-reload
 if ! systemd-run --wait --collect --pipe --unit=news-migrate --property=User=news --property=Group=news \
     --property=WorkingDirectory=/opt/news/current --property=EnvironmentFile=/etc/news/app.env \

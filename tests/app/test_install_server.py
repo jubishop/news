@@ -72,7 +72,9 @@ exit 0
             "flock", "restic", "install", "useradd", "chown", "chmod",
         ):
             (self.root / "bin" / name).symlink_to("boundary")
-        (self.root / "opt/news/python3.14").symlink_to("/bin/boundary")
+        # Only the shared runtime exists; the retired dedicated interpreter is absent.
+        (self.root / "opt/python/current/bin").mkdir(parents=True)
+        (self.root / "opt/python/current/bin/python3").symlink_to("/bin/boundary")
         (self.root / "opt/news/releases/fixture/.venv/bin/python").symlink_to("/bin/boundary")
         installer = Path(os.environ.get("TEST_INSTALLER_SOURCE", ROOT / "ops/install-server"))
         self.copy(installer, "/installer")
@@ -110,7 +112,11 @@ exit 0
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "var/lib/news-backup/pre-release.sqlite3").read_text(), "saved")
         positions = [events.index(event) for event in (
-            "systemctl stop news.service", "python -\n", "systemd-run --wait",
+            "python3 -m venv /opt/news/releases/fixture/.venv\n",
+            "systemctl stop news.service", "python -\n",
+            "install -m 0755 /opt/news/releases/fixture/ops/rebuild-environment "
+            "/usr/local/sbin/news-rebuild-environment\n",
+            "systemd-run --wait",
             "systemctl enable --now news.service", "curl --fail",
             "systemctl start news-maintain.service", "systemctl enable --now news-maintain.timer",
         )]

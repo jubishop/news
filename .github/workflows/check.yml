@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # 3.14 is the minimum and production's runtime; 3.x is the latest stable release.
+        # 3.14 is the minimum; 3.x is the latest stable release, which production follows.
         python-version: ['3.14', '3.x']
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6

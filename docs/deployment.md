@@ -12,7 +12,7 @@ This supersedes the earlier PR-only delivery scope for server implementation.
 ## Release workflow
 
 [Repository checks](../.github/workflows/check.yml) runs full validation on
-Python 3.14, production's runtime, and on the latest stable Python for every
+Python 3.14, the minimum, and on the latest stable Python for every
 push and PR. Both must pass before deployment. A push to `main`, including
 a merged PR, deploys after validation succeeds unless it carries the
 explicit skip decision described below. PR checks cannot deploy or read
@@ -38,7 +38,9 @@ The workflow uses these entry points:
 3. [install-server](../ops/install-server) takes a host lock shared by manual
    and automated installs. It installs locked dependencies before downtime,
    stops all News writers, takes a consistent local SQLite checkpoint, switches
-   the release link, installs systemd units, and runs `news.cli init-db`.
+   the release link, installs systemd units and the
+   [Python rebuild command](server-operations.md#production-python), and runs
+   `news.cli init-db`.
 4. The installer starts the web service, checks loopback health, runs
    `news-maintain.service` once, and enables the maintenance and backup timers.
    GitHub then checks public HTTPS health before reporting deployment success.
@@ -102,8 +104,8 @@ create provider credentials that the deployment does not have.
 
 On the VPS, create `/opt/news/releases` and install `ops/receive-release` as
 root-owned mode 0755 at `/usr/local/sbin/news-receive-release`. Install
-`restic`, `curl`, and `util-linux` (for `flock`), and provision the dedicated
-[Python 3.14 runtime](server-operations.md#production-python). Add a
+`restic`, `curl`, and `util-linux` (for `flock`), and confirm the shared
+[Python runtime](server-operations.md#production-python). Add a
 dedicated public deployment key to root's `authorized_keys` with:
 
 ```text

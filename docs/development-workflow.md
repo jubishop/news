@@ -51,9 +51,10 @@ workflow result for the exact pushed commit.
 The application and the worker require Python 3.14 or later, declared in
 `pyproject.toml` and checked by `bin/app-setup`, `ops/install-server`, and the
 `news` package. `.python-version` requests the newest available Python that
-meets that minimum. Production runs Python 3.14; CI tests it and the latest
-stable Python. Foundation commands keep their Python 3.9 or later requirement.
-Restic 0.16 or later is supported for backups. See the
+meets that minimum. Production runs the shared VPS Python, which follows the
+newest stable release; CI tests 3.14 and the latest stable Python. Foundation
+commands keep their Python 3.9 or later requirement. Restic 0.16 or later is
+supported for backups. See the
 [runtime decision](server-operations.md#runtime-and-local-setup) and the
 [version policy](foundation/engineering-policy.md#runtime-and-toolchain-versions).
 

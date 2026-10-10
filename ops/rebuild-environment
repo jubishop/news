@@ -1,0 +1,175 @@
+#!/opt/python/current/bin/python3
+"""Rebuild the active News release's environment for a Python interpreter.
+
+ops/install-server installs this at /usr/local/sbin/news-rebuild-environment.
+The shared runtime's python-update calls it with an interpreter path. It builds
+or reuses <release>/.venv-<version>, verifies that the news user can import
+News with it, and then atomically points <release>/.venv at it. On failure it
+exits nonzero and leaves the active environment unchanged.
+"""
+
+from contextlib import contextmanager
+import ctypes
+import fcntl
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import time
+
+
+NEWS = Path("/opt/news")
+LOCK = Path("/run/lock/news-deploy.lock")
+LOCK_WAIT = 20 * 60  # Seconds; longer than a deployment's 15-minute limit.
+PROBE = (
+    "import sys; print('.'.join(map(str, sys.version_info[:3]))); "
+    "sys.exit(0 if sys.version_info >= (3, 14) else 'News requires Python 3.14 or later.')"
+)
+
+
+class RebuildError(Exception):
+    pass
+
+
+@contextmanager
+def deployment_lock():
+    # install-server holds the same lock, so a rebuild never overlaps a release.
+    with open(LOCK, "a") as handle:
+        deadline = time.monotonic() + LOCK_WAIT
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise RebuildError("A News deployment holds the lock; nothing changed.") from None
+                time.sleep(1)
+        yield
+
+
+def interpreter_version(python):
+    result = subprocess.run([python, "-c", PROBE], capture_output=True, text=True)
+    version = result.stdout.strip()
+    if result.returncode or not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        raise RebuildError(result.stderr.strip() or f"{python} did not report its version.")
+    return version
+
+
+def imports_news(environment, release):
+    """Check the environment as the service account, from the release like the units."""
+    clean = {key: value for key, value in os.environ.items() if not key.startswith("PYTHON")}
+    command = ["runuser", "-u", "news", "--", str(environment / "bin/python"), "-B", "-c", "import news"]
+    return subprocess.run(command, cwd=release, env=clean).returncode == 0
+
+
+def reusable(environment, python, release):
+    return (os.path.realpath(environment / "bin/python") == os.path.realpath(python)
+            and imports_news(environment, release))
+
+
+def remove(path):
+    if path.is_symlink() or path.is_file():
+        path.unlink()
+    elif path.exists():
+        shutil.rmtree(path)
+
+
+def build(python, environment, release):
+    try:
+        # Match install-server: a stdlib venv with the release's hash-locked requirements.
+        subprocess.run([python, "-m", "venv", environment], check=True, umask=0o022)
+        subprocess.run([environment / "bin/python", "-m", "pip", "install", "--require-hashes",
+                        "-r", release / "requirements.txt"], check=True, umask=0o022)
+        if not imports_news(environment, release):
+            raise RebuildError(f"{environment} cannot import News; nothing changed.")
+    except BaseException:
+        remove(environment)
+        raise
+
+
+def exchange(first, second):
+    """Atomically swap two paths, so .venv never disappears while it changes kind."""
+    libc = ctypes.CDLL(None, use_errno=True)
+    if sys.platform == "darwin":  # Lets local tests exercise the same swap.
+        result = libc.renamex_np(os.fsencode(first), os.fsencode(second), ctypes.c_uint(2))  # RENAME_SWAP
+    else:
+        at_fdcwd, rename_exchange = -100, 2
+        result = libc.renameat2(at_fdcwd, os.fsencode(first), at_fdcwd, os.fsencode(second),
+                                ctypes.c_uint(rename_exchange))
+    if result:
+        error = ctypes.get_errno()
+        raise OSError(error, os.strerror(error), str(second))
+
+
+def retire(old, release):
+    """Keep a replaced real .venv for rollback when its version name is free."""
+    try:
+        match = re.search(r"^version\s*=\s*(\d+\.\d+\.\d+)\s*$", (old / "pyvenv.cfg").read_text(), re.M)
+        keep = release / (".venv-" + match[1]) if match else None
+        if keep and not (keep.exists() or keep.is_symlink()):
+            # Its scripts name <release>/.venv/bin/python, so it works whenever .venv points to it.
+            old.rename(keep)
+        else:
+            remove(old)
+    except OSError as error:
+        print(f"Warning: could not tidy {old}: {error}", file=sys.stderr)
+
+
+def switch(release, name):
+    active, staged = release / ".venv", release / ".venv.new"
+    remove(staged)
+    staged.symlink_to(name, target_is_directory=True)
+    try:
+        if active.is_dir() and not active.is_symlink():
+            exchange(staged, active)
+        else:
+            os.replace(staged, active)
+    except BaseException:
+        remove(staged)
+        raise
+    if staged.exists() and not staged.is_symlink():
+        retire(staged, release)
+
+
+def rebuild(python):
+    version = interpreter_version(python)
+    release = (NEWS / "current").resolve(strict=True)
+    if release.parent != (NEWS / "releases").resolve():
+        raise RebuildError(f"The active release {release} is not under {NEWS / 'releases'}.")
+    name = ".venv-" + version
+    environment = release / name
+    active = release / ".venv"
+    current = os.readlink(active) if active.is_symlink() else None
+    if environment.exists() or environment.is_symlink():
+        if reusable(environment, python, release):
+            print(f"Reusing {environment}.")
+        elif current == name:
+            raise RebuildError(f"The active {environment} does not match {python}; leaving it unchanged.")
+        else:
+            remove(environment)
+            build(python, environment, release)
+    else:
+        build(python, environment, release)
+    switch(release, name)
+    print(f"{active} now uses {environment} ({python}). Restart News to use it.")
+
+
+def main(argv=None):
+    args = sys.argv[1:] if argv is None else argv
+    try:
+        if len(args) != 1 or not os.path.isabs(args[0]):
+            raise RebuildError("Usage: news-rebuild-environment /absolute/path/to/python3")
+        if os.geteuid() != 0:
+            raise RebuildError("Run as root.")
+        with deployment_lock():
+            rebuild(Path(args[0]))
+    except (OSError, RebuildError, subprocess.SubprocessError) as error:
+        print(error, file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

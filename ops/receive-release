@@ -1,4 +1,4 @@
-#!/opt/news/python3.14
+#!/opt/python/current/bin/python3
 """Restricted SSH entry point. Install at /usr/local/sbin/news-receive-release."""
 
 import io
