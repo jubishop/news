@@ -32,12 +32,24 @@ necessary jargon. Give enough context and useful detail to understand the story
 and why it matters, without padding. Distinguish facts, attributed claims, and
 uncertainty.
 
-Include relevant photos or illustrations when they help the reader. Look for
-them during research and embed them with Markdown
-![descriptive alt text](https://...) in body_markdown, using direct, absolute
-HTTPS image URLs. Verify the image URL and what it depicts; never invent image
-URLs. Credit and link the image source nearby. If no suitable image can be
-verified, publish useful text without image placeholders.
+Many stories are better with photos: games and players, products and launches,
+events and things to do, places, people in the news, books, films, and other
+visual subjects. Look for photos while you research. Set lead_image to the
+article's main photo; it appears beside the summary on the front page and at
+the top of the article. Give its direct image URL, descriptive alt text, a
+credit naming the publisher or photographer, and credit_url linking the page
+where you found it. Leave lead_image null when a photo would not help the
+reader, as with most abstract research findings, unless a figure explains
+something. Skip logos, icons, and generic stock images.
+
+Add more photos to the body where they help, such as one for each entry in a
+roundup, with Markdown ![descriptive alt text](https://...) in body_markdown;
+do not repeat the lead image in the body. Credit and link the image source
+nearby. Official, press, publisher, venue, event, and Wikimedia Commons pages
+are good sources; when fetching a page, ask for the image URLs it shows with
+their captions or alt text. Use only direct HTTPS image URLs that you found on
+a page; never invent or guess image URLs. Choose images that show the story's
+actual subject. The supervisor removes images that do not load.
 
 Publish useful partial coverage when warranted and explain material gaps; never
 invent facts to fill them. Research or tool failure is not evidence that there
@@ -68,6 +80,9 @@ ARTICLE_SCHEMA = object_schema({
     **{key: TEXT for key in ("title", "summary", "body_markdown")},
     **{key: DATE for key in DATE_FIELDS},
     "sources": {"type": "array", "items": object_schema({"title": TEXT, "url": TEXT})},
+    "lead_image": {"anyOf": [object_schema({"url": {"type": "string", "pattern": "^https://"},
+                                            **{key: TEXT for key in ("alt", "credit", "credit_url")}}),
+                             {"type": "null"}]},
 })
 RESULT_SCHEMA = object_schema({
     "outcome": {"type": "string", "enum": ["published", "nothing_to_publish", "failed"]},
@@ -97,6 +112,16 @@ def article_dates(article):
     return article
 
 
+def usable_lead_image(article):
+    # An unusable optional photo should not discard the story with it.
+    if isinstance(article, dict) and article.get("lead_image") is not None:
+        try:
+            v.lead_image(article["lead_image"])
+        except Problem:
+            return {**article, "lead_image": None}
+    return article
+
+
 def validate_result(value):
     v.object_fields(value, ("outcome", "articles", "reason", "error"), ("outcome", "articles", "reason", "error"))
     outcome, articles = value["outcome"], value["articles"]
@@ -104,9 +129,7 @@ def validate_result(value):
         raise Problem("Invalid agent outcome.")
     if not isinstance(articles, list) or len(articles) > 20 or bool(articles) != (outcome == "published"):
         raise Problem("Published results require 1–20 articles; other outcomes require none.")
-    articles = [article_dates(article) for article in articles]
-    for article in articles:
-        v.article(article)
+    articles = [v.article(usable_lead_image(article_dates(article))) for article in articles]
     v.text(value["reason"], "reason", 4000, empty=True)
     result = {"outcome": outcome, "articles": articles}
     if outcome == "nothing_to_publish":

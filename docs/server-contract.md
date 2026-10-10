@@ -18,7 +18,7 @@ worker check-ins, and incidents. IDs are opaque strings. Event timestamps are
 UTC Unix seconds; schedule dates use `America/Los_Angeles`.
 
 SQLite uses WAL, foreign keys, a five-second busy timeout, and short write
-transactions. `init-db` applies the initial numbered schema through
+transactions. `init-db` applies the numbered schema migrations through
 `PRAGMA user_version`; it rejects a database newer than the application.
 Foreign keys restrict deletion. Removing a reporter retains its identity and
 history. No operation cascades into articles.
@@ -69,11 +69,19 @@ or worker request payloads. `/health` is a minimal public database check.
   "coverage_start": "2026-09-26",
   "coverage_end": "2026-09-27",
   "body_markdown": "## First option\n\nSee the [official event page](https://example.com/event).\n\n![A workshop](https://example.com/workshop.jpg)",
-  "sources": [{"title": "Official event page", "url": "https://example.com/event"}]
+  "sources": [{"title": "Official event page", "url": "https://example.com/event"}],
+  "lead_image": {
+    "url": "https://example.com/festival.jpg",
+    "alt": "Families at the harvest festival",
+    "credit": "Example Festival",
+    "credit_url": "https://example.com/press"
+  }
 }
 ```
 
-All fields above are required. Unknown article fields are rejected. Title and
+All fields above except `lead_image` are required. Unknown article fields are
+rejected. `lead_image` may be omitted or `null`, meaning no lead photo, so
+earlier workers and saved results remain valid. Title and
 summary are plain text. `article_date`, `coverage_start`, and `coverage_end`
 are exact ISO dates (`YYYY-MM-DD`). Coverage endpoints are inclusive and ordered;
 future dates are allowed. No server timestamp determines research coverage.
@@ -87,6 +95,17 @@ must use absolute HTTPS URLs; HTTP image syntax becomes alt text. Images load
 lazily in the reader's browser without a referrer. News does not fetch, upload,
 proxy, store, or back up images. Captions and credits can be ordinary Markdown.
 
+### Lead photo
+
+A [lead photo](product-design.md#structured-article-storage) needs all four fields:
+an absolute HTTPS `url`, plain-text `alt`, a plain-text `credit`, and an HTTP
+or HTTPS `credit_url` for the page where it appears. The front page shows it
+as a cropped thumbnail beside the summary, or above the headline on narrow
+screens. The article page shows it, uncropped up to a maximum height, above
+the body with its linked credit. Both load without a referrer. Articles
+without one keep the text-only layout. A photo that fails to load in the
+browser is removed from the page, as is a failed inline image.
+
 Sources are structured title/URL pairs. An empty source list is permitted:
 source sufficiency and inline citation placement belong to the assignment and
 worker. Server validation cannot verify a claim or the quality of its research.
@@ -96,6 +115,7 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | Request body | 2,000,000 bytes |
 | Articles in a result | 1–20 for publication; zero otherwise |
 | Title / summary | 300 / 2,000 characters |
+| Lead photo alt text / credit | 300 / 200 characters |
 | Markdown body | 250,000 characters per article |
 | Sources | At most 100 per article |
 | Source title / URL | 500 / 4,096 characters |

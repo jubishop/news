@@ -196,14 +196,36 @@ For [issue #25](https://github.com/jubishop/news/issues/25), the shared prompt
 also asks reporters to find and include photos or illustrations when they help
 the reader. Use the existing [inline image format](server-contract.md#inline-images):
 direct HTTPS image URLs in the Markdown body, descriptive alt text, and a nearby
-source credit and link. Reporters must verify the URL and depicted subject.
-If no suitable image can be verified, useful text can still be published without
-image placeholders. Image selection remains an editorial judgment.
+source credit and link. Image selection remains an editorial judgment.
+
+Few reports had images, so on October 9, 2026 the owner asked for photos in
+many stories and chose an explicit [lead photo](product-design.md#structured-article-storage).
+The prompt names visual subjects that usually deserve a photo, such as games,
+products, events, places, and people in the news. It asks for a `lead_image`
+with alt text and a linked credit, and for further body photos where they help,
+such as one per roundup entry. Abstract research usually gets none. It
+suggests official and press pages and Wikimedia Commons, and asks reporters to
+request a page's image URLs while fetching it. Reporters must use only image
+URLs they found, never invented or guessed ones.
+
+An unusable lead photo, such as one with a non-HTTPS URL or an empty credit,
+is dropped rather than failing the result. Before saving a result, the
+supervisor requests each lead and inline image URL as a browser would, without
+a referrer, and follows only HTTPS redirects. It never requests non-HTTPS
+destinations, which the page would not show. It keeps images that return a
+successful image response. Access denials, rate limits, server errors, and
+timeouts are inconclusive, since bot protection can refuse scripts that
+browsers pass, so those images also stay. It removes the rest, such as missing
+files, unknown hosts, web pages, and non-HTTPS destinations: a failed lead
+photo becomes none, and a failed inline image's Markdown is deleted. Each attempt's private
+`images.json` records the outcome per URL. Reference-style Markdown images are
+not checked; the page removes them if they fail to load.
 
 The automated worker test verifies that this guidance reaches the Claude Code process
 alongside the exact claimed assignment. The worker/server integration test also
-verifies that image Markdown and credits survive publication and render on the
-public article page. These tests do not measure generated prose or image quality,
+verifies that lead photos, image Markdown, and credits survive publication and
+render on the public pages. Worker tests fake image hosts to verify that images
+that fail to load are removed. These tests do not measure generated prose or image quality,
 establish factual accuracy, or guarantee external image availability.
 
 Updating the permanent worker checkout after merge activates the guidance for

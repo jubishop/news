@@ -1,5 +1,16 @@
 "use strict";
 
+// Photos load from their publishers' hosts; drop any that are gone rather than
+// leaving a broken image or an empty frame.
+for (const image of document.querySelectorAll("[data-photo] img, .prose img")) {
+  const drop = () => (image.closest("[data-photo]") || image).remove();
+  image.addEventListener("error", drop);
+  // Catches images that failed before this script ran.
+  image.decode().catch(() => {
+    if (image.complete && !image.naturalWidth) drop();
+  });
+}
+
 for (const form of document.querySelectorAll("form[data-confirm]")) {
   form.addEventListener("submit", (event) => {
     if (!window.confirm(form.dataset.confirm)) event.preventDefault();

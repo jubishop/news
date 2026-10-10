@@ -55,7 +55,10 @@ main { min-height: 65vh; padding: 46px 0 70px; }
 .status-dot { width: 6px; height: 6px; display: inline-block; border-radius: 50%; background: var(--green); margin-right: 7px; }
 .status-dot.warning { background: #ad7332; }
 .story-list { padding-top: 34px; }
-.story { padding: 28px 0 34px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.story { padding: 28px 0 34px; border-bottom: 1px solid var(--line); display: flex; gap: 40px; align-items: flex-start; min-width: 0; }
+.story-text { flex: 1; display: flex; flex-direction: column; align-items: flex-start; align-self: stretch; min-width: 0; }
+.story-photo { flex: 0 0 min(300px, 34%); display: block; aspect-ratio: 3 / 2; overflow: hidden; border-radius: 2px; background: #e8e9df; }
+.story-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .story-meta { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; color: var(--muted); font-size: 11px; margin-bottom: 19px; }
 .story-meta a { text-transform: uppercase; font-weight: 600; color: var(--accent); font-size: 10px; letter-spacing: .09em; text-decoration: none; }
 .story h2 a { text-decoration: none; }
@@ -80,6 +83,10 @@ main { min-height: 65vh; padding: 46px 0 70px; }
 .meta-divider { display: inline-block; color: var(--line); margin: 0 11px; }
 .standfirst { font-family: var(--serif); font-size: 23px; line-height: 1.55; color: var(--muted); }
 .article-dateline { display: flex; flex-wrap: wrap; gap: 5px 20px; font-size: 11px; color: var(--muted); margin-top: 28px; }
+.lead-photo { margin: 0 0 36px; }
+.lead-photo img { display: block; width: 100%; height: auto; max-height: min(75vh, 640px); object-fit: cover; border-radius: 2px; }
+.lead-photo figcaption { margin-top: 10px; font-size: 11px; color: var(--muted); text-align: right; }
+.lead-photo a { text-decoration: none; }
 .prose { font-family: var(--serif); font-size: 20px; line-height: 1.8; overflow-wrap: anywhere; }
 .prose h2 { font-size: 33px; margin: 42px 0 20px; }
 .prose h3 { font-size: 26px; margin-top: 32px; }
@@ -228,6 +235,8 @@ textarea { line-height: 1.7; resize: vertical; font-size: 14px; }
   .filter-bar .button { padding: 10px; }
   .reporter-grid, .editor-layout, .operating-note { grid-template-columns: 1fr; }
   .story-list { padding-top: 6px; }
+  .story { flex-direction: column-reverse; align-items: stretch; gap: 20px; }
+  .story-photo { flex-basis: auto; }
   .empty-edition { padding: 48px 0 25px; }
   .site-footer { flex-wrap: wrap; gap: 12px 20px; padding-bottom: 25px; }
   .site-footer span:last-child { margin-left: 0; width: 100%; }

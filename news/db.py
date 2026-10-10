@@ -21,16 +21,17 @@ def migrate(path):
     with closing(connect(path)) as connection:
         connection.execute("PRAGMA journal_mode = WAL")
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-        if version > 2:
+        if version > 3:
             raise RuntimeError(
                 "Database is newer than this server; do not downgrade it."
             )
         if version == 0:
             script = Path(__file__).with_name("schema.sql").read_text()
             connection.executescript("BEGIN IMMEDIATE;\n" + script + "\nCOMMIT;")
-        if version < 2:
-            script = Path(__file__).with_name("migrations").joinpath("002-archive.sql").read_text()
-            connection.executescript("BEGIN IMMEDIATE;\n" + script + "\nCOMMIT;")
+        for number, name in ((2, "002-archive.sql"), (3, "003-lead-image.sql")):
+            if version < number:
+                script = Path(__file__).with_name("migrations").joinpath(name).read_text()
+                connection.executescript("BEGIN IMMEDIATE;\n" + script + "\nCOMMIT;")
 
 
 @contextmanager

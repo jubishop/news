@@ -402,8 +402,8 @@ def result(connection, run_id, worker, values):
         ids.append(identity)
         connection.execute(
             """INSERT INTO articles (id,reporter_id,attempt_id,reporter_name,title,summary,
-            body_markdown,sources_json,article_date,coverage_start,coverage_end,published_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+            body_markdown,sources_json,article_date,coverage_start,coverage_end,published_at,
+            lead_image_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 identity,
                 reporter["id"],
@@ -417,6 +417,7 @@ def result(connection, run_id, worker, values):
                 article["coverage_start"],
                 article["coverage_end"],
                 clock.now(),
+                v.canonical(article["lead_image"]) if "lead_image" in article else None,
             ),
         )
     state, retry_at, finished = outcome, None, clock.now()

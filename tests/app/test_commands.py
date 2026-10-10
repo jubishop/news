@@ -36,7 +36,7 @@ class CommandTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             with sqlite3.connect(database) as connection:
                 self.assertEqual(
-                    connection.execute("PRAGMA user_version").fetchone()[0], 2
+                    connection.execute("PRAGMA user_version").fetchone()[0], 3
                 )
             result = subprocess.run(
                 [

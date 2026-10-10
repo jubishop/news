@@ -321,6 +321,64 @@ class ServerTests(ServerFixture):
         self.assertIn('src="https://example.com/image.jpg"', html)
         self.assertIn("<table>", html)
 
+    def test_lead_photo_appears_beside_feed_summary_and_atop_its_article(self):
+        _, run = self.due()
+        photo = {
+            "url": "https://images.example.com/game.jpg",
+            "alt": "A running back crosses the goal line",
+            "credit": "Team Photographer",
+            "credit_url": "https://example.com/gallery",
+        }
+        claim = self.claim(run)
+        for invalid in (
+            {**photo, "url": "http://images.example.com/game.jpg"},
+            {**photo, "credit_url": "javascript:alert(1)"},
+            {key: value for key, value in photo.items() if key != "credit"},
+            {**photo, "caption": "Unsupported"},
+            {**photo, "alt": " "},
+            "https://images.example.com/game.jpg",
+        ):
+            with self.subTest(invalid=invalid):
+                body = self.envelope(claim, articles=[self.article(lead_image=invalid)])
+                self.assertEqual(self.result(run, body).status_code, 422)
+        articles = [
+            self.article(title="Photographed game", lead_image=photo),
+            self.article(title="Text-only study", lead_image=None),
+            self.article(title="Older worker story"),
+        ]
+        response = self.result(run, self.envelope(claim, articles=articles))
+        self.assertEqual(response.status_code, 200, response.get_data(as_text=True))
+        stored = {
+            article["title"]: article
+            for article in self.client.get(
+                "/api/v1/worker/articles/search", headers=self.worker
+            ).json["articles"]
+        }
+        self.assertEqual(stored["Photographed game"]["lead_image"], photo)
+        self.assertIsNone(stored["Text-only study"]["lead_image"])
+        self.assertIsNone(stored["Older worker story"]["lead_image"])
+        self.assertNotIn("lead_image_json", stored["Photographed game"])
+
+        feed = self.client.get("/").get_data(as_text=True)
+        self.assertEqual(feed.count('src="https://images.example.com/game.jpg"'), 1)
+        self.assertEqual(feed.count("<img"), 1)
+        self.assertIn('referrerpolicy="no-referrer"', feed)
+        self.assertIn('loading="lazy"', feed)
+
+        html = self.client.get(
+            "/articles/" + stored["Photographed game"]["id"]
+        ).get_data(as_text=True)
+        self.assertIn('src="https://images.example.com/game.jpg"', html)
+        self.assertIn('alt="A running back crosses the goal line"', html)
+        self.assertIn('referrerpolicy="no-referrer"', html)
+        self.assertIn('href="https://example.com/gallery"', html)
+        self.assertIn("Team Photographer", html)
+        plain = self.client.get(
+            "/articles/" + stored["Text-only study"]["id"]
+        ).get_data(as_text=True)
+        self.assertNotIn("<img", plain)
+        self.assertNotIn("<figure", plain)
+
     def test_month_end_preview_and_category_validation(self):
         response = self.client.get(
             "/newsroom/schedule-preview?cadence=monthly&day_of_month=31",

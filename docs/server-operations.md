@@ -255,7 +255,8 @@ Temporary plaintext snapshots are removed even on handled failure.
 `restore-check` reads and validates all Restic data, restores the latest News
 snapshot into a private temporary directory, then checks SQLite integrity,
 foreign keys, schema version, and all six application table queries. It accepts
-schema 1 or 2; schema 2 also checks the archive metadata table and revision column. It removes this test
+schema 1, 2, or 3; schema 2 also checks the archive metadata table and revision column,
+and schema 3 checks the lead photo column. It removes this test
 restore without touching the running database. Successful state is saved in
 `/var/lib/news-backup/restore.json`. A backup or restore failure opens an email
 incident; abrupt host/process failures still require checking systemd status.

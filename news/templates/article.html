@@ -8,6 +8,15 @@
             <p class="standfirst">{{ article.summary }}</p>
             <div class="article-dateline"><span>Published {{ article.published_at|event_time }}</span><span>Coverage {{ article.coverage_start }} – {{ article.coverage_end }}</span></div>
         </header>
+        {% if article.lead_image %}
+            <figure class="lead-photo" data-photo>
+                <img src="{{ article.lead_image.url }}"
+                     alt="{{ article.lead_image.alt }}"
+                     decoding="async"
+                     referrerpolicy="no-referrer">
+                <figcaption><a href="{{ article.lead_image.credit_url }}" rel="noreferrer">{{ article.lead_image.credit }}</a></figcaption>
+            </figure>
+        {% endif %}
         <div class="prose">{{ article_html }}</div>
         {% if article.sources %}
             <aside class="sources">
