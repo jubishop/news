@@ -17,7 +17,8 @@ import threading
 import time
 import unittest
 from unittest.mock import patch
-from urllib.error import HTTPError
+from urllib.parse import urlsplit
+from urllib.request import HTTPHandler, HTTPSHandler
 from urllib.response import addinfourl
 
 from news.worker import run
@@ -400,45 +401,73 @@ print(json.dumps(final))
 
     def test_images_that_do_not_load_are_removed_before_publication(self):
         self.server.add()
-        good, missing, page = ("https://images.example.com/" + name for name in ("good.jpg", "missing.jpg", "page"))
-        sniffed, limited = "https://cdn.example.com/photo?id=1", "https://images.example.com/busy.jpg"
+        good, missing, page, limited, moved, downgraded, guarded, signed = ("https://images.example.com/" + name for name in (
+            "good.jpg", "missing.jpg", "page", "busy.jpg", "moved.jpg", "downgraded.jpg", "guarded.jpg", "signed.jpg?w=1&s=x"))
+        sniffed, cleartext = "https://cdn.example.com/photo?id=1", "http://images.example.com/good.jpg"
         photo = {"url": good, "alt": "A verified photo", "credit": "Example", "credit_url": "https://example.com/gallery"}
-        first = dict(ARTICLE, lead_image=photo, body_markdown=(
-            "Intro.\n\n![Good photo](" + good + ")\n\n![Missing photo](" + missing + ' "Title")\n\n'
-            "Middle.\n\n![A web page](<" + page + ">)\n\n![Untyped photo](" + sniffed + ")\n\nEnd."))
+        kept = ["![Good photo](" + good + ")", "![Untyped photo](" + sniffed + ")", "![Moved photo](" + moved + ")",
+                "![Guarded photo](" + guarded + ")", "![Signed photo](" + signed.replace("&", "&amp;") + ")"]
+        removed = ["![Missing photo](" + missing + ' "Title")', "![A web page](<" + page + ">)",
+                   "![Downgraded photo](" + downgraded + ")", "![Local file](file:///etc/hosts)",
+                   "![Cleartext photo](" + cleartext + ")"]
+        first = dict(ARTICLE, lead_image=photo, body_markdown="\n\n".join(["Intro.", *kept[:1], *removed, *kept[1:], "End."]))
         second = dict(ARTICLE, title="Second story", lead_image=dict(photo, url=missing))
         rate_limited = dict(ARTICLE, title="Busy host", lead_image=dict(photo, url=limited))
+        # An unusable optional photo must not discard the story with it.
+        unusable = dict(ARTICLE, title="Unusable photo", lead_image=dict(photo, url=cleartext, credit=""))
         self.fake_config["result"] = dict(RESULT, articles=[
-            first, second, dict(ARTICLE, title="Text only", lead_image=None), rate_limited])
+            first, second, dict(ARTICLE, title="Text only", lead_image=None), rate_limited, unusable])
+        image = (200, {"Content-Type": "image/jpeg"}, b"\xff\xd8\xff")
+        responses = {
+            page: (200, {"Content-Type": "text/html"}, b"<html>"),
+            sniffed: (200, {"Content-Type": "application/octet-stream"}, b"\x89PNG\r\n\x1a\n"),
+            missing: (404, {}, b""),
+            # Rate limits and bot blocking say nothing about whether the image exists.
+            limited: (429, {}, b""),
+            guarded: (403, {}, b""),
+            moved: (302, {"Location": good}, b""),
+            downgraded: (302, {"Location": cleartext}, b""),
+        }
         requested = []
 
-        def fetch(request, timeout):
+        def respond(request):
             requested.append(request.full_url)
             self.assertIsNone(request.get_header("Referer"))
-            self.assertLessEqual(timeout, 10)
-            if request.full_url in (missing, limited):
-                # A rate limit says nothing about whether the image exists.
-                code = 404 if request.full_url == missing else 429
-                raise HTTPError(request.full_url, code, "Unavailable", Message(), io.BytesIO())
-            kind, data = {good: ("image/jpeg", b"\xff\xd8\xff"), page: ("text/html", b"<html>"),
-                          sniffed: ("application/octet-stream", b"\x89PNG\r\n\x1a\n")}[request.full_url]
+            self.assertLessEqual(request.timeout, 10)
+            self.assertNotIn("&amp;", request.full_url)
+            status, fields, data = responses.get(request.full_url, image)
             headers = Message()
-            headers["Content-Type"] = kind
-            return addinfourl(io.BytesIO(data), headers, request.full_url, 200)
+            for name, value in fields.items():
+                headers[name] = value
+            response = addinfourl(io.BytesIO(data), headers, request.full_url, status)
+            response.msg = "Fixture"
+            return response
 
-        with patch("urllib.request.urlopen", side_effect=fetch):
+        real_http_open = HTTPHandler.http_open
+
+        def http_open(handler, request):
+            if urlsplit(request.full_url).hostname in ("127.0.0.1", "localhost"):
+                return real_http_open(handler, request)
+            return respond(request)
+
+        with (patch.object(HTTPSHandler, "https_open", autospec=True, side_effect=lambda handler, request: respond(request)),
+              patch.object(HTTPHandler, "http_open", autospec=True, side_effect=http_open)):
             self.assertEqual(self.execute(), 0)
-        self.assertEqual(sorted(set(requested)), sorted({good, missing, page, sniffed, limited}))
-        self.assertEqual(len(requested), 5)
+        self.assertEqual(sorted(requested), sorted([good, missing, page, sniffed, limited, moved, good, downgraded,
+                                                    guarded, signed]))
         delivered, = self.server.results
-        first, second, third, fourth = delivered["articles"]
-        self.assertEqual(fourth["lead_image"]["url"], limited)
+        first, second, third, fourth, fifth = delivered["articles"]
+        self.assertEqual(fifth["title"], "Unusable photo")
+        self.assertNotIn("lead_image", fifth)
         self.assertEqual(first["lead_image"], photo)
-        self.assertEqual(first["body_markdown"], (
-            "Intro.\n\n![Good photo](" + good + ")\n\n\n\nMiddle.\n\n\n\n![Untyped photo](" + sniffed + ")\n\nEnd."))
+        for markdown in ["Intro.", "End.", *kept]:
+            self.assertIn(markdown, first["body_markdown"])
+        for markdown in removed:
+            self.assertNotIn(markdown, first["body_markdown"])
         self.assertNotIn("lead_image", second)
         self.assertNotIn("lead_image", third)
         self.assertEqual(third["body_markdown"], ARTICLE["body_markdown"])
+        self.assertEqual(fourth["lead_image"]["url"], limited)
 
     def test_invalid_dates_report_the_validation_error_to_later_attempts(self):
         self.server.add()

@@ -80,7 +80,8 @@ ARTICLE_SCHEMA = object_schema({
     **{key: TEXT for key in ("title", "summary", "body_markdown")},
     **{key: DATE for key in DATE_FIELDS},
     "sources": {"type": "array", "items": object_schema({"title": TEXT, "url": TEXT})},
-    "lead_image": {"anyOf": [object_schema({key: TEXT for key in ("url", "alt", "credit", "credit_url")}),
+    "lead_image": {"anyOf": [object_schema({"url": {"type": "string", "pattern": "^https://"},
+                                            **{key: TEXT for key in ("alt", "credit", "credit_url")}}),
                              {"type": "null"}]},
 })
 RESULT_SCHEMA = object_schema({
@@ -111,6 +112,16 @@ def article_dates(article):
     return article
 
 
+def usable_lead_image(article):
+    # An unusable optional photo should not discard the story with it.
+    if isinstance(article, dict) and article.get("lead_image") is not None:
+        try:
+            v.lead_image(article["lead_image"])
+        except Problem:
+            return {**article, "lead_image": None}
+    return article
+
+
 def validate_result(value):
     v.object_fields(value, ("outcome", "articles", "reason", "error"), ("outcome", "articles", "reason", "error"))
     outcome, articles = value["outcome"], value["articles"]
@@ -118,7 +129,7 @@ def validate_result(value):
         raise Problem("Invalid agent outcome.")
     if not isinstance(articles, list) or len(articles) > 20 or bool(articles) != (outcome == "published"):
         raise Problem("Published results require 1–20 articles; other outcomes require none.")
-    articles = [v.article(article_dates(article)) for article in articles]
+    articles = [v.article(usable_lead_image(article_dates(article))) for article in articles]
     v.text(value["reason"], "reason", 4000, empty=True)
     result = {"outcome": outcome, "articles": articles}
     if outcome == "nothing_to_publish":

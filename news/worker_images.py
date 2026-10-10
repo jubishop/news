@@ -5,11 +5,14 @@ import re
 from urllib import error, request
 
 from markdown_it.common.normalize_url import normalizeLink
+from markdown_it.common.utils import unescapeAll
+
+from . import validation as v
 
 TIMEOUT = 10
-# Rate limits, outages, and timeouts do not show that an image is gone; keep it,
-# and let the page remove it if it still fails for a reader.
-INCONCLUSIVE = (408, 425, 429, 500, 502, 503, 504)
+# Bot blocking, rate limits, outages, and timeouts do not show that an image is
+# gone; keep it, and let the page remove it if it still fails for a reader.
+INCONCLUSIVE = (401, 403, 408, 425, 429, 500, 502, 503, 504)
 # Readers' browsers fetch photos directly, without a referrer; check the same way.
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 "
@@ -26,11 +29,24 @@ def image_bytes(head):
             or (head[:4] == b"RIFF" and head[8:12] == b"WEBP") or head[4:8] == b"ftyp")
 
 
+class HTTPSRedirects(request.HTTPRedirectHandler):
+    # Pages render only HTTPS images; refusing other hops also keeps model-chosen
+    # URLs from reaching local files or cleartext hosts.
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if v.url(newurl, image=True):
+            return super().redirect_request(req, fp, code, msg, headers, newurl)
+        return None
+
+
 def loads(url, checked):
+    # Request exactly what the page renders: Markdown unescapes, then encodes.
+    target = normalizeLink(unescapeAll(url))
+    if url not in checked and not v.url(target, image=True):
+        checked[url] = False
     if url not in checked:
         try:
-            req = request.Request(normalizeLink(url), headers=HEADERS)
-            with request.urlopen(req, timeout=TIMEOUT) as response:
+            req = request.Request(target, headers=HEADERS)
+            with request.build_opener(HTTPSRedirects).open(req, timeout=TIMEOUT) as response:
                 head = response.read(16)
                 checked[url] = 200 <= response.status < 300 and (
                     response.headers.get_content_type().startswith("image/") or image_bytes(head))
