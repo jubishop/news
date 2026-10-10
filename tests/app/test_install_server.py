@@ -20,7 +20,7 @@ class InstallerTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
-        for executable in ("sh", "mkdir", "ln", "mv", "cat"):
+        for executable in ("sh", "mkdir", "ln", "mv", "cat", "rm"):
             source = Path(shutil.which(executable)).resolve()
             dependencies = subprocess.check_output(["ldd", str(source)], text=True)
             for library in re.findall(r"(/[^\s()]+)", dependencies):
@@ -30,6 +30,8 @@ class InstallerTests(unittest.TestCase):
             "etc/news", "etc/systemd/system", "run/lock", "dev",
             "opt/news/releases/fixture/news", "opt/news/releases/fixture/ops/systemd",
             "opt/news/releases/fixture/.venv/bin", "var/lib/news", "var/lib/news-backup",
+            "opt/news/releases/previous/news", "opt/news/releases/older/news",
+            "opt/news/releases/failed/news",
         ):
             (self.root / directory).mkdir(parents=True, exist_ok=True)
         (self.root / "dev/null").touch()
@@ -122,6 +124,19 @@ exit 0
         )]
         self.assertEqual(positions, sorted(positions))
         self.assertEqual(os.readlink(self.root / "opt/news/current"), "/opt/news/releases/fixture")
+
+    def releases(self):
+        return sorted(path.name for path in (self.root / "opt/news/releases").iterdir())
+
+    def test_success_keeps_only_the_new_and_replaced_releases(self):
+        result, _ = self.install()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.releases(), ["fixture", "previous"])
+
+    def test_failed_deployment_keeps_every_release(self):
+        result, _ = self.install("health")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.releases(), ["failed", "fixture", "older", "previous"])
 
     def test_cannot_stop_writer_means_no_migration(self):
         result, events = self.install("stop")

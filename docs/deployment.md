@@ -165,9 +165,10 @@ Inspect the failed Actions run and the corresponding `news-deploy-*` journal.
 Follow [database recovery](server-operations.md#backups-and-recovery) before
 restarting a release after a schema failure. `/opt/news/current/REVISION`
 identifies the selected code, but only a successful deployment and health
-check establish that it is running. Release directories are retained for
-inspection; periodically remove old unused releases after checking the current
-link and keeping the prior working release.
+check establish that it is running. Failed release directories remain for
+inspection until the next successful deployment, which removes every release
+except itself and the release it replaced. Deployments run one at a time; do
+not upload a manual release while one is running.
 
 If only public HTTPS verification failed, the origin may already be healthy.
 Check DNS, TLS, and the proxy before retrying. Use **Run workflow** on `main`

@@ -74,4 +74,10 @@ fi
 systemctl start news-maintain.service
 systemctl enable --now news-maintain.timer news-backup.timer news-restore-check.timer
 stopped=false
+# Keep this release and the one it replaced. GitHub deployments run one at a time.
+for old in /opt/news/releases/*; do
+    if [ -d "$old" ] && [ "$old" != "$release" ] && [ "$old" != "$previous" ]; then
+        rm -rf -- "$old" || echo "Warning: could not remove $old" >&2
+    fi
+done
 echo 'News deployed. Database migrations, health check, and maintenance completed.'
