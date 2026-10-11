@@ -74,8 +74,9 @@ inside the active checkout; `.venv`, `var`, and nested worktrees are excluded.
 
 Production uses the shared VPS runtime, `/opt/python/current/bin/python3`, as
 described in `~/projects/vps-infra/docs/python-runtime.md`. That project's
-`python-update` keeps it on the newest final CPython release; the owner chose
-automatic latest-stable updates on October 9, 2026, replacing News's
+`python-update` moves it to the newest final CPython release whose minor series
+has been out for at least 14 days, while patch releases apply right away. The
+owner chose these automatic updates on October 9, 2026, replacing News's
 dedicated 3.14 interpreter. Keep Ubuntu's system Python unchanged because other
 host services can depend on it. The SSH receiver and `ops/install-server` use
 the shared path, and each release's `.venv` is built from it; installation

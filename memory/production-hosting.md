@@ -20,8 +20,9 @@ Track rollout progress and remaining acceptance work in GitHub Issues.
   `/opt/python/current/bin/python3`, then CPython 3.14.8. Release 26ce865 was
   the first built from it, and `news-rebuild-environment` then moved it to
   `.venv-3.14.8`. News is registered in the host's `/etc/python-update.json`.
-  Ubuntu's `/usr/bin/python3` remains 3.12.3. See the
-  [runtime procedure](../docs/server-operations.md#production-python).
+  Live checks on October 11, 2026 confirmed that registration and the
+  `current` 3.14.8 update status. Ubuntu's `/usr/bin/python3` remains 3.12.3.
+  See the [runtime procedure](../docs/server-operations.md#production-python).
 - The retired dedicated CPython 3.14.7 under `/opt/news/python`, with
   `/opt/news/python3.14` and uv in `/opt/news/tools`, was removed on
   October 9, 2026 (Pacific). Release 72b25c9's deployment first pruned the
