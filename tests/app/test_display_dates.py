@@ -92,8 +92,9 @@ class ReadableDatePages(ServerFixture):
         ]))
         self.assertEqual(response.status_code, 200)
         articles = dict(zip(coverage, response.json["article_ids"]))
+        # The feed's day header carries the publish date; matching article dates add none.
+        self.assertIn('Today ·</span> <time datetime="2026-09-26">Saturday, Sep 26</time>', self.page("/"))
         published = '<time datetime="2026-09-26">Sat, Sep 26</time>'
-        self.assertIn(published, self.page("/"))
         expected = {
             "Within one month": '<time datetime="2026-09-01">Sep 1</time>–<time datetime="2026-09-30">30</time>',
             "Across two months": '<time datetime="2026-09-28">Sep 28</time> – <time datetime="2026-10-04">Oct 4</time>',
@@ -107,7 +108,7 @@ class ReadableDatePages(ServerFixture):
                 self.assertIn(f"<span>Covers {markup}</span>", html)
                 self.assertNotIn("Coverage", html)
         self.at("2027-01-05T12:00:00-08:00")
-        self.assertIn('<time datetime="2026-09-26">Sat, Sep 26, 2026</time>', self.page("/"))
+        self.assertIn('<time datetime="2026-09-26">Saturday, Sep 26, 2026</time>', self.page("/"))
         self.assertIn(
             '<time datetime="2026-09-01">Sep 1</time>–<time datetime="2026-09-30">30, 2026</time>',
             self.page("/articles/" + articles["Within one month"]),

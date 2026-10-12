@@ -10,14 +10,8 @@
     <meta name="twitter:card" content="summary">
 {% endblock %}
 {% block content %}
-    <section class="section-heading">
-        <div>
-            <p class="eyebrow">The latest dispatches</p>
-            <h1>Your daily perspective.</h1>
-            <p class="muted">Stories worth your time, from reporters on your beat.</p>
-        </div>
-        <span class="edition-count">{{ total }} {% if total == 1 %}story{% else %}stories{% endif %}</span></section>
-    <form method="get" class="filter-bar" aria-label="Filter stories">
+    <h1 class="sr-only">Latest edition</h1>
+    <form method="get" class="filter-bar" aria-label="Filter stories" data-feed-filter>
         <label for="reporter-filter">From the desk of</label><select id="reporter-filter" name="reporter_id">
             <option value="">All reporters</option>
             {% for byline in bylines %}<option value="{{ byline.id }}"
@@ -26,25 +20,26 @@
        name="q"
        type="search"
        placeholder="Search the archive"
-       value="{{ request.args.get('q', '') }}"><button class="button quiet" type="submit">Apply</button>
+       value="{{ request.args.get('q', '') }}"><button class="button quiet" type="submit" data-filter-apply>Apply</button>
 {% if request.args.get("q") or request.args.get("reporter_id") %}<a href="/">Clear</a>
-{% endif %}
+{% endif %}<span class="edition-count">{{ total }} {% if total == 1 %}story{% else %}stories{% endif %}</span>
 </form>
 {% if overdue %}
     <p class="status-line"><span class="status-dot warning"></span>{{ overdue }} {% if overdue == 1 %}scheduled report is{% else %}scheduled reports are{% endif %} late. The edition will update when reporting arrives.</p>
 {% endif %}
 {% if articles %}
-    <div class="story-list">
-        {% for article in articles %}
-            <article class="story">
-                <div class="story-text">
-                    <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a><span>{{ article.article_date|short_date }}</span></div>
-                    <h2><a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a></h2>
-                    <p>{{ article.summary }}</p>
-                    <a class="read-story"
-                       href="{{ url_for('pages.article',identity=article.id) }}">Read the story <span aria-hidden="true">→</span></a>
-                </div>
-                {% if article.lead_image %}<a class="story-photo"
+    {% for day in days %}
+        <section class="day">
+            <h2>{% if day.label %}<span class="day-label">{{ day.label }} ·</span> {% endif %}{{ day.date|long_date }}</h2>
+            {% for article in day.articles %}
+                <article class="story">
+                    <div class="story-text">
+                        <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a>
+                            {%- if article.article_date != day.date.isoformat() %} · {{ article.article_date|short_date }}{% endif %}</div>
+                        <h3><a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a></h3>
+                        <p>{{ article.summary }}</p>
+                    </div>
+                    {% if article.lead_image %}<a class="story-photo"
    href="{{ url_for('pages.article',identity=article.id) }}"
    tabindex="-1"
    aria-hidden="true"
@@ -53,9 +48,10 @@
      loading="lazy"
      decoding="async"
      referrerpolicy="no-referrer"></a>{% endif %}
-            </article>
-        {% endfor %}
-    </div>
+                </article>
+            {% endfor %}
+        </section>
+    {% endfor %}
     <nav class="pagination" aria-label="Archive pages">
         {% if page > 1 %}<a href="{{ url_for('pages.feed',page=page-1,reporter_id=request.args.get('reporter_id',''),q=request.args.get('q','')) }}">← Newer stories</a>
         {% endif %}<span>Page {{ page }}</span>

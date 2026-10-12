@@ -1,6 +1,6 @@
 """HTTP adaptation; state transitions live in the domain modules."""
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 import json
 from pathlib import Path
 
@@ -37,6 +37,23 @@ def body():
     return data
 
 
+def days(articles):
+    """Consecutive feed articles that share a Pacific publish date, newest first.
+
+    Each page groups its own articles, so a page that starts partway through a
+    day repeats that day's header.
+    """
+    today = clock.today()
+    labels = {today: "Today", today - timedelta(days=1): "Yesterday"}
+    sections = []
+    for article in articles:
+        day = datetime.fromtimestamp(article["published_at"], clock.PACIFIC).date()
+        if not sections or sections[-1]["date"] != day:
+            sections.append({"date": day, "label": labels.get(day), "articles": []})
+        sections[-1]["articles"].append(article)
+    return sections
+
+
 @pages.get("/")
 def feed():
     with transaction(database()) as connection:
@@ -51,7 +68,9 @@ def feed():
             WHERE expected_date<? AND state IN ('pending','running','retry_wait') AND p.deleted_at IS NULL""",
             (clock.today().isoformat(),),
         ).fetchone()[0]
-    return render_template("feed.html", **results, bylines=bylines, overdue=overdue)
+    return render_template(
+        "feed.html", **results, days=days(results["articles"]), bylines=bylines, overdue=overdue
+    )
 
 
 @pages.get("/articles/<identity>")

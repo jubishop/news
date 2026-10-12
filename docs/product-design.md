@@ -141,7 +141,39 @@ Accepted on September 25, 2026: the feed shows each article's title, short
 summary, reporter name, and date, with a link to a separate full article page.
 The owner agreed to the recommended layout; no further reason was stated.
 This keeps long reports from overwhelming the feed. The tradeoff is an
-additional navigation step to read an article in full.
+additional navigation step to read an article in full. The
+[front page day sections](#front-page-day-sections) decision of October 12,
+2026 revises how the feed shows dates.
+
+### Front page day sections
+
+Accepted on October 12, 2026, in the
+[October UI review](https://github.com/jubishop/news/issues/30): the front page
+groups stories into day sections by the Pacific date each story was published,
+in the feed's existing newest-first order. Headers read `Today · Monday, Oct 12`,
+`Yesterday · Sunday, Oct 11`, then `Saturday, Oct 10`. A page that starts
+partway through a day repeats that day's header, and filtered and search
+results use the same sections. The hero block is removed, so the page starts
+with the reporter filter and search, which show the story count.
+
+This revises the September 25, 2026 feed decision above. Dates now come from
+the day headers, and the kicker adds the worker-supplied article date only when
+it differs from the publish day, as in `AI DEVELOPMENTS · Sat, Oct 10`. Each
+story row has a text column of about 680px and a photo column of about 300px
+that stays reserved without a photo, so headlines and summaries wrap the same
+way. The headline replaces the "Read the story" link, and the photo keeps its
+link. With JavaScript, choosing a reporter applies the filter at once and
+Enter submits a search; without it, an Apply button does both.
+
+The owner chose the recommended option; no further reason was stated. The
+review found that the hero pushed the first headline about 550px down at
+1440×900, that thirty stories formed one flat list without day boundaries,
+that text-only summaries ran about 170 characters per line, and that headline
+width changed with the photo. The tradeoff is that text-only rows leave the
+photo column empty, and the publish day, not the article date, organizes the
+page. Named topic sections remain deferred, and a day's stories are not
+grouped by reporter. [Issue #32](https://github.com/jubishop/news/issues/32)
+lists the layout criteria.
 
 ### Dates and text size
 
