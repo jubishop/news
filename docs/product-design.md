@@ -227,8 +227,10 @@ The dark scheme keeps the newspaper look with a warm near-black paper,
 off-white ink, and lighter accent and green colors. Native controls, such as
 menus, checkboxes, and date pickers, follow the same setting. Every color in
 the stylesheet is a token that both schemes define. Body, muted, link, accent,
-badge, and notice text reach at least 4.5:1 contrast in both. The light scheme
-is unchanged. The tradeoff is that a reader cannot choose a scheme for this
+badge, notice, and placeholder text reach at least 4.5:1 contrast in both, and
+dark form-field borders and focus rings reach 3:1. The light scheme is
+unchanged apart from placeholders, which now use the muted text color. The
+tradeoff is that a reader cannot choose a scheme for this
 site alone; only the device setting changes it. Photos and the site icon look
 the same in both schemes.
 [Issue #35](https://github.com/jubishop/news/issues/35) records the details.

@@ -34,6 +34,17 @@ TEXT_PAIRS = [
     ("tint-ink", "tint", "the schedule preview"),
 ]
 
+# Borders and rings that mark controls need 3:1 against what surrounds them
+# (WCAG 1.4.11). Light field borders predate dark mode and are not covered here.
+NON_TEXT_PAIRS = [
+    ("field-border", "paper", ("dark",), "the feed's transparent search and reporter fields"),
+    ("field-border", "panel", ("dark",), "form fields on the editor"),
+    ("accent", "paper", ("light", "dark"), "focus rings"),
+    ("accent", "panel", ("light", "dark"), "focus rings on cards and the calendar's Today ring"),
+]
+# Tokens that are not colors.
+FONTS = {"serif", "sans"}
+
 # CSS Color 4 named and system colors; transparent and currentColor are exempt.
 NAMED_COLORS = set("""
 aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue
@@ -104,6 +115,8 @@ class ColorSchemes(unittest.TestCase):
     def test_dark_scheme_redefines_every_light_color(self):
         palettes = schemes()
         light, dark = colors(palettes["light"]), colors(palettes["dark"])
+        # A light color written another way would otherwise leak into dark unchecked.
+        self.assertEqual(set(palettes["light"]) - FONTS, set(light), "Every light color must be hex")
         self.assertEqual(set(palettes["dark"]), set(light), "Dark tokens must match the light colors")
         self.assertEqual(set(dark), set(light), "Every dark token must be a hex color")
         for surface in ("paper", "panel"):
@@ -120,6 +133,14 @@ class ColorSchemes(unittest.TestCase):
                 with self.subTest(scheme=scheme, text=text, background=background, used_for=used_for):
                     ratio = contrast(palette[text], palette[background])
                     self.assertGreaterEqual(ratio, 4.5, f"{ratio:.2f}:1")
+
+    def test_control_borders_and_focus_rings_reach_three_to_one(self):
+        palettes = {scheme: colors(tokens) for scheme, tokens in schemes().items()}
+        for border, background, applies, used_for in NON_TEXT_PAIRS:
+            for scheme in applies:
+                with self.subTest(scheme=scheme, border=border, background=background, used_for=used_for):
+                    ratio = contrast(palettes[scheme][border], palettes[scheme][background])
+                    self.assertGreaterEqual(ratio, 3, f"{ratio:.2f}:1")
 
     def test_colors_appear_only_in_the_token_blocks(self):
         _, rest = read()

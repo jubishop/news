@@ -797,6 +797,10 @@ class BrowserJourney(unittest.TestCase):
                             self.assertEqual(page.evaluate(probe), [
                                 css_rgb(palette["paper"]), css_rgb(palette["ink"]), canvas_text[scheme],
                             ])
+                            # Browser placeholder gray is too faint on dark fields; placeholders use muted text.
+                            placeholders = page.evaluate("""() => [...document.querySelectorAll("[placeholder]")]
+                                .map(field => getComputedStyle(field, "::placeholder").color)""")
+                            self.assertEqual(set(placeholders) - {css_rgb(palette["muted"])}, set())
                             page.screenshot(path=str(directory / f"{scheme}-{name}.png"), full_page=True)
                     context.close()
             finally:

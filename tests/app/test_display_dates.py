@@ -104,7 +104,7 @@ class ReadableDatePages(ServerFixture):
         for title, markup in expected.items():
             with self.subTest(title=title):
                 html = self.page("/articles/" + articles[title])
-                self.assertIn(f'<span class="meta-divider">/</span> {published}', html)
+                self.assertIn(f'<span class="meta-divider" aria-hidden="true">/</span> {published}', html)
                 self.assertIn(f"<span>Covers {markup}</span>", html)
                 self.assertNotIn("Coverage", html)
         self.at("2027-01-05T12:00:00-08:00")
