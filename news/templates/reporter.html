@@ -82,7 +82,7 @@
             {% if reporter and reporter.fixed_dates %}
                 <p class="field-label">Original dates already due</p>
                 <p class="field-help">Dates already due cannot be changed or deleted. They stay in the assignment to preserve reporting history. See their results below.</p>
-                <ul>{% for day in reporter.fixed_dates %}<li>{{ day }}<input type="hidden" name="dates" value="{{ day }}"></li>{% endfor %}</ul>
+                <ul>{% for day in reporter.fixed_dates %}<li>{{ day|short_date }}<input type="hidden" name="dates" value="{{ day }}"></li>{% endfor %}</ul>
             {% endif %}
             <div role="group" aria-labelledby="dates-label">
                 <p class="field-label" id="dates-label">{{ 'Future assignment dates' if reporter and reporter.fixed_dates else 'Assignment dates' }}</p>
@@ -145,7 +145,7 @@
             <div class="history-row">
                 <div>
                     <a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a>
-                    <p class="muted">{{ article.article_date }}</p>
+                    <p class="muted">{{ article.article_date|short_date }}</p>
                 </div>
                 <form method="post"
                       action="{{ url_for('pages.article_state',identity=article.id,action='delete') }}"
@@ -168,7 +168,7 @@
     <p class="eyebrow">Reporting history</p>
     {% for run in runs %}
         <details class="run-row">
-            <summary><span>{{ run.expected_date }}</span><span>{{ run.kind|replace('_', ' ') }}</span><span class="badge {% if run.late or run.state == 'failed' %}danger{% endif %}">{{ run.state|replace('_', ' ') }}{{ ' · late' if run.late else '' }}</span></summary>
+            <summary><span>{{ run.expected_date|short_date }}</span><span>{{ run.kind|replace('_', ' ') }}</span><span class="badge {% if run.late or run.state == 'failed' %}danger{% endif %}">{{ run.state|replace('_', ' ') }}{{ ' · late' if run.late else '' }}</span></summary>
             {% if run.closed_reason %}
                 <p>{{ run.closed_reason }}</p>
             {% endif %}
@@ -185,7 +185,7 @@
                     {% if attempt.reason or attempt.error_message %}
                         <p>{{ attempt.reason or attempt.error_message }}</p>
                     {% endif %}
-                    {% if attempt.snapshot.assignment_dates %}<p>Assignment dates: {{ attempt.snapshot.assignment_dates|join(', ') }}</p>{% endif %}
+                    {% if attempt.snapshot.assignment_dates %}<p>Assignment dates: {{ attempt.snapshot.assignment_dates|map('short_date')|join('; ') }}</p>{% endif %}
                     <details>
                         <summary>Instructions used</summary>
                         <pre class="prompt-history">{{ attempt.snapshot.prompt }}</pre>

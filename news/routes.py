@@ -228,7 +228,11 @@ def preview():
     schedules.validate_change(schedule, reporter["schedule"] if reporter else None)
     tomorrow = clock.today() + timedelta(days=1)
     day = schedules.next_date(schedule, tomorrow)
-    return jsonify(next_date=day.isoformat() if day else None, cadence_label=schedules.label(schedule))
+    return jsonify(
+        next_date=day.isoformat() if day else None,
+        next_date_label=clock.short_date(day) if day else None,
+        cadence_label=schedules.label(schedule),
+    )
 
 
 @pages.get("/newsroom/trash")

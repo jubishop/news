@@ -28,7 +28,7 @@
         {% for article in articles %}
             <article class="story">
                 <div class="story-text">
-                    <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a><span>{{ article.article_date }}</span></div>
+                    <div class="story-meta"><a href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">{{ article.reporter_name }}</a><span>{{ article.article_date|short_date }}</span></div>
                     <h2><a href="{{ url_for('pages.article',identity=article.id) }}">{{ article.title }}</a></h2>
                     <p>{{ article.summary }}</p>
                     <a class="read-story"

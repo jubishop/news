@@ -143,6 +143,23 @@ The owner agreed to the recommended layout; no further reason was stated.
 This keeps long reports from overwhelming the feed. The tradeoff is an
 additional navigation step to read an article in full.
 
+### Dates and text size
+
+Accepted on October 12, 2026, in the
+[October UI review](https://github.com/jubishop/news/issues/30): pages show
+calendar dates as readable Pacific dates, such as `Sun, Oct 11`, instead of
+ISO dates such as `2026-10-11`, and add the year only outside the current
+Pacific year. Article coverage reads as a range, such as `Covers Oct 5–11`.
+All visible text is at least 12px at every width.
+[Issue #31](https://github.com/jubishop/news/issues/31) lists each format.
+
+The owner chose the recommended option; no further reason was stated. The
+review found that ISO dates read as machine output in a newspaper-style design
+and that much metadata used 9–11px text. Stored values, JSON fields, worker
+payloads, date inputs, and `datetime` attributes keep ISO dates, and event
+timestamps keep their existing format. The tradeoff is that larger metadata
+takes more room, most visibly in the phone masthead.
+
 ### Editorial guidance through prompt edits
 
 Accepted on September 24, 2026: the reporter's prompt contains its editorial

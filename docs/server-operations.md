@@ -60,7 +60,7 @@ Do not bind this fixture to a public interface.
 `bin/check-application` runs API/lifecycle tests, a real local Restic backup and restore,
 a browser journey, and deployment shell lint. Tests fake Cloudflare, R2, and
 Resend at their network boundaries. Browser tests cover reporter controls,
-Trash/restore, public reading, and mobile layout. Screenshots go under ignored
+Trash/restore, public reading, mobile layout, and the 12px minimum text size. Screenshots go under ignored
 `test-results/` in this checkout. No test uses real service credentials or sends
 email. Test runs are sequential; the concurrency case alone deliberately races
 two requests against one temporary SQLite database.

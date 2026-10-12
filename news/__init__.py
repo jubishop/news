@@ -115,6 +115,12 @@ def create_app(settings=None):
             "error.html", message=error.description, status=error.code
         ), error.code
 
-    app.jinja_env.filters["event_time"] = clock.display_time
+    app.jinja_env.filters.update(
+        event_time=clock.display_time,
+        # Calendar dates render inside <time datetime="YYYY-MM-DD"> elements.
+        short_date=clock.short_date_html,
+        long_date=clock.long_date_html,
+        date_range=clock.date_range_html,
+    )
     app.jinja_env.globals.update(pacific_today=clock.today)
     return app
