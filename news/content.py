@@ -51,6 +51,17 @@ def article(connection, identity):
     return decode(row)
 
 
+def more_from(connection, article, limit=3):
+    """The reporter's other readable articles, newest first in feed order."""
+    return many(
+        connection,
+        """SELECT id,title,article_date FROM articles
+        WHERE reporter_id=? AND id<>? AND deleted_at IS NULL
+        ORDER BY published_at DESC,id DESC LIMIT ?""",
+        (article["reporter_id"], article["id"], limit),
+    )
+
+
 def archive_version(connection, expected=None):
     if expected is not None and not re.fullmatch(r"[0-9a-f]{32}", expected):
         raise Problem("Invalid archive version.")

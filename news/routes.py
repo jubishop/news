@@ -58,10 +58,12 @@ def feed():
 def article(identity):
     with transaction(database()) as connection:
         row = content.article(connection, identity)
+        more_from = content.more_from(connection, row)
     return render_template(
         "article.html",
         article=row,
         article_html=content.render_markdown(row["body_markdown"]),
+        more_from=more_from,
     )
 
 
