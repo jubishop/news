@@ -11,6 +11,14 @@ for (const image of document.querySelectorAll("[data-photo] img, .prose img")) {
   });
 }
 
+// Choosing a reporter applies the feed filter at once and Enter submits a
+// search, so Apply is only needed without JavaScript.
+const filter = document.querySelector("[data-feed-filter]");
+if (filter) {
+  filter.querySelector("[data-filter-apply]").hidden = true;
+  filter.elements.reporter_id.addEventListener("change", () => filter.requestSubmit());
+}
+
 for (const form of document.querySelectorAll("form[data-confirm]")) {
   form.addEventListener("submit", (event) => {
     if (!window.confirm(form.dataset.confirm)) event.preventDefault();

@@ -100,10 +100,11 @@ proxy, store, or back up images. Captions and credits can be ordinary Markdown.
 A [lead photo](product-design.md#structured-article-storage) needs all four fields:
 an absolute HTTPS `url`, plain-text `alt`, a plain-text `credit`, and an HTTP
 or HTTPS `credit_url` for the page where it appears. The front page shows it
-as a cropped thumbnail beside the summary, or above the headline on narrow
-screens. The article page shows it, uncropped up to a maximum height, above
-the body with its linked credit. Both load without a referrer. Articles
-without one keep the text-only layout. A photo that fails to load in the
+as a cropped thumbnail in a fixed column beside the summary, or above the
+kicker on narrow screens. The article page shows it, uncropped up to a maximum
+height, above the body with its linked credit. Both load without a referrer.
+Front-page stories without one leave the photo column empty, so their text
+wraps like a story with a photo. A photo that fails to load in the
 browser is removed from the page, as is a failed inline image.
 
 Sources are structured title/URL pairs. An empty source list is permitted:
@@ -128,7 +129,7 @@ worker. Server validation cannot verify a claim or the quality of its research.
 
 | Method and route | Purpose |
 | --- | --- |
-| `GET /` | Newest-first feed, search, reporter filter, pagination, and concise late-report status. |
+| `GET /` | Newest-first feed in Pacific publish-day sections, search, reporter filter with the matching story count, pagination, and concise late-report status. |
 | `GET /articles/{id}` | Full Markdown article and sources. |
 | `GET /favicon.ico` | 32×32 favicon as PNG data (`image/png`), rendered from `/static/icon.svg`. |
 | `GET /apple-touch-icon.png` | 180×180 Home Screen icon, rendered from `/static/icon.svg`. |

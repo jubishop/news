@@ -345,7 +345,7 @@ class BrowserJourney(unittest.TestCase):
                                 self.assertGreaterEqual(
                                     current["y"], previous["y"] + previous["height"]
                                 )
-                            for selector in ("h2", "p"):
+                            for selector in ("h3", "p"):
                                 styles = stories.locator(selector).evaluate_all(
                                     """elements => elements.map(element => {
                                         const style = getComputedStyle(element);
@@ -353,6 +353,7 @@ class BrowserJourney(unittest.TestCase):
                                                 style.fontWeight, style.lineHeight];
                                     })"""
                                 )
+                                self.assertEqual(len(styles), count)
                                 self.assertTrue(
                                     all(style == styles[0] for style in styles),
                                     f"Unequal {selector} typography: {styles}",
@@ -368,7 +369,7 @@ class BrowserJourney(unittest.TestCase):
                 expect(page.get_by_label("From the desk of")).to_have_value(reporter)
                 story = page.get_by_role("article").first
                 title = story.get_by_role("heading").inner_text()
-                story.get_by_role("link", name="Read the story").click()
+                story.get_by_role("link", name=title, exact=True).click()
                 expect(page.get_by_role("heading", name=title)).to_be_visible()
             finally:
                 browser.close()
@@ -442,13 +443,138 @@ class BrowserJourney(unittest.TestCase):
                         boxes = [box.bounding_box() for box in stories.all()]
                         self.assertTrue(all(box["x"] == boxes[0]["x"] and box["width"] == boxes[0]["width"] for box in boxes))
                         self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
-                story.get_by_role("link", name="Read the story").click()
+                story.get_by_role("link", name="Photographed story", exact=True).click()
                 expect(page.get_by_role("heading", name="Photographed story")).to_be_visible()
                 hero = page.get_by_role("img", name="Photo of the lead scene")
                 expect(hero).to_be_visible()
                 credit = page.get_by_role("link", name="Example Photo Desk")
                 expect(credit).to_have_attribute("href", "https://example.com/photos")
                 self.assertLess(hero.bounding_box()["y"], page.locator(".prose").bounding_box()["y"])
+            finally:
+                browser.close()
+
+    def test_front_page_starts_near_the_top_with_fixed_story_columns(self):
+        # Layout criteria are CSS-determined widths or leave room for CI's wider fallback serif.
+        headline = "Open-weight models close the gap on long-context reasoning benchmarks"
+        summary = "Researchers released results that change how practitioners approach the problem. " * 4
+        with preview() as fixture, sync_playwright() as playwright:
+            for day, lead_image in (("27", None), ("28", "https://images.example.com/lead.png")):
+                fixture.at(f"2026-09-{day}T12:00:00-07:00")
+                run = fixture.work()[0]["id"]  # The only due run, so no report is late.
+                photo = lead_image and {"url": lead_image, "alt": "Photo of the lead scene",
+                                        "credit": "Example Photo Desk", "credit_url": "https://example.com/photos"}
+                article = fixture.article(title=headline, summary=summary, lead_image=photo)
+                response = fixture.result(run, fixture.envelope(fixture.claim(run), articles=[article]))
+                self.assertEqual(response.status_code, 200)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page()
+                page.route("https://images.example.com/**",
+                           lambda route: route.fulfill(content_type="image/png", body=PNG))
+                for width, height in ((1440, 900), (390, 844)):
+                    with self.subTest(width=width):
+                        page.set_viewport_size({"width": width, "height": height})
+                        page.goto(fixture.base_url + "/")
+                        expect(page.locator(".status-line")).to_have_count(0)
+                        expect(page.get_by_role("heading", level=2).first).to_have_text("Today · Monday, Sep 28")
+                        stories = page.get_by_role("article").filter(has_text=headline)
+                        pictured, plain = stories.first, stories.last
+                        expect(pictured.locator("img")).to_be_visible()
+                        expect(plain.locator("img")).to_have_count(0)
+                        title = pictured.get_by_role("heading").bounding_box()
+                        photo = pictured.locator("img").bounding_box()
+                        if width == 1440:
+                            self.assertLessEqual(title["y"], 420)
+                            self.assertGreaterEqual(photo["x"], title["x"] + title["width"])
+                            for story in (pictured, plain):
+                                self.assertLessEqual(story.locator("p").bounding_box()["width"], 680)
+                        else:
+                            self.assertLessEqual(photo["y"] + photo["height"], title["y"])
+                            self.assertLessEqual(title["y"] + title["height"], height)
+                        self.assertEqual(title["width"], plain.get_by_role("heading").bounding_box()["width"])
+                        for story in (pictured, plain):
+                            text = story.locator(".story-text").bounding_box()
+                            self.assertLessEqual(story.locator("p").bounding_box()["width"], text["width"])
+                        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+            finally:
+                browser.close()
+
+    def test_filter_applies_immediately_with_javascript_and_through_apply_without(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            response = fixture.form("/newsroom/reporters", name="Sports desk",
+                                    prompt="Cover the home team.", cadence="daily")
+            sports = response.headers["Location"].rsplit("/", 1)[-1]
+            fixture.at("2026-09-27T12:00:00-07:00")
+            run = next(run["id"] for run in fixture.work() if run["reporter_id"] == sports)
+            articles = [fixture.article(title="Match report")]
+            fixture.result(run, fixture.envelope(fixture.claim(run), articles=articles))
+            fits = """input => {
+                const style = getComputedStyle(input);
+                const context = document.createElement("canvas").getContext("2d");
+                context.font = style.font;
+                const room = input.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+                return context.measureText(input.placeholder).width <= room;
+            }"""
+            browser = playwright.chromium.launch()
+            try:
+                for scripts in (True, False):
+                    context = browser.new_context(java_script_enabled=scripts)
+                    page = context.new_page()
+                    page.goto(fixture.base_url + "/")
+                    stories = page.get_by_role("article")
+                    expect(stories).to_have_count(3)
+                    apply = page.get_by_role("button", name="Apply")
+                    for width in (390, 320):
+                        with self.subTest(scripts=scripts, width=width):
+                            page.set_viewport_size({"width": width, "height": 844})
+                            self.assertTrue(page.get_by_label("Search stories").evaluate(fits))
+                            self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                    page.set_viewport_size({"width": 1280, "height": 900})
+                    reporter = page.get_by_label("From the desk of")
+                    if scripts:
+                        expect(apply).to_be_hidden()
+                        reporter.select_option(label="Sports desk")
+                    else:
+                        expect(apply).to_be_visible()
+                        reporter.select_option(label="Sports desk")
+                        expect(page).to_have_url(fixture.base_url + "/")
+                        apply.click()
+                    expect(page).to_have_url(f"{fixture.base_url}/?reporter_id={sports}&q=")
+                    expect(stories).to_have_count(1)
+                    expect(page.locator("form .edition-count")).to_have_text("1 story")
+                    reporter.select_option(label="All reporters")
+                    if scripts:
+                        expect(page).to_have_url(f"{fixture.base_url}/?reporter_id=&q=")
+                        expect(stories).to_have_count(3)
+                    page.get_by_label("Search stories").fill("curiosity")
+                    page.get_by_label("Search stories").press("Enter")
+                    expect(page).to_have_url(f"{fixture.base_url}/?reporter_id=&q=curiosity")
+                    expect(stories).to_have_count(1)
+                    expect(stories.get_by_role("heading")).to_have_text("A little curiosity goes a long way")
+                    context.close()
+            finally:
+                browser.close()
+
+    def test_long_reporter_names_wrap_in_phone_kickers(self):
+        name = "Correspondent" * 6  # 78 characters with nowhere to break.
+        with preview() as fixture, sync_playwright() as playwright:
+            response = fixture.form("/newsroom/reporters", name=name,
+                                    prompt="Report useful changes.", cadence="daily")
+            reporter = response.headers["Location"].rsplit("/", 1)[-1]
+            fixture.at("2026-09-27T12:00:00-07:00")
+            run = next(run for run in fixture.work() if run["reporter_id"] == reporter)["id"]
+            article = fixture.article(article_date="2026-09-20")  # The kicker adds the date.
+            response = fixture.result(run, fixture.envelope(fixture.claim(run), articles=[article]))
+            self.assertEqual(response.status_code, 200)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(viewport={"width": 390, "height": 844})
+                for path in ("/", f"/?reporter_id={reporter}"):
+                    with self.subTest(path=path):
+                        page.goto(fixture.base_url + path)
+                        expect(page.locator(".story-meta").first).to_contain_text("Sun, Sep 20")
+                        expect(page.get_by_role("article").get_by_role("link", name=name)).to_be_visible()
+                        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
             finally:
                 browser.close()
 
