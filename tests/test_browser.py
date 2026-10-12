@@ -110,9 +110,103 @@ class BrowserJourney(unittest.TestCase):
                         Path("test-results").mkdir(exist_ok=True)
                         calendar.screenshot(path=f"test-results/calendar-{width}.png")
                 page.goto(fixture.base_url + "/newsroom?month=2026-08")
-                expect(calendar.get_by_text("No upcoming reports this month.")).to_be_visible()
+                expect(calendar.get_by_text("Past reports for August 2026 are in each reporter's history.")).to_be_visible()
                 expect(calendar.locator("[data-calendar-date]")).to_have_count(31)
                 expect(calendar.get_by_role("link")).to_have_count(3)  # Navigation only.
+            finally:
+                browser.close()
+
+    def assert_padding_matches(self, calendar, last_date, trailing):
+        """Cells after the last day fill its week like the cells before the first day."""
+        cells = calendar.locator(".calendar-days > li")
+        leading = calendar.locator(".calendar-days > li.calendar-padding:first-child")
+        expect(leading).to_have_count(1)  # Compare with a real leading cell, not a trailing one.
+        after = calendar.locator(f'[data-calendar-date="{last_date}"] ~ li')
+        expect(after).to_have_count(trailing)
+        last = calendar.locator(f'[data-calendar-date="{last_date}"]').bounding_box()
+        sunday = calendar.locator(".calendar-weekdays span").nth(6).bounding_box()
+        style = "cell => [getComputedStyle(cell).backgroundColor, cell.textContent.trim()]"
+        self.assertEqual(cells.count() % 7, 0)
+        for index in range(trailing):
+            cell = after.nth(index)
+            expect(cell).to_have_class("calendar-padding")
+            self.assertEqual(cell.evaluate(style), leading.evaluate(style))
+            box = cell.bounding_box()
+            self.assertAlmostEqual(box["y"], last["y"], delta=1)
+            self.assertAlmostEqual(box["height"], last["height"], delta=1)
+        if trailing:
+            box = after.last.bounding_box()
+            self.assertAlmostEqual(box["x"] + box["width"], sunday["x"] + sunday["width"], delta=2)
+
+    def test_newsroom_lists_reporters_before_an_upcoming_calendar(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            # New reporters start tomorrow, so create them before moving to October 12.
+            weekly = fixture.reporter("weekly", weekdays=["mon"])
+            retired = fixture.reporter("weekly", weekdays=["tue"])
+            self.assertEqual(fixture.form(f"/newsroom/reporters/{retired}/delete").status_code, 303)
+            fixture.at("2026-10-12T12:00:00-07:00")
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner)
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                calendar = page.locator("#reporting-calendar")
+                days = calendar.locator("[data-calendar-date]")
+                past = calendar.locator(".calendar-past")
+                history = "Past reports for September 2026 are in each reporter's history."
+                for width, height in ((390, 844), (1440, 900)):
+                    page.set_viewport_size({"width": width, "height": height})
+                    for path in ("/newsroom", "/newsroom?view=archive"):
+                        with self.subTest(width=width, path=path):
+                            page.goto(fixture.base_url + path)
+                            boxes = [page.locator(selector).bounding_box() for selector in (
+                                ".stat-strip", ".section-nav", ".reporter-grid",
+                                "#reporting-calendar", ".operating-note",
+                            )]
+                            for above, below in zip(boxes, boxes[1:]):
+                                self.assertLessEqual(above["y"] + above["height"], below["y"])
+                            expect(page.get_by_role("link", name="Newsroom", exact=True)).to_have_text("Newsroom →")
+                            for link in page.get_by_role("link", name="Open reporter", exact=True).all():
+                                expect(link).to_have_text("Open reporter →")
+                            expect(page.get_by_text("Past date")).to_have_count(0)
+                            expect(days).to_have_count(31)
+                            expect(past).to_have_count(11)
+                            expect(calendar.locator('[data-calendar-date="2026-10-12"]')
+                                   .locator(f'a[href$="/{weekly}"]')).to_be_visible()
+                            if width <= 600:
+                                # The phone list starts at today; earlier days stay in the HTML only.
+                                for index in range(11):
+                                    expect(past.nth(index)).to_be_hidden()
+                                expect(days.filter(visible=True)).to_have_count(20)
+                                expect(days.filter(visible=True).first).to_have_attribute(
+                                    "data-calendar-date", "2026-10-12")
+                            else:
+                                # Desktop keeps dimmed past cells that show only the date number.
+                                expect(days.filter(visible=True)).to_have_count(31)
+                                first = calendar.locator('[data-calendar-date="2026-10-01"]')
+                                expect(first).to_have_text("Thursday, October 1")
+                                expect(first.locator("time")).to_have_attribute("datetime", "2026-10-01")
+                                color = "cell => getComputedStyle(cell.querySelector('time')).color"
+                                for index in range(11):
+                                    expect(past.nth(index)).to_be_visible()
+                                    self.assertNotEqual(
+                                        past.nth(index).evaluate(color),
+                                        calendar.locator('[data-calendar-date="2026-10-13"]').evaluate(color),
+                                    )
+                                self.assert_padding_matches(calendar, "2026-10-31", 1)
+                    with self.subTest(width=width, month="2026-09"):
+                        page.goto(fixture.base_url + "/newsroom?month=2026-09")
+                        expect(calendar.get_by_text(history)).to_be_visible()
+                        expect(calendar.get_by_text("No upcoming reports this month.")).to_have_count(0)
+                        expect(days).to_have_count(30)
+                        expect(past).to_have_count(30)
+                        if width <= 600:
+                            expect(days.filter(visible=True)).to_have_count(0)
+                            expect(calendar.locator(".calendar-days")).to_be_hidden()
+                        else:
+                            expect(days.filter(visible=True)).to_have_count(30)
+                            self.assert_padding_matches(calendar, "2026-09-30", 4)
+                self.assertEqual(errors, [])
             finally:
                 browser.close()
 

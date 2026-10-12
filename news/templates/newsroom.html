@@ -31,7 +31,6 @@
     {% endfor %}
     </section>
 {% endif %}
-{% include "reporting_calendar.html" %}
 <div class="section-nav">
     <div><a href="/newsroom" {% if not archived %}aria-current="page"{% endif %}>Your reporters</a><a href="/newsroom?view=archive"
    {% if archived %}aria-current="page"{% endif %}>Retired & completed</a></div>
@@ -70,7 +69,7 @@
                     </div>
                 </dl>
                 <a class="text-link"
-                   href="{{ url_for('pages.reporter_detail',identity=reporter.id) }}">Open reporter <span aria-hidden="true">↗</span></a></article>
+                   href="{{ url_for('pages.reporter_detail',identity=reporter.id) }}">Open reporter <span aria-hidden="true">→</span></a></article>
         {% endfor %}
     </div>
 {% else %}
@@ -82,6 +81,7 @@
 {% endif %}
 </section>
 {% endif %}
+{% include "reporting_calendar.html" %}
 <aside class="operating-note">
     <div>
         <p class="eyebrow">About this newsroom</p>

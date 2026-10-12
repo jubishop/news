@@ -15,11 +15,15 @@
         </nav>
     </div>
     <p class="calendar-note muted">Active schedules from today onward. Paused and retired reporters are not shown. Earlier dates and finished assignments are in reporter history.</p>
-    {% if calendar.empty %}<p class="calendar-empty">No upcoming reports this month.</p>{% endif %}
+    {% if calendar.past %}
+        <p class="calendar-empty">Past reports for {{ calendar.label }} are in each reporter's history.</p>
+    {% elif calendar.empty %}
+        <p class="calendar-empty">No upcoming reports this month.</p>
+    {% endif %}
     <div class="calendar-weekdays" aria-hidden="true">
         {% for day in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] %}<span>{{ day }}</span>{% endfor %}
     </div>
-    <ol class="calendar-days" aria-label="{{ calendar.label }} reporting dates" role="list">
+    <ol class="calendar-days{% if calendar.past %} calendar-days-past{% endif %}" aria-label="{{ calendar.label }} reporting dates" role="list">
         {% for unused in calendar.padding %}<li class="calendar-padding" aria-hidden="true"></li>{% endfor %}
         {% for day in calendar.days %}
             <li class="calendar-day{% if day.today %} calendar-today{% endif %}{% if day.past %} calendar-past{% endif %}" data-calendar-date="{{ day.date.isoformat() }}">
@@ -32,9 +36,10 @@
                 {% for reporter in day.entries %}
                     <a class="calendar-entry" href="{{ url_for('pages.reporter_detail', identity=reporter.id) }}">{{ reporter.name }}</a>
                 {% else %}
-                    <p class="calendar-day-empty">{{ 'Past date' if day.past else 'No upcoming reports' }}</p>
+                    {% if not day.past %}<p class="calendar-day-empty">No upcoming reports</p>{% endif %}
                 {% endfor %}
             </li>
         {% endfor %}
+        {% for unused in calendar.trailing %}<li class="calendar-padding" aria-hidden="true"></li>{% endfor %}
     </ol>
 </section>

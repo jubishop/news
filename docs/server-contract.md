@@ -132,7 +132,7 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | `GET /articles/{id}` | Full Markdown article and sources, then [More from](product-design.md#more-from-the-reporter) its reporter: up to three of its other articles outside Trash, in feed order, and a link to its filtered feed. |
 | `GET /favicon.ico` | 32×32 favicon as PNG data (`image/png`), rendered from `/static/icon.svg`. |
 | `GET /apple-touch-icon.png` | 180×180 Home Screen icon, rendered from `/static/icon.svg`. |
-| `GET /newsroom` | Upcoming reporting calendar, active reporters, worker contact, notices, and backup size; `?view=archive` shows removed/completed reporter cards. |
+| `GET /newsroom` | Active reporters, then the upcoming reporting calendar, worker contact, notices, and backup size; `?view=archive` shows removed/completed reporter cards. |
 | `GET /newsroom/reporters/new` | Reporter form with schedule preview. |
 | `GET /newsroom/reporters/{id}` | Settings, paginated stories, and paginated run/attempt history with instruction snapshots. |
 | `POST /newsroom/reporters` | Create a reporter. |
