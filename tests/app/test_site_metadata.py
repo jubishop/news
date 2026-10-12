@@ -3,6 +3,7 @@
 from html.parser import HTMLParser
 import struct
 import unittest
+from xml.etree import ElementTree
 
 from support import ServerFixture
 
@@ -78,7 +79,9 @@ class SiteMetadataTests(ServerFixture):
                 if size:
                     self.assertEqual(png_size(response.data), size)
                 else:
-                    self.assertIn(b'<svg xmlns="http://www.w3.org/2000/svg"', response.data)
+                    # Browsers reject an SVG image that is not well-formed XML.
+                    svg = ElementTree.fromstring(response.data)
+                    self.assertEqual(svg.tag, "{http://www.w3.org/2000/svg}svg")
         for path, headers, status in [
             ("/", None, 200),
             ("/newsroom", self.owner, 200),
