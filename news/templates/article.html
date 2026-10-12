@@ -46,4 +46,15 @@
         {% endif %}
         <div class="article-end" aria-hidden="true">N.</div>
     </article>
+    {% if more_from %}
+        <section class="more-from" aria-labelledby="more-from-title">
+            <h2 id="more-from-title">More from {{ article.reporter_name }}</h2>
+            <ul role="list">
+                {% for story in more_from %}
+                    <li><a href="{{ url_for('pages.article',identity=story.id) }}">{{ story.title }}</a> {{ story.article_date|short_date }}</li>
+                {% endfor %}
+            </ul>
+            <a class="text-link" href="{{ url_for('pages.feed',reporter_id=article.reporter_id) }}">See all from {{ article.reporter_name }} <span aria-hidden="true">→</span></a>
+        </section>
+    {% endif %}
 {% endblock %}

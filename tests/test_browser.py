@@ -564,10 +564,10 @@ class BrowserJourney(unittest.TestCase):
                 "| Tool | Command |\n| --- | --- |\n| pip | `pip list` |\n\n"
                 "```\npip install news\n```\n",
             )
-            articles = [kept_article, fixture.article(title="Trashed story")]
+            articles = [kept_article, fixture.article(title="Trashed story"), fixture.article(title="Another story")]
             receipt = fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"]), articles=articles))
             self.assertEqual(receipt.status_code, 200)
-            kept, trashed = receipt.json["article_ids"]
+            kept, trashed, _ = receipt.json["article_ids"]
             self.assertEqual(fixture.form(f"/newsroom/articles/{trashed}/delete").status_code, 303)
             browser = playwright.chromium.launch()
             try:
@@ -585,6 +585,8 @@ class BrowserJourney(unittest.TestCase):
                             if path.startswith("/articles/"):
                                 for element in (".lead-photo figcaption", ".prose table code", ".prose pre"):
                                     expect(page.locator(element)).to_be_visible()
+                                more = page.get_by_role("region", name="More from Science desk")
+                                expect(more.get_by_role("link")).to_have_count(2)
                             if "/reporters/" in path:
                                 expect(page.locator("[data-schedule-preview]")).to_contain_text(
                                     "First future date for this schedule: Sat, Oct 3 · Pacific Time."
@@ -616,6 +618,73 @@ class BrowserJourney(unittest.TestCase):
                             self.assertEqual(small, [])
                             self.assertNotRegex(page.evaluate("document.body.innerText"), r"\d{4}-\d{2}-\d{2}")
                 self.assertEqual(errors, [])
+            finally:
+                browser.close()
+
+    def test_article_headline_size_and_more_from_the_reporter(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            titles = []
+            for day in (27, 28, 29, 30):
+                fixture.at(f"2026-09-{day}T12:00:00-07:00")
+                run = fixture.work()[0]["id"]
+                claim = fixture.claim(run)
+                titles.append(f"Research update for September {day}")
+                response = fixture.result(run, fixture.envelope(claim, articles=[
+                    fixture.article(title=titles[-1], article_date=f"2026-09-{day}"),
+                ]))
+                self.assertEqual(response.status_code, 200)
+            newest = response.json["article_ids"][0]
+            reporter = claim["reporter"]["id"]
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page()
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                page.goto(fixture.base_url + "/articles/" + newest)
+                headline = page.get_by_role("heading", level=1)
+                section = page.get_by_role("region", name="More from Science desk")
+                for width, height, size in ((1440, 900, "44px"), (390, 844, "32px")):
+                    with self.subTest(width=width):
+                        page.set_viewport_size({"width": width, "height": height})
+                        expect(headline).to_have_css("font-size", size)
+                        sources = page.locator(".sources").bounding_box()
+                        self.assertGreaterEqual(section.bounding_box()["y"], sources["y"] + sources["height"])
+                        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                expect(section.get_by_role("heading")).to_have_text("More from Science desk")
+                stories = section.get_by_role("listitem")
+                expect(stories.get_by_role("link")).to_have_text(titles[2::-1])
+                expect(stories).to_contain_text(["Tue, Sep 29", "Mon, Sep 28", "Sun, Sep 27"])
+                stories.get_by_role("link", name=titles[1]).click()
+                expect(headline).to_have_text(titles[1])
+                expect(stories.get_by_role("link")).to_have_text([titles[3], titles[2], titles[0]])
+                page.go_back()
+                section.get_by_role("link", name="See all from Science desk").click()
+                expect(page).to_have_url(f"{fixture.base_url}/?reporter_id={reporter}")
+                expect(page.get_by_role("link", name=titles[3], exact=True)).to_be_visible()
+                self.assertEqual(errors, [])
+            finally:
+                browser.close()
+
+    def test_more_from_wraps_long_reporter_names_on_phones(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            name = "Correspondent" * 6
+            response = fixture.form("/newsroom/reporters", name=name,
+                                    prompt="Report useful changes.", cadence="daily")
+            reporter = response.headers["Location"].rsplit("/", 1)[-1]
+            for day in (27, 28):
+                fixture.at(f"2026-09-{day}T12:00:00-07:00")
+                run = next(run for run in fixture.work() if run["reporter_id"] == reporter)["id"]
+                response = fixture.result(run, fixture.envelope(
+                    fixture.claim(run), articles=[fixture.article(title=f"Update for September {day}")]))
+                self.assertEqual(response.status_code, 200)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(viewport={"width": 390, "height": 844})
+                page.goto(fixture.base_url + "/articles/" + response.json["article_ids"][0])
+                section = page.get_by_role("region", name="More from " + name)
+                expect(section.get_by_role("list")).to_have_attribute("role", "list")
+                expect(section.get_by_role("listitem")).to_have_text("Update for September 27 Sat, Sep 26")
+                self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
             finally:
                 browser.close()
 
