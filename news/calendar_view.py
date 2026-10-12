@@ -69,5 +69,7 @@ def month_view(connection, value=None):
         "current": today.isoformat()[:7],
         "padding": range(first.weekday()),
         "days": days,
+        "trailing": range(6 - days[-1]["date"].weekday()),
         "empty": not any(day["entries"] for day in days),
+        "past": days[-1]["past"],
     }

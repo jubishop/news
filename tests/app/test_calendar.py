@@ -12,16 +12,30 @@ class CalendarHTML(HTMLParser):
     def __init__(self, html):
         super().__init__()
         self.days = {}
+        self.past = []
+        self.text = {}
+        self.cells = []  # Grid cells in order: a date, or None for a padding cell.
         self.day = None
         self.feed(html)
 
     def handle_starttag(self, tag, attrs):
         attrs = dict(attrs)
+        classes = (attrs.get("class") or "").split()
         if "data-calendar-date" in attrs:
             self.day = attrs["data-calendar-date"]
             self.days[self.day] = []
+            self.text[self.day] = ""
+            self.cells.append(self.day)
+            if "calendar-past" in classes:
+                self.past.append(self.day)
+        elif tag == "li" and "calendar-padding" in classes:
+            self.cells.append(None)
         if tag == "a" and self.day:
             self.days[self.day].append(attrs["href"].rsplit("/", 1)[-1])
+
+    def handle_data(self, data):
+        if self.day:
+            self.text[self.day] = " ".join((self.text[self.day] + " " + data).split())
 
     def handle_endtag(self, tag):
         if tag == "li":
@@ -29,14 +43,17 @@ class CalendarHTML(HTMLParser):
 
 
 class CalendarJourneys(ServerFixture):
-    def calendar(self, month=None):
+    def page(self, month=None):
         response = self.client.get(
             "/newsroom" + (f"?month={month}" if month else ""), headers=self.owner
         )
         self.assertEqual(response.status_code, 200)
         html = response.get_data(as_text=True)
         self.assertIn('id="reporting-calendar"', html)
-        return CalendarHTML(html).days
+        return html
+
+    def calendar(self, month=None):
+        return CalendarHTML(self.page(month)).days
 
     def snapshot(self):
         with closing(sqlite3.connect(self.database)) as connection:
@@ -127,6 +144,18 @@ class CalendarJourneys(ServerFixture):
         self.assertIn("month=2026-11", html)
         self.assertIn("month=2027-01", html)
         self.assertIn("No upcoming reports this month.", html)
+        # Only a month that has fully passed points to reporter history instead.
+        for month, message in (
+            ("2026-09", "No upcoming reports this month."),
+            ("2026-08", "Past reports for August 2026 are in each reporter's history."),
+            ("0001-01", "Past reports for January 0001 are in each reporter's history."),
+        ):
+            with self.subTest(month=month):
+                html = self.page(month)
+                self.assertIn(message, html)
+                for other in ("No upcoming reports this month.", "Past reports for"):
+                    if other not in message:
+                        self.assertNotIn(other, html)
 
     def test_pacific_dates_across_dst(self):
         self.at("2026-03-06T12:00:00-08:00")
@@ -140,3 +169,40 @@ class CalendarJourneys(ServerFixture):
                 days = self.calendar()
                 self.assertEqual(days[expected], [reporter])
                 self.assertTrue(all(not entries for day, entries in days.items() if day < expected))
+
+    def test_cards_precede_calendar_and_past_days_stay_unlabeled(self):
+        # New reporters start tomorrow, so create them before moving to October 12.
+        weekly = self.reporter("weekly", weekdays=["mon"])
+        retired = self.reporter()
+        self.assertEqual(self.form(f"/newsroom/reporters/{retired}/delete").status_code, 303)
+        self.at("2026-10-12T12:00:00-07:00")
+        for path in ("/newsroom", "/newsroom?view=archive"):
+            with self.subTest(path=path):
+                html = self.client.get(path, headers=self.owner).get_data(as_text=True)
+                order = [html.index(marker) for marker in (
+                    'class="stat-strip"', 'class="section-nav"', 'class="reporter-card"',
+                    'id="reporting-calendar"', 'class="operating-note"',
+                )]
+                self.assertEqual(order, sorted(order))
+                self.assertNotIn("Past date", html)
+                self.assertNotIn("↗", html)  # Every newsroom link is internal.
+        calendar = CalendarHTML(self.page())
+        self.assertEqual(len(calendar.days), 31)
+        self.assertEqual(calendar.past, [f"2026-10-{number:02}" for number in range(1, 12)])
+        self.assertEqual(calendar.text["2026-10-01"], "Thursday, October 1")
+        self.assertEqual(calendar.text["2026-10-11"], "Sunday, October 11")
+        self.assertEqual(calendar.days["2026-10-12"], [weekly])
+        self.assertEqual(calendar.text["2026-10-13"], "Tuesday, October 13 No upcoming reports")
+
+    def test_month_ends_with_padding_cells_like_its_start(self):
+        for month, leading, length, trailing in (
+            ("2026-10", 3, 31, 1),   # Thursday to Saturday.
+            ("2026-09", 1, 30, 4),   # Tuesday to Wednesday.
+            ("2026-11", 6, 30, 6),   # Sunday to Monday.
+            ("2026-05", 4, 31, 0),   # Friday to Sunday.
+            ("2027-02", 0, 28, 0),   # Monday to Sunday.
+        ):
+            with self.subTest(month=month):
+                cells = CalendarHTML(self.page(month)).cells
+                days = [f"{month}-{number:02}" for number in range(1, length + 1)]
+                self.assertEqual(cells, [None] * leading + days + [None] * trailing)

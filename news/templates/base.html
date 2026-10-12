@@ -22,7 +22,7 @@
                     <p>The world, on your beat.</p>
                     <nav aria-label="Main navigation"><a href="{{ url_for('pages.feed') }}"
    {% if request.path == '/' %}aria-current="page"{% endif %}>Latest edition</a><a href="{{ url_for('pages.newsroom') }}"
-   {% if request.path.startswith('/newsroom') %}aria-current="page"{% endif %}>Newsroom <span aria-hidden="true">↗</span></a></nav>
+   {% if request.path.startswith('/newsroom') %}aria-current="page"{% endif %}>Newsroom <span aria-hidden="true">→</span></a></nav>
                 </div>
             </header>
             {% for message in get_flashed_messages() %}
