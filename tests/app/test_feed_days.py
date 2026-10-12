@@ -120,6 +120,17 @@ class FeedDays(ServerFixture):
         self.assertEqual(feed.order, ["filter", "status", "day", "day", "day"])
         self.assertIn("1 scheduled report is late", feed.status)
 
+    def test_days_use_pacific_standard_time_in_winter(self):
+        science = self.desk("Science desk")
+        self.publish("2026-12-14T23:30:00-08:00", science, "Monday night")  # Tuesday in UTC.
+        self.publish("2026-12-15T23:30:00-08:00", science, "Tuesday night")  # 00:30 at UTC−7.
+        self.at("2026-12-16T08:00:00-08:00")
+        feed = self.page()
+        self.assertEqual(feed.days, [
+            ("Yesterday · Tuesday, Dec 15", [("Science desk", "Tuesday night")]),
+            ("Monday, Dec 14", [("Science desk", "Monday night")]),
+        ])
+
     def test_kicker_adds_the_article_date_only_when_it_differs_from_the_publish_day(self):
         science = self.desk("Science desk")
         self.publish("2026-10-11T17:30:00-07:00", science, "Same day")  # Monday in UTC.

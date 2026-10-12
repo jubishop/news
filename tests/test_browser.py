@@ -457,6 +457,14 @@ class BrowserJourney(unittest.TestCase):
                                     "document.documentElement.scrollWidth <= innerWidth"
                                 )
                             )
+                            # A story without a photo starts at its padding, with no empty photo row.
+                            offsets = stories.evaluate_all(
+                                """stories => stories.map(story => Math.round(
+                                    story.querySelector(".story-meta").getBoundingClientRect().top
+                                    - story.getBoundingClientRect().top
+                                    - parseFloat(getComputedStyle(story).paddingTop)))"""
+                            )
+                            self.assertEqual(set(offsets), {0})
                 page.get_by_role("link", name="Older stories →").click()
                 expect(page.get_by_role("article")).to_have_count(2)
                 expect(page.get_by_label("Search stories")).to_have_value("Bulletin")
@@ -636,6 +644,13 @@ class BrowserJourney(unittest.TestCase):
                     expect(page).to_have_url(f"{fixture.base_url}/?reporter_id={sports}&q=")
                     expect(stories).to_have_count(1)
                     expect(page.locator("form .edition-count")).to_have_text("1 story")
+                    if scripts:
+                        # Keyboard users stay on the menu, and Back restores the page's own choice.
+                        expect(reporter).to_be_focused()
+                        page.go_back()
+                        expect(page).to_have_url(fixture.base_url + "/")
+                        expect(stories).to_have_count(3)
+                        expect(reporter).to_have_value("")
                     reporter.select_option(label="All reporters")
                     if scripts:
                         expect(page).to_have_url(f"{fixture.base_url}/?reporter_id=&q=")

@@ -15,8 +15,21 @@ for (const image of document.querySelectorAll("[data-photo] img, .prose img")) {
 // search, so Apply is only needed without JavaScript.
 const filter = document.querySelector("[data-feed-filter]");
 if (filter) {
+  const reporter = filter.elements.reporter_id;
   filter.querySelector("[data-filter-apply]").hidden = true;
-  filter.elements.reporter_id.addEventListener("change", () => filter.requestSubmit());
+  // Back and Forward can restore a menu choice that the shown page does not match.
+  window.addEventListener("pageshow", () => filter.reset());
+  reporter.addEventListener("change", () => {
+    try { sessionStorage.setItem("news-filter-focus", "1"); } catch {}
+    filter.submit();
+  });
+  // A choice reloads the page; keep keyboard focus on the menu afterwards.
+  try {
+    if (sessionStorage.getItem("news-filter-focus")) {
+      sessionStorage.removeItem("news-filter-focus");
+      reporter.focus({ preventScroll: true });
+    }
+  } catch {}
 }
 
 for (const form of document.querySelectorAll("form[data-confirm]")) {
