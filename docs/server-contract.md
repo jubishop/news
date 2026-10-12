@@ -37,11 +37,11 @@ reporter. Reusing a removed reporter's ID for another reporter is unsupported.
 
 ## Access boundaries
 
-The feed and article pages are public. `/newsroom` and descendants require the
-owner's Cloudflare Access application. `/api` and descendants require a separate
-worker application. Every origin request verifies the Access JWT's RSA
-signature, issuer, audience, and expiry. The owner must match the configured
-email. Worker tokens must contain a service identity (`common_name`).
+The feed, articles, and site icons are public. `/newsroom` and descendants
+require the owner's Cloudflare Access application. `/api` and descendants
+require a separate worker application. Every origin request verifies the
+Access JWT's RSA signature, issuer, audience, and expiry. The owner must match
+the configured email. Worker tokens must contain a service identity (`common_name`).
 
 The worker sends `CF-Access-Client-Id` and `CF-Access-Client-Secret` to Cloudflare.
 Cloudflare supplies `Cf-Access-Jwt-Assertion` to the origin. News derives the
@@ -130,6 +130,8 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | --- | --- |
 | `GET /` | Newest-first feed, search, reporter filter, pagination, and concise late-report status. |
 | `GET /articles/{id}` | Full Markdown article and sources. |
+| `GET /favicon.ico` | 32×32 favicon as PNG data (`image/png`), rendered from `/static/icon.svg`. |
+| `GET /apple-touch-icon.png` | 180×180 Home Screen icon, rendered from `/static/icon.svg`. |
 | `GET /newsroom` | Upcoming reporting calendar, active reporters, worker contact, notices, and backup size; `?view=archive` shows removed/completed reporter cards. |
 | `GET /newsroom/reporters/new` | Reporter form with schedule preview. |
 | `GET /newsroom/reporters/{id}` | Settings, paginated stories, and paginated run/attempt history with instruction snapshots. |
@@ -139,6 +141,15 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | `POST /newsroom/schedule-preview` | Preview a proposed schedule's first future date; legacy GET remains supported. |
 | `GET /newsroom/trash` | Recoverable articles and removal deadlines. |
 | `POST /newsroom/articles/{id}/{delete,restore}` | Move an article to Trash or restore it. |
+
+Every page links the three icons. The feed and article pages also carry
+[link preview](product-design.md#site-icons-and-link-previews) tags:
+`description`, Open Graph (`og:*`), and `twitter:card`. Each `og:url` is
+absolute, built from `NEWS_BASE_URL`. An article uses its title, summary, and
+URL; with a lead photo it adds `og:image` and `og:image:alt` and uses the
+`summary_large_image` card, otherwise `summary`. Every feed variant, whether
+filtered, searched, or paginated, uses the same site-level tags for the site
+root. Newsroom and error pages carry none.
 
 The [reporting calendar](newsroom-calendar.md) accepts `month=YYYY-MM`, defaulting
 to the current Pacific month. It projects active schedules without creating

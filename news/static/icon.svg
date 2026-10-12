@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The wordmark's "N." in the news.css ink and accent colors on paper. -->
+  <rect width="64" height="64" rx="14" fill="#f6f3ec"/>
+  <path fill="#252d2c" d="M6 12H24L42 30.79V18Q42 14 38 14V12H52V14Q48 14 48 18V50H46.4L16 18.26V44Q16 48 20 48V50H6V48Q10 48 10 44V18Q10 14 6 14Z"/>
+  <circle cx="54.6" cy="45" r="5" fill="#9e452e"/>
+</svg>

@@ -65,6 +65,22 @@ def article(identity):
     )
 
 
+@pages.app_template_global()
+def public_url(endpoint, **values):
+    """An absolute link for previews, built from BASE_URL, not proxy headers."""
+    return current_app.config["BASE_URL"].rstrip("/") + url_for(endpoint, **values)
+
+
+@pages.get("/favicon.ico")
+def favicon():
+    return current_app.send_static_file("favicon.png")
+
+
+@pages.get("/apple-touch-icon.png")
+def apple_touch_icon():
+    return current_app.send_static_file("apple-touch-icon.png")
+
+
 @pages.get("/health")
 def health():
     with transaction(database()) as connection:
