@@ -110,9 +110,103 @@ class BrowserJourney(unittest.TestCase):
                         Path("test-results").mkdir(exist_ok=True)
                         calendar.screenshot(path=f"test-results/calendar-{width}.png")
                 page.goto(fixture.base_url + "/newsroom?month=2026-08")
-                expect(calendar.get_by_text("No upcoming reports this month.")).to_be_visible()
+                expect(calendar.get_by_text("Past reports for August 2026 are in each reporter's history.")).to_be_visible()
                 expect(calendar.locator("[data-calendar-date]")).to_have_count(31)
                 expect(calendar.get_by_role("link")).to_have_count(3)  # Navigation only.
+            finally:
+                browser.close()
+
+    def assert_padding_matches(self, calendar, last_date, trailing):
+        """Cells after the last day fill its week like the cells before the first day."""
+        cells = calendar.locator(".calendar-days > li")
+        leading = calendar.locator(".calendar-days > li.calendar-padding:first-child")
+        expect(leading).to_have_count(1)  # Compare with a real leading cell, not a trailing one.
+        after = calendar.locator(f'[data-calendar-date="{last_date}"] ~ li')
+        expect(after).to_have_count(trailing)
+        last = calendar.locator(f'[data-calendar-date="{last_date}"]').bounding_box()
+        sunday = calendar.locator(".calendar-weekdays span").nth(6).bounding_box()
+        style = "cell => [getComputedStyle(cell).backgroundColor, cell.textContent.trim()]"
+        self.assertEqual(cells.count() % 7, 0)
+        for index in range(trailing):
+            cell = after.nth(index)
+            expect(cell).to_have_class("calendar-padding")
+            self.assertEqual(cell.evaluate(style), leading.evaluate(style))
+            box = cell.bounding_box()
+            self.assertAlmostEqual(box["y"], last["y"], delta=1)
+            self.assertAlmostEqual(box["height"], last["height"], delta=1)
+        if trailing:
+            box = after.last.bounding_box()
+            self.assertAlmostEqual(box["x"] + box["width"], sunday["x"] + sunday["width"], delta=2)
+
+    def test_newsroom_lists_reporters_before_an_upcoming_calendar(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            # New reporters start tomorrow, so create them before moving to October 12.
+            weekly = fixture.reporter("weekly", weekdays=["mon"])
+            retired = fixture.reporter("weekly", weekdays=["tue"])
+            self.assertEqual(fixture.form(f"/newsroom/reporters/{retired}/delete").status_code, 303)
+            fixture.at("2026-10-12T12:00:00-07:00")
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner)
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                calendar = page.locator("#reporting-calendar")
+                days = calendar.locator("[data-calendar-date]")
+                past = calendar.locator(".calendar-past")
+                history = "Past reports for September 2026 are in each reporter's history."
+                for width, height in ((390, 844), (1440, 900)):
+                    page.set_viewport_size({"width": width, "height": height})
+                    for path in ("/newsroom", "/newsroom?view=archive"):
+                        with self.subTest(width=width, path=path):
+                            page.goto(fixture.base_url + path)
+                            boxes = [page.locator(selector).bounding_box() for selector in (
+                                ".stat-strip", ".section-nav", ".reporter-grid",
+                                "#reporting-calendar", ".operating-note",
+                            )]
+                            for above, below in zip(boxes, boxes[1:]):
+                                self.assertLessEqual(above["y"] + above["height"], below["y"])
+                            expect(page.get_by_role("link", name="Newsroom", exact=True)).to_have_text("Newsroom →")
+                            for link in page.get_by_role("link", name="Open reporter", exact=True).all():
+                                expect(link).to_have_text("Open reporter →")
+                            expect(page.get_by_text("Past date")).to_have_count(0)
+                            expect(days).to_have_count(31)
+                            expect(past).to_have_count(11)
+                            expect(calendar.locator('[data-calendar-date="2026-10-12"]')
+                                   .locator(f'a[href$="/{weekly}"]')).to_be_visible()
+                            if width <= 600:
+                                # The phone list starts at today; earlier days stay in the HTML only.
+                                for index in range(11):
+                                    expect(past.nth(index)).to_be_hidden()
+                                expect(days.filter(visible=True)).to_have_count(20)
+                                expect(days.filter(visible=True).first).to_have_attribute(
+                                    "data-calendar-date", "2026-10-12")
+                            else:
+                                # Desktop keeps dimmed past cells that show only the date number.
+                                expect(days.filter(visible=True)).to_have_count(31)
+                                first = calendar.locator('[data-calendar-date="2026-10-01"]')
+                                expect(first).to_have_text("Thursday, October 1")
+                                expect(first.locator("time")).to_have_attribute("datetime", "2026-10-01")
+                                color = "cell => getComputedStyle(cell.querySelector('time')).color"
+                                for index in range(11):
+                                    expect(past.nth(index)).to_be_visible()
+                                    self.assertNotEqual(
+                                        past.nth(index).evaluate(color),
+                                        calendar.locator('[data-calendar-date="2026-10-13"]').evaluate(color),
+                                    )
+                                self.assert_padding_matches(calendar, "2026-10-31", 1)
+                    with self.subTest(width=width, month="2026-09"):
+                        page.goto(fixture.base_url + "/newsroom?month=2026-09")
+                        expect(calendar.get_by_text(history)).to_be_visible()
+                        expect(calendar.get_by_text("No upcoming reports this month.")).to_have_count(0)
+                        expect(days).to_have_count(30)
+                        expect(past).to_have_count(30)
+                        if width <= 600:
+                            expect(days.filter(visible=True)).to_have_count(0)
+                            expect(calendar.locator(".calendar-days")).to_be_hidden()
+                        else:
+                            expect(days.filter(visible=True)).to_have_count(30)
+                            self.assert_padding_matches(calendar, "2026-09-30", 4)
+                self.assertEqual(errors, [])
             finally:
                 browser.close()
 
@@ -596,10 +690,10 @@ class BrowserJourney(unittest.TestCase):
                 "| Tool | Command |\n| --- | --- |\n| pip | `pip list` |\n\n"
                 "```\npip install news\n```\n",
             )
-            articles = [kept_article, fixture.article(title="Trashed story")]
+            articles = [kept_article, fixture.article(title="Trashed story"), fixture.article(title="Another story")]
             receipt = fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"]), articles=articles))
             self.assertEqual(receipt.status_code, 200)
-            kept, trashed = receipt.json["article_ids"]
+            kept, trashed, _ = receipt.json["article_ids"]
             self.assertEqual(fixture.form(f"/newsroom/articles/{trashed}/delete").status_code, 303)
             browser = playwright.chromium.launch()
             try:
@@ -617,6 +711,8 @@ class BrowserJourney(unittest.TestCase):
                             if path.startswith("/articles/"):
                                 for element in (".lead-photo figcaption", ".prose table code", ".prose pre"):
                                     expect(page.locator(element)).to_be_visible()
+                                more = page.get_by_role("region", name="More from Science desk")
+                                expect(more.get_by_role("link")).to_have_count(2)
                             if "/reporters/" in path:
                                 expect(page.locator("[data-schedule-preview]")).to_contain_text(
                                     "First future date for this schedule: Sat, Oct 3 · Pacific Time."
@@ -648,6 +744,73 @@ class BrowserJourney(unittest.TestCase):
                             self.assertEqual(small, [])
                             self.assertNotRegex(page.evaluate("document.body.innerText"), r"\d{4}-\d{2}-\d{2}")
                 self.assertEqual(errors, [])
+            finally:
+                browser.close()
+
+    def test_article_headline_size_and_more_from_the_reporter(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            titles = []
+            for day in (27, 28, 29, 30):
+                fixture.at(f"2026-09-{day}T12:00:00-07:00")
+                run = fixture.work()[0]["id"]
+                claim = fixture.claim(run)
+                titles.append(f"Research update for September {day}")
+                response = fixture.result(run, fixture.envelope(claim, articles=[
+                    fixture.article(title=titles[-1], article_date=f"2026-09-{day}"),
+                ]))
+                self.assertEqual(response.status_code, 200)
+            newest = response.json["article_ids"][0]
+            reporter = claim["reporter"]["id"]
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page()
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                page.goto(fixture.base_url + "/articles/" + newest)
+                headline = page.get_by_role("heading", level=1)
+                section = page.get_by_role("region", name="More from Science desk")
+                for width, height, size in ((1440, 900, "44px"), (390, 844, "32px")):
+                    with self.subTest(width=width):
+                        page.set_viewport_size({"width": width, "height": height})
+                        expect(headline).to_have_css("font-size", size)
+                        sources = page.locator(".sources").bounding_box()
+                        self.assertGreaterEqual(section.bounding_box()["y"], sources["y"] + sources["height"])
+                        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+                expect(section.get_by_role("heading")).to_have_text("More from Science desk")
+                stories = section.get_by_role("listitem")
+                expect(stories.get_by_role("link")).to_have_text(titles[2::-1])
+                expect(stories).to_contain_text(["Tue, Sep 29", "Mon, Sep 28", "Sun, Sep 27"])
+                stories.get_by_role("link", name=titles[1]).click()
+                expect(headline).to_have_text(titles[1])
+                expect(stories.get_by_role("link")).to_have_text([titles[3], titles[2], titles[0]])
+                page.go_back()
+                section.get_by_role("link", name="See all from Science desk").click()
+                expect(page).to_have_url(f"{fixture.base_url}/?reporter_id={reporter}")
+                expect(page.get_by_role("link", name=titles[3], exact=True)).to_be_visible()
+                self.assertEqual(errors, [])
+            finally:
+                browser.close()
+
+    def test_more_from_wraps_long_reporter_names_on_phones(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            name = "Correspondent" * 6
+            response = fixture.form("/newsroom/reporters", name=name,
+                                    prompt="Report useful changes.", cadence="daily")
+            reporter = response.headers["Location"].rsplit("/", 1)[-1]
+            for day in (27, 28):
+                fixture.at(f"2026-09-{day}T12:00:00-07:00")
+                run = next(run for run in fixture.work() if run["reporter_id"] == reporter)["id"]
+                response = fixture.result(run, fixture.envelope(
+                    fixture.claim(run), articles=[fixture.article(title=f"Update for September {day}")]))
+                self.assertEqual(response.status_code, 200)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(viewport={"width": 390, "height": 844})
+                page.goto(fixture.base_url + "/articles/" + response.json["article_ids"][0])
+                section = page.get_by_role("region", name="More from " + name)
+                expect(section.get_by_role("list")).to_have_attribute("role", "list")
+                expect(section.get_by_role("listitem")).to_have_text("Update for September 27 Sat, Sep 26")
+                self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
             finally:
                 browser.close()
 

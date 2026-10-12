@@ -214,6 +214,24 @@ is that lead photos stay hotlinked, so a preview can lack its image when the
 publisher blocks other sites. The
 [route contract](server-contract.md#browser-routes) lists the tags.
 
+### More from the reporter
+
+Accepted on October 12, 2026: each article page ends with up to three more
+stories from the same reporter. The owner chose the recommended option in the
+UI review recorded in [issue #30](https://github.com/jubishop/news/issues/30);
+no further reason was stated. The review found that articles ended without
+onward navigation: below the sources, the page offered only the "N." mark and
+the footer.
+
+After the sources, a section headed "More from" and the reporter's name lists
+that reporter's other articles in feed order, newest published first, each
+with its article date, and links to the feed filtered to that reporter.
+Articles in Trash never appear. A removed reporter's articles still do, as
+they do in the feed. When the reporter has no other article outside Trash, the
+page omits the section. The tradeoff is that the list follows publication
+order, not topic, so it may not point to related stories.
+[Issue #33](https://github.com/jubishop/news/issues/33) records the details.
+
 ### Editorial guidance through prompt edits
 
 Accepted on September 24, 2026: the reporter's prompt contains its editorial
