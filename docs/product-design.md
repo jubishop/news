@@ -160,6 +160,28 @@ worker payloads, date inputs, and `datetime` attributes keep ISO dates, and
 event timestamps keep their existing format. The tradeoff is that larger metadata
 takes more room, most visibly in the phone masthead.
 
+### Site icons and link previews
+
+Accepted on October 12, 2026: the site has a favicon and a Home Screen icon,
+and its public reading pages carry link preview tags. The owner chose the
+recommended option in the UI review recorded in
+[issue #30](https://github.com/jubishop/news/issues/30); no further reason was
+stated. The review found that `/favicon.ico` returned 404, so tabs and Home
+Screen shortcuts showed a generic icon, and that a shared article appeared as
+a bare URL even when it had a lead photo.
+
+The icon is the wordmark's "N.": a serif N in ink with an accent-colored dot,
+on an opaque paper-colored rounded square that reads on light and dark tabs.
+The N is an SVG path, so it never depends on installed fonts. Its PNG sizes
+were rendered from that SVG once and committed, with no build step.
+
+An article's preview shows its title, summary, and lead photo when it has one.
+Every feed variant shares one site-level preview. Newsroom pages, which
+Cloudflare Access gates, and error pages carry no preview tags. The tradeoff
+is that lead photos stay hotlinked, so a preview can lack its image when the
+publisher blocks other sites. The
+[route contract](server-contract.md#browser-routes) lists the tags.
+
 ### Editorial guidance through prompt edits
 
 Accepted on September 24, 2026: the reporter's prompt contains its editorial

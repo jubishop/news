@@ -1,4 +1,14 @@
 {% extends "base.html" %}
+{% block preview %}
+    {% set description = "The world, on your beat. An independent, personal edition." %}
+    <meta name="description" content="{{ description }}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="News">
+    <meta property="og:title" content="News">
+    <meta property="og:description" content="{{ description }}">
+    <meta property="og:url" content="{{ public_url('pages.feed') }}">
+    <meta name="twitter:card" content="summary">
+{% endblock %}
 {% block content %}
     <section class="section-heading">
         <div>
