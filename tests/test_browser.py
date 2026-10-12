@@ -146,7 +146,7 @@ class BrowserJourney(unittest.TestCase):
                     field = page.get_by_label(f"Assignment date {index}", exact=True)
                     expect(field).to_be_focused()
                     field.fill(day)
-                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-01")
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("Thu, Oct 1")
                 page.get_by_role("button", name="Add reporter", exact=True).click()
                 expect(page.get_by_role("heading", name="A finite assignment")).to_be_visible()
                 reporter = page.url.rsplit("/", 1)[-1]
@@ -165,7 +165,7 @@ class BrowserJourney(unittest.TestCase):
                 page.get_by_role("button", name="Delete assignment date 2", exact=True).click()
                 self.assert_assignment_dates(page, ["2026-10-06", "2026-10-08"])
                 expect(page.get_by_label("Assignment date 2", exact=True)).to_be_focused()
-                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-06")
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("Tue, Oct 6")
                 for width in (1280, 390):
                     page.set_viewport_size({"width": width, "height": 900})
                     self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
@@ -190,8 +190,8 @@ class BrowserJourney(unittest.TestCase):
                 expect(page.get_by_role("button", name="Save changes")).to_have_count(0)
                 expect(page.get_by_role("link", name="This week in research")).to_be_visible()
                 self.assertEqual(page.locator(".run-row").count(), 4)
-                page.locator(".run-row").filter(has_text="2026-10-03").locator("summary").first.click()
-                expect(page.get_by_text("Assignment dates: 2026-10-01, 2026-10-03", exact=True)).to_be_visible()
+                page.locator(".run-row").filter(has_text="Sat, Oct 3").locator("summary").first.click()
+                expect(page.get_by_text("Assignment dates: Thu, Oct 1; Sat, Oct 3", exact=True)).to_be_visible()
                 for width in (1280, 390):
                     page.set_viewport_size({"width": width, "height": 900})
                     self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
@@ -234,7 +234,7 @@ class BrowserJourney(unittest.TestCase):
                 self.assertEqual(page.url, original_url)
                 self.assertIn("distinct", second.evaluate("input => input.validationMessage"))
                 second.fill("2026-10-03")
-                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-01")
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("Thu, Oct 1")
                 first.focus()
                 # Native date controls have several keyboard segments before Delete.
                 delete = page.get_by_role("button", name="Delete assignment date 1", exact=True)
@@ -246,7 +246,7 @@ class BrowserJourney(unittest.TestCase):
                 page.keyboard.press("Space")
                 self.assert_assignment_dates(page, ["2026-10-03"])
                 expect(first).to_be_focused()
-                expect(page.locator("[data-schedule-preview]")).to_contain_text("2026-10-03")
+                expect(page.locator("[data-schedule-preview]")).to_contain_text("Sat, Oct 3")
                 page.get_by_role("button", name="Delete assignment date 1", exact=True).click()
                 expect(add).to_be_focused()
                 expect(page.locator("[data-schedule-preview]")).to_contain_text("Choose at least one assignment date")
@@ -296,7 +296,7 @@ class BrowserJourney(unittest.TestCase):
                 expect(page.get_by_role("link", name="This week in research")).to_be_visible()
                 expect(page.locator(".run-row")).to_have_count(1)
                 page.locator(".run-row > summary").click()
-                expect(page.get_by_text("Assignment dates: 2026-10-01", exact=True)).to_be_visible()
+                expect(page.get_by_text("Assignment dates: Thu, Oct 1", exact=True)).to_be_visible()
             finally:
                 browser.close()
 
@@ -452,6 +452,79 @@ class BrowserJourney(unittest.TestCase):
             finally:
                 browser.close()
 
+    def test_pages_show_readable_dates_and_text_at_phone_and_desktop_widths(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            contractor = fixture.reporter("once", dates=["2026-09-27", "2026-09-29", "2026-10-03"])
+            fixture.at("2026-09-29T06:00:00-07:00")
+            job = next(run for run in fixture.work() if run["reporter_id"] == contractor)
+            # The kept article carries every small-text element: a photo credit, a table, and code.
+            kept_article = fixture.article(
+                title="Kept story",
+                lead_image={
+                    "url": "https://images.example.com/lead.png",
+                    "alt": "Photo of the lead scene",
+                    "credit": "Example Photo Desk",
+                    "credit_url": "https://example.com/photos",
+                },
+                body_markdown="## Findings\n\nRun `pip list` first.\n\n"
+                "| Tool | Command |\n| --- | --- |\n| pip | `pip list` |\n\n"
+                "```\npip install news\n```\n",
+            )
+            articles = [kept_article, fixture.article(title="Trashed story")]
+            receipt = fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"]), articles=articles))
+            self.assertEqual(receipt.status_code, 200)
+            kept, trashed = receipt.json["article_ids"]
+            self.assertEqual(fixture.form(f"/newsroom/articles/{trashed}/delete").status_code, 303)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(extra_http_headers=fixture.owner)
+                page.route("https://images.example.com/**",
+                           lambda route: route.fulfill(content_type="image/png", body=PNG))
+                errors = []
+                page.on("pageerror", lambda error: errors.append(str(error)))
+                for width, height in ((390, 844), (1440, 900)):
+                    page.set_viewport_size({"width": width, "height": height})
+                    for path in ("/", "/articles/" + kept, "/newsroom",
+                                 "/newsroom/reporters/" + contractor, "/newsroom/trash"):
+                        with self.subTest(width=width, path=path):
+                            page.goto(fixture.base_url + path)
+                            if path.startswith("/articles/"):
+                                for element in (".lead-photo figcaption", ".prose table code", ".prose pre"):
+                                    expect(page.locator(element)).to_be_visible()
+                            if "/reporters/" in path:
+                                expect(page.locator("[data-schedule-preview]")).to_contain_text(
+                                    "First future date for this schedule: Sat, Oct 3 · Pacific Time."
+                                )
+                            small = page.evaluate(
+                                """() => {
+                                    for (const details of document.querySelectorAll("details")) details.open = true;
+                                    const small = [];
+                                    const report = (element, text) => {
+                                        const size = parseFloat(getComputedStyle(element).fontSize);
+                                        if (size < 12) small.push(`${size}px <${element.localName} class="${element.className}"> ${text}`);
+                                    };
+                                    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+                                    while (walker.nextNode()) {
+                                        const node = walker.currentNode;
+                                        const range = document.createRange();
+                                        range.selectNodeContents(node);
+                                        if (node.data.trim() && node.parentElement.checkVisibility({visibilityProperty: true})
+                                            && [...range.getClientRects()].some(rect => rect.width && rect.height)) {
+                                            report(node.parentElement, node.data.trim().slice(0, 40));
+                                        }
+                                    }
+                                    for (const control of document.querySelectorAll("input:not([type=hidden]), select, textarea")) {
+                                        if (control.checkVisibility()) report(control, control.name);
+                                    }
+                                    return small;
+                                }"""
+                            )
+                            self.assertEqual(small, [])
+                            self.assertNotRegex(page.evaluate("document.body.innerText"), r"\d{4}-\d{2}-\d{2}")
+                self.assertEqual(errors, [])
+            finally:
+                browser.close()
+
     def test_inactive_schedule_fields_do_not_block_submission(self):
         with preview() as fixture, sync_playwright() as playwright:
             browser = playwright.chromium.launch()
@@ -513,7 +586,7 @@ class BrowserJourney(unittest.TestCase):
             page.get_by_label("How often").select_option("once")
             expect(page.get_by_label("Assignment date 1", exact=True)).to_be_visible()
             expect(page.locator("[data-schedule-preview]")).to_contain_text(
-                "2026-09-27"
+                "Sun, Sep 27"
             )
             page.get_by_role("button", name="Add reporter", exact=True).click()
             expect(

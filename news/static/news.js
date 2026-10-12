@@ -81,7 +81,7 @@ if (editor) {
       const data = await response.json();
       output.textContent = response.ok
         ? data.next_date
-          ? `First future date for this schedule: ${data.next_date} · Pacific Time. Dates already due stay unchanged.`
+          ? `First future date for this schedule: ${data.next_date_label} · Pacific Time. Dates already due stay unchanged.`
           : "No future dates. Unfinished assignments stay due until a successful result."
         : data.message;
     } catch (error) {

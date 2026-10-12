@@ -167,7 +167,9 @@ retained due dates. Blank entries are ignored. See the
 [date-entry guide](contractor-schedules.md#editing-dates).
 Only fields relevant to the chosen cadence apply. For edits, preview accepts
 `reporter_id` to validate retained due dates. Its `next_date` is the first future
-date, or null when only due dates remain. Owner history accepts
+date, or null when only due dates remain. `next_date_label` is that date as the
+newsroom displays it, such as `Thu, Oct 1`, with the year added outside the
+current Pacific year, or null with `next_date`. Owner history accepts
 `page` for runs and `articles_page` for stories. There is no Run Now, article
 editor, per-reporter model selection, reassignment, or feedback inbox.
 

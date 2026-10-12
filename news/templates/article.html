@@ -18,10 +18,10 @@
 {% block content %}
     <article class="article-page"><a class="back-link" href="/">← Latest edition</a>
         <header class="article-header">
-            <p class="eyebrow">{{ article.reporter_name }} <span class="meta-divider">/</span> {{ article.article_date }}</p>
+            <p class="eyebrow">{{ article.reporter_name }} <span class="meta-divider">/</span> {{ article.article_date|short_date }}</p>
             <h1>{{ article.title }}</h1>
             <p class="standfirst">{{ article.summary }}</p>
-            <div class="article-dateline"><span>Published {{ article.published_at|event_time }}</span><span>Coverage {{ article.coverage_start }} – {{ article.coverage_end }}</span></div>
+            <div class="article-dateline"><span>Published {{ article.published_at|event_time }}</span><span>Covers {{ article.coverage_start|date_range(article.coverage_end) }}</span></div>
         </header>
         {% if article.lead_image %}
             <figure class="lead-photo" data-photo>

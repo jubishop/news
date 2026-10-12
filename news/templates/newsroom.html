@@ -48,13 +48,18 @@
                     <div>
                         <dt>Schedule</dt>
                         <dd>
-                            {{ reporter.cadence_label }}
+                            {# schedules.label() keeps ISO for the worker; format a single contractor date here. #}
+                            {% if reporter.schedule.cadence == 'once' and reporter.schedule.dates|length == 1 %}
+                                Contractor · {{ reporter.schedule.dates[0]|short_date }}
+                            {% else %}
+                                {{ reporter.cadence_label }}
+                            {% endif %}
                         </dd>
                     </div>
                     <div>
                         <dt>Next due</dt>
                         <dd>
-                            {{ reporter.next_date or '—' }}
+                            {{ reporter.next_date|short_date }}
                         </dd>
                     </div>
                     <div>
