@@ -5,6 +5,10 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="color-scheme" content="light">
         <title>{% block title %}News · Your personal edition{% endblock %}</title>
+        {% block preview %}{% endblock %}
+        <link rel="icon" href="{{ url_for('pages.favicon') }}" sizes="32x32">
+        <link rel="icon" href="{{ url_for('static',filename='icon.svg') }}" type="image/svg+xml">
+        <link rel="apple-touch-icon" href="{{ url_for('pages.apple_touch_icon') }}">
         <link rel="stylesheet" href="{{ url_for('static',filename='news.css') }}">
         <script src="{{ url_for('static',filename='news.js') }}" defer></script>
     </head>
