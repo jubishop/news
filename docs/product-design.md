@@ -155,9 +155,9 @@ All visible text is at least 12px at every width.
 
 The owner chose the recommended option; no further reason was stated. The
 review found that ISO dates read as machine output in a newspaper-style design
-and that much metadata used 9–11px text. Stored values, JSON fields, worker
-payloads, date inputs, and `datetime` attributes keep ISO dates, and event
-timestamps keep their existing format. The tradeoff is that larger metadata
+and that much metadata used 9–11px text. Stored values, existing JSON fields,
+worker payloads, date inputs, and `datetime` attributes keep ISO dates, and
+event timestamps keep their existing format. The tradeoff is that larger metadata
 takes more room, most visibly in the phone masthead.
 
 ### Editorial guidance through prompt edits

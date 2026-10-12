@@ -303,5 +303,5 @@ class ContractorTests(ServerFixture):
         self.assertEqual(self.result(run["id"], body).json, receipt.json)
         detail = self.client.get(f"/newsroom/reporters/{reporter}", headers=self.owner)
         self.assertEqual(detail.status_code, 200)
-        self.assertIn("2026-10-01", detail.get_data(as_text=True))
+        self.assertIn('<time datetime="2026-10-01">Thu, Oct 1</time>', detail.get_data(as_text=True))
         self.assertEqual(self.history(reporter)[0]["attempts"][0]["outcome"], "published")

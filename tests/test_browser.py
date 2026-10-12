@@ -457,7 +457,20 @@ class BrowserJourney(unittest.TestCase):
             contractor = fixture.reporter("once", dates=["2026-09-27", "2026-09-29", "2026-10-03"])
             fixture.at("2026-09-29T06:00:00-07:00")
             job = next(run for run in fixture.work() if run["reporter_id"] == contractor)
-            articles = [fixture.article(title="Kept story"), fixture.article(title="Trashed story")]
+            # The kept article carries every small-text element: a photo credit, a table, and code.
+            kept_article = fixture.article(
+                title="Kept story",
+                lead_image={
+                    "url": "https://images.example.com/lead.png",
+                    "alt": "Photo of the lead scene",
+                    "credit": "Example Photo Desk",
+                    "credit_url": "https://example.com/photos",
+                },
+                body_markdown="## Findings\n\nRun `pip list` first.\n\n"
+                "| Tool | Command |\n| --- | --- |\n| pip | `pip list` |\n\n"
+                "```\npip install news\n```\n",
+            )
+            articles = [kept_article, fixture.article(title="Trashed story")]
             receipt = fixture.result(job["id"], fixture.envelope(fixture.claim(job["id"]), articles=articles))
             self.assertEqual(receipt.status_code, 200)
             kept, trashed = receipt.json["article_ids"]
@@ -465,6 +478,8 @@ class BrowserJourney(unittest.TestCase):
             browser = playwright.chromium.launch()
             try:
                 page = browser.new_page(extra_http_headers=fixture.owner)
+                page.route("https://images.example.com/**",
+                           lambda route: route.fulfill(content_type="image/png", body=PNG))
                 errors = []
                 page.on("pageerror", lambda error: errors.append(str(error)))
                 for width, height in ((390, 844), (1440, 900)):
@@ -473,6 +488,9 @@ class BrowserJourney(unittest.TestCase):
                                  "/newsroom/reporters/" + contractor, "/newsroom/trash"):
                         with self.subTest(width=width, path=path):
                             page.goto(fixture.base_url + path)
+                            if path.startswith("/articles/"):
+                                for element in (".lead-photo figcaption", ".prose table code", ".prose pre"):
+                                    expect(page.locator(element)).to_be_visible()
                             if "/reporters/" in path:
                                 expect(page.locator("[data-schedule-preview]")).to_contain_text(
                                     "First future date for this schedule: Sat, Oct 3 · Pacific Time."
