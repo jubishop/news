@@ -119,7 +119,8 @@ class BrowserJourney(unittest.TestCase):
     def assert_padding_matches(self, calendar, last_date, trailing):
         """Cells after the last day fill its week like the cells before the first day."""
         cells = calendar.locator(".calendar-days > li")
-        leading = calendar.locator(".calendar-padding").first
+        leading = calendar.locator(".calendar-days > li.calendar-padding:first-child")
+        expect(leading).to_have_count(1)  # Compare with a real leading cell, not a trailing one.
         after = calendar.locator(f'[data-calendar-date="{last_date}"] ~ li')
         expect(after).to_have_count(trailing)
         last = calendar.locator(f'[data-calendar-date="{last_date}"]').bounding_box()

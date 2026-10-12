@@ -194,6 +194,16 @@ class CalendarJourneys(ServerFixture):
         self.assertEqual(calendar.days["2026-10-12"], [weekly])
         self.assertEqual(calendar.text["2026-10-13"], "Tuesday, October 13 No upcoming reports")
 
+    def test_last_day_of_the_month_is_still_upcoming(self):
+        reporter = self.reporter()  # Daily from tomorrow, September 26.
+        self.at("2026-09-30T12:00:00-07:00")
+        html = self.page()
+        self.assertNotIn("Past reports for", html)
+        self.assertNotIn("calendar-days-past", html)
+        calendar = CalendarHTML(html)
+        self.assertEqual(calendar.days["2026-09-30"], [reporter])
+        self.assertNotIn("2026-09-30", calendar.past)
+
     def test_month_ends_with_padding_cells_like_its_start(self):
         for month, leading, length, trailing in (
             ("2026-10", 3, 31, 1),   # Thursday to Saturday.
