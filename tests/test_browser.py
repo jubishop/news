@@ -7,6 +7,7 @@ import unittest
 
 from playwright.sync_api import sync_playwright, expect
 from preview import preview
+from stylesheet import colors, css_rgb, schemes
 
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
@@ -759,6 +760,45 @@ class BrowserJourney(unittest.TestCase):
                             self.assertEqual(small, [])
                             self.assertNotRegex(page.evaluate("document.body.innerText"), r"\d{4}-\d{2}-\d{2}")
                 self.assertEqual(errors, [])
+            finally:
+                browser.close()
+
+    def test_pages_follow_the_system_color_scheme(self):
+        palettes = {scheme: colors(tokens) for scheme, tokens in schemes().items()}
+        # System colors resolve for the scheme the page uses, as native controls do.
+        canvas_text = {"light": "rgb(0, 0, 0)", "dark": "rgb(255, 255, 255)"}
+        probe = """() => {
+            const probe = document.body.appendChild(document.createElement("i"));
+            probe.style.color = "CanvasText";
+            const body = getComputedStyle(document.body);
+            const colors = [body.backgroundColor, body.color, getComputedStyle(probe).color];
+            probe.remove();
+            return colors;
+        }"""
+        directory = Path(__file__).resolve().parents[1] / "test-results"
+        directory.mkdir(exist_ok=True)
+        with preview() as fixture, sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            try:
+                for scheme, palette in palettes.items():
+                    context = browser.new_context(
+                        color_scheme=scheme, viewport={"width": 390, "height": 844},
+                        extra_http_headers=fixture.owner,
+                    )
+                    page = context.new_page()
+                    page.goto(fixture.base_url + "/")
+                    article = page.locator(".story h3 a").first.get_attribute("href")
+                    page.goto(fixture.base_url + "/newsroom")
+                    reporter = page.get_by_role("link", name="Open reporter").first.get_attribute("href")
+                    for name, path in (("feed", "/"), ("article", article),
+                                       ("newsroom", "/newsroom"), ("reporter", reporter)):
+                        with self.subTest(scheme=scheme, page=name):
+                            page.goto(fixture.base_url + path)
+                            self.assertEqual(page.evaluate(probe), [
+                                css_rgb(palette["paper"]), css_rgb(palette["ink"]), canvas_text[scheme],
+                            ])
+                            page.screenshot(path=str(directory / f"{scheme}-{name}.png"), full_page=True)
+                    context.close()
             finally:
                 browser.close()
 
