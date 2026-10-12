@@ -571,6 +571,29 @@ class BrowserJourney(unittest.TestCase):
             finally:
                 browser.close()
 
+    def test_more_from_wraps_long_reporter_names_on_phones(self):
+        with preview() as fixture, sync_playwright() as playwright:
+            name = "Correspondent" * 6
+            response = fixture.form("/newsroom/reporters", name=name,
+                                    prompt="Report useful changes.", cadence="daily")
+            reporter = response.headers["Location"].rsplit("/", 1)[-1]
+            for day in (27, 28):
+                fixture.at(f"2026-09-{day}T12:00:00-07:00")
+                run = next(run for run in fixture.work() if run["reporter_id"] == reporter)["id"]
+                response = fixture.result(run, fixture.envelope(
+                    fixture.claim(run), articles=[fixture.article(title=f"Update for September {day}")]))
+                self.assertEqual(response.status_code, 200)
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page(viewport={"width": 390, "height": 844})
+                page.goto(fixture.base_url + "/articles/" + response.json["article_ids"][0])
+                section = page.get_by_role("region", name="More from " + name)
+                expect(section.get_by_role("list")).to_have_attribute("role", "list")
+                expect(section.get_by_role("listitem")).to_have_text("Update for September 27 Sat, Sep 26")
+                self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+            finally:
+                browser.close()
+
     def test_inactive_schedule_fields_do_not_block_submission(self):
         with preview() as fixture, sync_playwright() as playwright:
             browser = playwright.chromium.launch()
