@@ -47,32 +47,43 @@ def get(connection, identity):
     return row
 
 
+def unrecorded_days(reporter):
+    """Due days through today whose runs materialize() has not created yet."""
+    today = clock.today()
+    start = max(
+        date.fromisoformat(reporter["schedule_effective_date"]),
+        date.fromisoformat(reporter["materialized_through"]) + timedelta(days=1),
+    )
+    schedule = json.loads(reporter["schedule_json"])
+    days = []
+    while start <= today:
+        if schedules.occurs(schedule, start):
+            days.append(start)
+        start += timedelta(days=1)
+    return days
+
+
 def materialize(connection):
     today = clock.today()
     for reporter in many(
         connection,
         "SELECT * FROM reporters WHERE deleted_at IS NULL AND completed_at IS NULL",
     ):
-        start = max(
-            date.fromisoformat(reporter["schedule_effective_date"]),
-            date.fromisoformat(reporter["materialized_through"]) + timedelta(days=1),
-        )
-        schedule = json.loads(reporter["schedule_json"])
-        day = start
-        while day <= today:
-            if schedules.occurs(schedule, day):
-                connection.execute(
-                    """INSERT OR IGNORE INTO runs
-                    (id,reporter_id,expected_date,kind,state,created_at) VALUES (?,?,?,'scheduled','pending',?)""",
-                    (
-                        secrets.token_hex(16),
-                        reporter["id"],
-                        day.isoformat(),
-                        clock.now(),
-                    ),
-                )
-            day += timedelta(days=1)
-        if start <= today:
+        for day in unrecorded_days(reporter):
+            connection.execute(
+                """INSERT OR IGNORE INTO runs
+                (id,reporter_id,expected_date,kind,state,created_at) VALUES (?,?,?,'scheduled','pending',?)""",
+                (
+                    secrets.token_hex(16),
+                    reporter["id"],
+                    day.isoformat(),
+                    clock.now(),
+                ),
+            )
+        if (
+            reporter["schedule_effective_date"] <= today.isoformat()
+            and reporter["materialized_through"] < today.isoformat()
+        ):
             connection.execute(
                 "UPDATE reporters SET materialized_through=? WHERE id=?",
                 (today.isoformat(), reporter["id"]),

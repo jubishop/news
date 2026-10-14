@@ -89,7 +89,9 @@ cannot reset the allowance.
 Dates already satisfied by later success do not reopen. The owner accepted
 instruction-edit recovery September 25 without a further stated reason. It
 permits correction without a Run Now control, at the cost of requesting new
-work whenever failed instructions change.
+work whenever failed instructions change. Since October 14, an
+[explicit retry](server-contract.md#explicit-retries) can also reopen the
+latest failed run without changing instructions.
 
 Pause acknowledgments record contact and keep unfinished dates. On resume,
 combine unfinished due dates by the same catch-up rule. A valid attempt

@@ -112,6 +112,15 @@ class Batch:
         print(f"Run {run_id}: {message}", file=sys.stderr, flush=True)
         notify(self.settings, worker_failed=True)
 
+    def reopen_failed(self):
+        reopened = self.api.call("/retries", {}).get("runs")
+        if not isinstance(reopened, list):
+            raise WorkerError("The server returned an invalid retry response.")
+        for job in reopened:
+            print(f'Reopened {job["reporter_name"]} ({job["expected_date"]}) with three new attempts.', flush=True)
+        if not reopened:
+            print("No failed runs can be retried; running a normal batch.", flush=True)
+
     def discover(self):
         path = self.root / "checkin.json"
         request = {"request_id": secrets.token_hex(16)}
@@ -224,7 +233,7 @@ class Batch:
         return 1 if self.errors or self.failed_runs else 0
 
 
-def run(settings):
+def run(settings, retry_failed=False):
     settings = dict(settings)
     settings.setdefault("state_dir", str(Path.home() / ".local/state/news-worker"))
     settings.setdefault("claude", shutil.which("claude") or "claude")
@@ -241,9 +250,14 @@ def run(settings):
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
+            if retry_failed:
+                raise WorkerError("The worker is running. Retry failed runs after the batch finishes.") from None
             print("News worker is already running; this start was skipped.", flush=True)
             return 0
         batch = Batch(settings, lock.fileno())
+        if retry_failed:
+            # Only this explicit command reopens exhausted runs; batches never do.
+            batch.reopen_failed()
         result = batch.execute()
         notify(settings, worker_failed=batch.errors)
         return result
@@ -254,6 +268,7 @@ def main():
     parser.add_argument("--config", type=Path, default=Path.home() / ".config/news/worker.json")
     parser.add_argument("--check", action="store_true", help="Check Claude Code login and API access without claiming work or invoking a model.")
     parser.add_argument("--prepare-history", action="store_true", help="Refresh and verify local history search without claiming or publishing work.")
+    parser.add_argument("--retry-failed", action="store_true", help="Reopen each reporter's failed latest run with three new attempts, then run a batch now.")
     args = parser.parse_args()
     settings = {}
     try:
@@ -283,11 +298,11 @@ def main():
             NewsAPI(settings).call("/articles/search?limit=1")
             print("Claude Code subscription login, QMD version, and News API access verified. No model was called.")
             return 0
-        return run(settings)
+        return run(settings, retry_failed=args.retry_failed)
     except (WorkerError, OSError, ValueError, KeyError, Problem) as exc:
         # Do not print config contents, credentials, or remote response bodies.
         print(str(exc) if isinstance(exc, WorkerError) else "Worker setup or local state is invalid; inspect the private configuration and state.", file=sys.stderr)
-        if not args.check and not args.prepare_history:
+        if not (args.check or args.prepare_history or args.retry_failed):
             notify(settings, worker_failed=True)
         return 1
 

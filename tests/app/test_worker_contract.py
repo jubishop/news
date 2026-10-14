@@ -75,6 +75,38 @@ else:
         self.assertEqual(sum(len(row["attempts"]) for row in history), 1)
         self.assertEqual(self.work(), [])
 
+    def test_retry_command_reopens_an_exhausted_run_and_finishes_it(self):
+        reporter, run_id = self.due()
+        for _ in range(3):
+            claim = self.claim(run_id)
+            self.result(run_id, self.envelope(claim, outcome="failed", articles=[], error={
+                "code": "research_failed", "message": "Spend limit reached", "retryable": True,
+            }))
+            self.clock.return_value += 16 * 60
+        self.assertEqual(self.work(), [])
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / "claude"
+            executable.write_text(f"#!{sys.executable}\n" + '''
+import json, sys
+if "--version" in sys.argv:
+    print("2.1.296 (Claude Code)")
+elif sys.argv[1:3] == ["auth", "status"]:
+    print(json.dumps({"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty"}))
+else:
+    print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": "connected"}]}))
+    print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "structured_output": {"outcome": "nothing_to_publish", "articles": [], "reason": "Nothing new", "error": None}}))
+''')
+            executable.chmod(0o700)
+            self.assertEqual(run({
+                "server_url": "https://news.example.com", "client_id": "fixture-id",
+                "client_secret": "fixture-secret", "state_dir": str(root / "state"),
+                "claude": str(executable), "concurrency": 1, "qmd_command": fake_qmd(root),
+            }, retry_failed=True), 0)
+        latest, = self.client.get(f"/api/v1/worker/reporters/{reporter}/runs", headers=self.worker).json["runs"]
+        self.assertEqual((latest["state"], latest["retry_generation"]), ("nothing_to_publish", 2))
+        self.assertEqual([a["outcome"] for a in latest["attempts"]], ["failed"] * 3 + ["nothing_to_publish"])
+
     def test_real_api_receives_agent_article_and_renders_it_publicly(self):
         reporter = self.reporter()
         self.at("2026-09-27T06:00:00-07:00")

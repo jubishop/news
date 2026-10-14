@@ -487,3 +487,69 @@ def result(connection, run_id, worker, values):
     if outcome == "skipped_paused" or state == "failed":
         incidents.resolve(connection, "overdue:" + run_id)
     return receipt
+
+
+def retry_refusal(connection, reporter, run):
+    """Why an explicit retry cannot reopen this run, or None when it can."""
+    if run["state"] != "failed":
+        return "Only a failed run can be retried."
+    if reporter["deleted_at"] or reporter["completed_at"]:
+        return "This reporter is retired."
+    if reporter["paused"]:
+        return "Resume the reporter before retrying its run."
+    # Later work already covers an older failure; due days count before the
+    # worker's next check-in records them.
+    later = connection.execute(
+        "SELECT 1 FROM runs WHERE reporter_id=? AND expected_date>?",
+        (reporter["id"], run["expected_date"]),
+    ).fetchone()
+    if later or reporters.unrecorded_days(reporter):
+        return "Only the reporter's latest run can be retried."
+    return None
+
+
+def retry_candidate(connection, reporter):
+    run = one(
+        connection,
+        "SELECT * FROM runs WHERE reporter_id=? ORDER BY expected_date DESC LIMIT 1",
+        (reporter["id"],),
+    )
+    return run if run and not retry_refusal(connection, reporter, run) else None
+
+
+def retry(connection, run_id):
+    """Reopen an exhausted run with a new bounded allowance, keeping its attempts."""
+    reporters.materialize(connection)
+    run = get_run(connection, run_id)
+    refusal = retry_refusal(connection, reporters.get(connection, run["reporter_id"]), run)
+    if refusal:
+        raise Problem(refusal, 409, "retry_unavailable")
+    connection.execute(
+        """UPDATE runs SET state='pending',finished_at=NULL,retry_not_before=NULL,
+        retry_generation=retry_generation+1 WHERE id=?""",
+        (run_id,),
+    )
+    incidents.resolve(connection, "failed:" + run_id)
+    return get_run(connection, run_id)
+
+
+def retry_failed(connection, values):
+    v.object_fields(values, (), ())
+    reporters.materialize(connection)
+    reopened = []
+    for row in many(
+        connection,
+        "SELECT id FROM reporters WHERE deleted_at IS NULL AND completed_at IS NULL ORDER BY created_at,id",
+    ):
+        reporter = reporters.get(connection, row["id"])
+        candidate = retry_candidate(connection, reporter)
+        if candidate:
+            run = retry(connection, candidate["id"])
+            reopened.append({
+                "id": run["id"],
+                "reporter_id": reporter["id"],
+                "reporter_name": reporter["name"],
+                "expected_date": run["expected_date"],
+                "retry_generation": run["retry_generation"],
+            })
+    return {"runs": reopened}

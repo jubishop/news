@@ -451,8 +451,9 @@ timings remain to be specified where noted.
 - Report errors explicitly and use the accepted bounded retry and email policy.
   The server must also recover claims abandoned by a disconnected worker.
 - Follow the accepted [contractor recovery rule](product-design.md#recurring-reporters-and-one-time-contractors).
-  An exhausted assignment remains failed until changed instructions authorize
-  a new retry allowance or a later scheduled run succeeds. Later success also
+  An exhausted assignment remains failed until changed instructions or an
+  [explicit retry](server-contract.md#explicit-retries) authorize a new retry
+  allowance, or a later scheduled run succeeds. Later success also
   satisfies earlier failed dates while retaining their history. The worker
   discovers available work through its normal check and must not restart
   exhausted research on its own each day.

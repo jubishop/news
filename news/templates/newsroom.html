@@ -68,6 +68,13 @@
                         </dd>
                     </div>
                 </dl>
+                {% if reporter.retry_run_id %}
+                    <form method="post"
+                          class="run-retry"
+                          action="{{ url_for('pages.retry_run',identity=reporter.retry_run_id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}"><button class="button quiet" type="submit">Retry failed run</button>
+                    </form>
+                {% endif %}
                 <a class="text-link"
                    href="{{ url_for('pages.reporter_detail',identity=reporter.id) }}">Open reporter <span aria-hidden="true">→</span></a></article>
         {% endfor %}

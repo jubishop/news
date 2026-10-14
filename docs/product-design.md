@@ -75,15 +75,20 @@ newsroom request would not cause immediate execution. The tradeoff is that
 extra runs require access to the worker's machine. The specific worker-side
 command and its API interaction remain part of the later worker design.
 
-Accepted on October 14, 2026: a failed run can be retried immediately from
-both the newsroom and a worker command. Only the reporter's latest run is
-eligible. This supersedes the September 25 omission for failed runs only;
-scheduled work still waits for the daily worker check. The owner chose both
-entry points and latest-run eligibility. The owner's stated reason is not
-recorded. The context is that two spend-limit failures that day were reopened
-by hand over SSH. How an immediate retry counts against the bounded retry
-allowance remains an implementation detail to specify. The work is tracked in
-[GitHub issue #43](https://github.com/jubishop/news/issues/43).
+Accepted on October 14, 2026: a failed run can be retried explicitly, both
+from the newsroom and with one command on the worker's Mac. Only the
+reporter's latest run is eligible, while the reporter is active. This
+supersedes the September 25 omission for failed runs only; scheduled work
+still waits for the daily worker check. The owner chose both entry points and
+latest-run eligibility. The owner's stated reason is not recorded. The context
+is that two runs exhausted their attempts that day because of a Claude spend
+limit, and were reopened by hand over SSH. The newsroom control reopens the
+run for the worker's next start; as the September 25 reason anticipated, it
+cannot run research immediately. The worker command reopens eligible runs and
+starts a batch at once. Each retry grants a new bounded allowance of three
+attempts. The [retry rules](server-contract.md#explicit-retries) and
+[procedure](worker-operations.md#retrying-failed-runs) define the details,
+tracked in [GitHub issue #43](https://github.com/jubishop/news/issues/43).
 
 ### Pausing reporters
 
@@ -435,7 +440,8 @@ The server also detects [missing run outcomes](reporting-worker.md#timeliness-an
 independently of worker-reported errors.
 Apply the accepted [alert grouping policy](reporting-worker.md#alert-grouping)
 when a worker outage affects several reporters. Keep their individual missing
-results visible while sending one outage email without daily reminders.
+results visible while sending one outage email without daily reminders. The
+owner can also [retry a failed run explicitly](#newsroom-controls).
 
 Accepted on October 1, 2026 (td-07237e): add immediate, local macOS notices for
 final reporter failures and worker operational errors caught by the Mac worker.

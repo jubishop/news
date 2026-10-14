@@ -114,6 +114,9 @@ the requested change. If SSH loses the reply or times out, the write may
 have committed. Inspect `list` and `show` before deciding whether to retry;
 do not repeat a mutation blindly. The helper does not retry writes.
 
+This helper does not retry runs. To retry a reporter's failed latest run, follow
+[retrying failed runs](../../../docs/worker-operations.md#retrying-failed-runs).
+
 Connection defaults are in `--help`. Consult the
 [hosting record](../../../memory/production-hosting.md) if infrastructure changes.
 Use the owner's normal administrative SSH access; the restricted deployment

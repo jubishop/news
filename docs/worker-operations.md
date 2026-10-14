@@ -147,12 +147,12 @@ Validation failures include the specific contract error in the run history so
 later attempts can correct it. Other research failures retain private diagnostics.
 The server continues to accept dates only.
 
-An exhausted recurring run does not reopen on worker restart. For operator-led
-recovery of a retained draft, first validate the corrected result and confirm
-its reporter, original assignment, and failed-run receipt. Acquire the worker
-lock, preserve pending state, and take a consistent private server database
-backup. Reopen only the verified failed run with a new retry generation, keeping
-all prior attempts. Claim a fresh attempt through the worker API, save its
+An exhausted run does not reopen on worker restart; [retry it](#retrying-failed-runs)
+explicitly for new research. For operator-led recovery of a retained draft,
+first validate the corrected result and confirm its reporter, original
+assignment, and failed-run receipt. Acquire the worker lock and preserve
+pending state. Reopen only the verified failed run with the newsroom's retry
+control, which keeps all prior attempts. Claim a fresh attempt through the worker API, save its
 ownership and corrected result durably, and submit through the normal result
 endpoint. Verify the receipt, article contents, and resolved incident. Reuse
 the saved claim and submission IDs after an uncertain response; never replay a
@@ -173,9 +173,52 @@ failed original jobs. This delay releases process slots after each round and
 avoids early claims. It does not continuously discover new daily assignments.
 Exhausted or nonretryable failures stay visible on the server. Restarting during
 a server retry delay can defer that work to the next daily batch. This is
-acceptable daily discovery behavior; use an explicit local start for earlier
-recovery if needed. A crash during unfinished research creates an explicit
+acceptable daily discovery behavior; use an explicit local start, such as the
+[retry command](#retrying-failed-runs), for earlier recovery if needed. A crash during unfinished research creates an explicit
 replacement attempt when the assignment is next offered.
+
+## Retrying failed runs
+
+On October 14, 2026, two runs exhausted their attempts because the owner's
+Claude subscription had reached its monthly spend limit, and recovery required
+a hand-written server database change. The owner then
+[accepted explicit retries](product-design.md#newsroom-controls) from both the
+newsroom and a one-step worker command, limited to each reporter's latest run.
+
+An [explicit retry](server-contract.md#explicit-retries) gives a failed run
+three new attempts. It keeps the original due date and earlier attempts and
+resolves the failure notice. Only the reporter's latest run qualifies, and
+only while the reporter is active. A failure that a later due date already
+covers stays closed. Fix the cause first: `--check` does not establish that
+the subscription has remaining allowance.
+
+From the permanent checkout on the Mac, run this while no batch is running:
+
+```sh
+bin/worker --config ~/.config/news/worker.json --retry-failed
+```
+
+The command takes the worker lock and asks the server to reopen every eligible
+failed run. It prints each reopened reporter and due date, then runs a normal
+batch in the foreground. That batch also processes runs already reopened in
+the newsroom, so the command is useful even when nothing new reopens. If a
+batch holds the lock, the command exits without reopening anything. Output
+goes to the terminal, not `scheduled.log`; per-attempt logs are unchanged.
+A batch can take up to 30 minutes per attempt, plus 15-minute retry rounds.
+Agents should run the command in the background and wait for it to finish.
+
+In the newsroom, use **Retry failed run** on the reporter's card or
+**Retry this run** in its reporting history. The worker researches the run at
+its next start. To start now, run the command above or start the installed
+LaunchAgent, which writes `scheduled.log` like a scheduled batch:
+
+```sh
+launchctl kickstart gui/$(id -u)/com.jubishop.news.worker
+```
+
+The worker service token can reopen failed runs through the API, but only the
+explicit command uses it; scheduled batches never reopen exhausted work on
+their own.
 
 ## Shared article writing guidance
 
@@ -341,6 +384,10 @@ LaunchAgents or cron entries.
 The crash regression kills a real batch supervisor with SIGKILL while a fake
 researcher and its descendant remain alive. It verifies deadline cleanup,
 duplicate-start exclusion, unchanged pending state, and a later replacement.
+
+Retry tests cover owner and worker eligibility, repeated requests, the
+newsroom controls, the `--retry-failed` command with and without the batch
+lock, and a reopened run finishing through the real API.
 
 Focused command:
 

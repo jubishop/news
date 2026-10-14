@@ -139,6 +139,7 @@ worker. Server validation cannot verify a claim or the quality of its research.
 | `POST /newsroom/reporters` | Create a reporter. |
 | `POST /newsroom/reporters/{id}` | Save name, instructions, and schedule. |
 | `POST /newsroom/reporters/{id}/{pause,resume,delete}` | Change reporter lifecycle. |
+| `POST /newsroom/runs/{id}/retry` | [Retry](#explicit-retries) a reporter's failed latest run. |
 | `POST /newsroom/schedule-preview` | Preview a proposed schedule's first future date; legacy GET remains supported. |
 | `GET /newsroom/trash` | Recoverable articles and removal deadlines. |
 | `POST /newsroom/articles/{id}/{delete,restore}` | Move an article to Trash or restore it. |
@@ -171,7 +172,8 @@ Only fields relevant to the chosen cadence apply. For edits, preview accepts
 date, or null when only due dates remain. `next_date_label` is that date as the
 newsroom displays it, such as `Thu, Oct 1`, with the year added outside the
 current Pacific year, or null with `next_date`. Owner history accepts
-`page` for runs and `articles_page` for stories. There is no Run Now, article
+`page` for runs and `articles_page` for stories. There is no Run Now, apart
+from the [explicit retry](#explicit-retries) of a failed latest run, article
 editor, per-reporter model selection, reassignment, or feedback inbox.
 
 The newsroom posts preview fields with its CSRF token so long date lists do
@@ -190,6 +192,7 @@ durable local storage before making the corresponding request.
 | `POST /runs/{id}/claim` | Start or explicitly replace an attempt. |
 | `POST /runs/{id}/renew` | Extend an unfinished attempt's ownership information. |
 | `POST /runs/{id}/result` | Atomically submit a result and receive its receipt. |
+| `POST /retries` | [Retry](#explicit-retries) every eligible failed run. Body: `{}`. |
 | `GET /reporters/{id}/runs` | Paginated factual history, outcomes, errors, and attempt timestamps. |
 | `GET /articles/search` | Search retained article text/metadata and supplied coverage dates. |
 | `GET /articles/manifest` | Bounded ID/revision listing for consistent archive synchronization. |
@@ -249,6 +252,24 @@ due dates and attempts remain.
 A later scheduled contractor run has its own allowance. Its success satisfies
 earlier failed dates, including exhausted ones. Repeated checks alone never
 replenish an exhausted allowance, and satisfied failures never reopen.
+
+### Explicit retries
+
+An explicit retry reopens a failed run with a new bounded generation. The run
+returns to `pending` with its original due date and every earlier attempt, and
+its failure notice resolves. Only the reporter's latest run can reopen, and
+only while the reporter is active: not paused, removed, or completed. A later
+run, or a due date that the next check-in has not yet recorded, keeps the
+failure closed. Other runs return `409 retry_unavailable` from the owner route.
+A reopened run is no longer failed, so a repeated request cannot add another
+generation. Discovery then treats it like any pending run; an older recurring
+date joins the current catch-up.
+
+`POST /retries` applies this rule to every reporter and returns
+`runs:[{id,reporter_id,reporter_name,expected_date,retry_generation}]` for the
+runs it reopened, or an empty list. Only the worker's explicit
+[retry command](worker-operations.md#retrying-failed-runs) calls it; batches
+never reopen exhausted work on their own.
 
 ### Results and receipts
 

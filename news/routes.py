@@ -138,6 +138,8 @@ def newsroom():
                     (reporter["id"], clock.today().isoformat()),
                 ).fetchone()
             )
+            candidate = jobs.retry_candidate(connection, reporter)
+            reporter["retry_run_id"] = candidate["id"] if candidate else None
         alerts = many(
             connection,
             "SELECT * FROM incidents WHERE resolved_at IS NULL ORDER BY first_seen_at DESC LIMIT 100",
@@ -177,6 +179,7 @@ def new_reporter():
         "reporter.html",
         reporter=None,
         runs=[],
+        retry_run_id=None,
         articles=[],
         weekdays=schedules.WEEKDAYS,
         tomorrow=(clock.today() + timedelta(days=1)).isoformat(),
@@ -207,6 +210,7 @@ def reporter_detail(identity):
             for attempt in run["attempts"]:
                 attempt["snapshot"] = json.loads(attempt.pop("config_snapshot_json"))
         contractors.annotate_history(connection, reporter, runs)
+        candidate = jobs.retry_candidate(connection, reporter)
         article_results = content.search(
             connection, {"reporter_id": identity, "limit": 20, "page": articles_page}
         )
@@ -215,6 +219,7 @@ def reporter_detail(identity):
         "reporter.html",
         reporter=reporter,
         runs=runs,
+        retry_run_id=candidate["id"] if candidate else None,
         articles=articles,
         weekdays=schedules.WEEKDAYS,
         tomorrow=(clock.today() + timedelta(days=1)).isoformat(),
@@ -250,6 +255,14 @@ def reporter_state(identity, action):
         else url_for("pages.reporter_detail", identity=identity),
         code=303,
     )
+
+
+@pages.post("/newsroom/runs/<identity>/retry")
+def retry_run(identity):
+    with transaction(database(), write=True) as connection:
+        run = jobs.retry(connection, identity)
+    flash("Retry queued with three new attempts. The worker starts it at its next run.")
+    return redirect(url_for("pages.reporter_detail", identity=run["reporter_id"]), code=303)
 
 
 @pages.get("/newsroom/schedule-preview")
@@ -302,6 +315,13 @@ def article_state(identity, action):
 def check_in():
     with transaction(database(), write=True) as connection:
         result = jobs.discover(connection, g.worker, body())
+    return jsonify(result)
+
+
+@api.post("/retries")
+def retries():
+    with transaction(database(), write=True) as connection:
+        result = jobs.retry_failed(connection, body())
     return jsonify(result)
 
 

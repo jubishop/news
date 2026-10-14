@@ -167,8 +167,16 @@
 <section class="history-section">
     <p class="eyebrow">Reporting history</p>
     {% for run in runs %}
-        <details class="run-row">
+        <details class="run-row" {% if run.id == retry_run_id %}open{% endif %}>
             <summary><span>{{ run.expected_date|short_date }}</span><span>{{ run.kind|replace('_', ' ') }}</span><span class="badge {% if run.late or run.state == 'failed' %}danger{% endif %}">{{ run.state|replace('_', ' ') }}{{ ' · late' if run.late else '' }}</span></summary>
+            {% if run.id == retry_run_id %}
+                <form method="post"
+                      class="run-retry"
+                      action="{{ url_for('pages.retry_run',identity=run.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ session.csrf_token }}"><button class="button quiet" type="submit">Retry this run</button>
+                    <p class="muted">Three new attempts start at the worker's next run. Earlier attempts stay below.</p>
+                </form>
+            {% endif %}
             {% if run.closed_reason %}
                 <p>{{ run.closed_reason }}</p>
             {% endif %}

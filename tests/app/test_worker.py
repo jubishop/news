@@ -46,6 +46,7 @@ class Newsroom:
         self.lose_claim_responses = 0
         self.lose_result_responses = 0
         self.runs = []
+        self.reopenable = []
         self.failures = {}
         self.truncated_responses = {}
         self.archive = [dict(ARTICLE, id="old", reporter_id="reporter0")]
@@ -73,6 +74,13 @@ class Newsroom:
                 return failure[1], {"error": "fixture_failure", "message": "Unavailable"}
             if route == "/check-ins":
                 return 200, {"reporting_date": "2026-09-27", "runs": deepcopy(self.runs)}
+            if route == "/retries":
+                reopened, self.reopenable = self.reopenable, []
+                self.runs.extend(reopened)
+                return 200, {"runs": [{
+                    "id": job["id"], "reporter_id": job["reporter"]["id"], "reporter_name": job["reporter"]["name"],
+                    "expected_date": job["expected_date"], "retry_generation": 2,
+                } for job in reopened]}
             if route == "/articles/search":
                 return 200, {"articles": self.archive, "has_more": False}
             if route.startswith("/articles/"):
@@ -826,6 +834,46 @@ print(json.dumps(final))
         self.assertEqual(self.captures(), [])
         self.assertEqual(self.server.claims, {})
         self.assertTrue(all("/articles/" in path for _, path, _ in self.server.requests))
+
+    def retry_command(self):
+        config = self.root / "worker.json"
+        config.write_text(json.dumps(self.settings))
+        config.chmod(0o600)
+        (self.root / "fake.json").write_text(json.dumps(self.fake_config))
+        return subprocess.run([sys.executable, "-B", "-m", "news.worker", "--config", str(config), "--retry-failed"],
+                              capture_output=True, text=True, timeout=30)
+
+    def test_retry_failed_reopens_failures_then_researches_them_immediately(self):
+        self.server.add(0)
+        self.server.add(1)
+        failed = self.server.runs.pop()
+        self.server.reopenable.append(failed)
+        result = self.retry_command()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Reopened Reporter 1 (2026-09-27)", result.stdout)
+        routes = [path for method, path, _ in self.server.requests if method == "POST"]
+        self.assertEqual(routes[0], "/api/v1/worker/retries")
+        self.assertEqual(self.server.requests[0][2], {})
+        self.assertEqual(sorted(r["reporter"]["id"] for r in map(json.loads, (
+            c["prompt"].split("Assignment JSON:\n", 1)[1] for c in self.captures()))), ["reporter0", "reporter1"])
+        self.assertEqual([r["outcome"] for r in self.server.results], ["published", "published"])
+
+        result = self.retry_command()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("No failed runs can be retried", result.stdout)
+
+    def test_retry_failed_refuses_while_a_batch_holds_the_lock(self):
+        self.server.reopenable.append(self.server.add())
+        self.server.runs.clear()
+        state = Path(self.settings["state_dir"])
+        state.mkdir(mode=0o700, parents=True)
+        with (state / "worker.lock").open("a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            result = self.retry_command()
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("The worker is running", result.stderr)
+        self.assertEqual(self.server.requests, [])
+        self.assertEqual(len(self.server.reopenable), 1)
 
     def test_broken_history_is_an_explicit_failure_and_paused_work_still_finishes(self):
         self.server.add(0)

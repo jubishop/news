@@ -133,8 +133,9 @@ nor resumption completes the contractor.
 
 Engineering bookkeeping for instruction-edit recovery: increment
 `retry_generation` only when changed instructions reopen an exhausted
-contractor's unresolved assignment. Dates satisfied by later success cannot
-reopen. Set the same run back to `pending`, clear its terminal timestamp,
+contractor's unresolved assignment, or when an
+[explicit retry](server-contract.md#explicit-retries) reopens a reporter's
+failed latest run. Dates satisfied by later success cannot reopen. Set the same run back to `pending`, clear its terminal timestamp,
 and preserve its original due date, attempts, and errors. Prior failure times
 remain in the attempts and incidents. Renaming, ordinary polling, unchanged
 instruction saves, and pause acknowledgments cannot reset the retry budget.
