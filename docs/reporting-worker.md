@@ -103,7 +103,10 @@ Mac is off or the owner is logged out; server catch-up handles that work.
 Clarified by the owner on September 25, 2026: the worker checks for new work
 once a day, at a time chosen on the worker side. The server does not need to
 know that time. This supports the accepted day-based schedules and is the
-reason the newsroom has [no manual-run action](product-design.md#newsroom-controls).
+reason the newsroom has [no general manual-run
+action](product-design.md#newsroom-controls). The [failed-run
+retry](product-design.md#newsroom-controls) accepted October 14, 2026 is the
+exception.
 The tradeoff is that new assignments or settings saved after the daily check
 may wait until the next check to be picked up. Under the accepted
 [schedule activation rule](product-design.md#schedules-by-day), new schedules

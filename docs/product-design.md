@@ -75,6 +75,16 @@ newsroom request would not cause immediate execution. The tradeoff is that
 extra runs require access to the worker's machine. The specific worker-side
 command and its API interaction remain part of the later worker design.
 
+Accepted on October 14, 2026: a failed run can be retried immediately from
+both the newsroom and a worker command. Only the reporter's latest run is
+eligible. This supersedes the September 25 omission for failed runs only;
+scheduled work still waits for the daily worker check. The owner chose both
+entry points and latest-run eligibility. The owner's stated reason is not
+recorded. The context is that two spend-limit failures that day were reopened
+by hand over SSH. How an immediate retry counts against the bounded retry
+allowance remains an implementation detail to specify. The work is tracked in
+[GitHub issue #43](https://github.com/jubishop/news/issues/43).
+
 ### Pausing reporters
 
 Accepted on September 25, 2026: include Pause/Resume in the v1 newsroom.
