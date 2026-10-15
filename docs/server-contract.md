@@ -263,7 +263,8 @@ run, or a due date that the next check-in has not yet recorded, keeps the
 failure closed. Other runs return `409 retry_unavailable` from the owner route.
 A reopened run is no longer failed, so a repeated request cannot add another
 generation. Discovery then treats it like any pending run; an older recurring
-date joins the current catch-up.
+date joins the current catch-up. A reopened run past its due date raises a
+`run_overdue` incident until an attempt records an outcome.
 
 `POST /retries` applies this rule to every reporter and returns
 `runs:[{id,reporter_id,reporter_name,expected_date,retry_generation}]` for the

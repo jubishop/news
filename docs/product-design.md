@@ -222,6 +222,9 @@ on an opaque paper-colored rounded square that reads on light and dark tabs.
 The N is an SVG path, so it never depends on installed fonts. Its PNG sizes
 were rendered from that SVG once and committed, with no build step.
 
+On October 14, 2026, the owner decided that no real-iPhone "Add to Home Screen"
+check is wanted; no reason was stated.
+
 An article's preview shows its title, summary, and lead photo when it has one.
 Every feed variant shares one site-level preview. Newsroom pages, which
 Cloudflare Access gates, and error pages carry no preview tags. The tradeoff
@@ -249,6 +252,9 @@ tradeoff is that a reader cannot choose a scheme for this
 site alone; only the device setting changes it. Photos and the site icon look
 the same in both schemes.
 [Issue #35](https://github.com/jubishop/news/issues/35) records the details.
+On October 14, 2026, the owner decided to leave light-mode field borders
+unchanged. They predate dark mode and are outside the 3:1 contrast check; no
+reason was stated.
 
 ### More from the reporter
 
