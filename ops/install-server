@@ -71,9 +71,13 @@ ln -s "$release" "/opt/news/next.$$"
 mv -Tf "/opt/news/next.$$" /opt/news/current
 install -m 0644 "$kit"/news*.service "$kit"/news*.timer /etc/systemd/system/
 systemctl daemon-reload
+# Migrate under the same sandbox as the services, with systemd's clean environment.
 if ! systemd-run --wait --collect --pipe --unit=news-migrate --property=User=news --property=Group=news \
     --property=WorkingDirectory=/opt/news/current --property=EnvironmentFile=/etc/news/app.env \
-    --property=UMask=0077 /opt/news/current/.venv/bin/python -B -m news.cli init-db; then
+    --property=Environment=PYTHONDONTWRITEBYTECODE=1 --property=UMask=0077 \
+    --property=NoNewPrivileges=yes --property=PrivateTmp=yes --property=ProtectHome=yes \
+    --property=ProtectSystem=strict --property=ReadWritePaths=/var/lib/news \
+    /opt/news/current/.venv/bin/python -B -m news.cli init-db; then
     echo 'Migration failed. Services remain stopped. Inspect the database and pre-release snapshot before recovery.' >&2
     exit 1
 fi

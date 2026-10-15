@@ -25,6 +25,7 @@ import json
 import os
 from pathlib import Path, PurePosixPath
 import re
+import resource
 import subprocess
 import sys
 import tarfile
@@ -34,6 +35,12 @@ import uuid
 NEWS = Path("/opt/news")
 KIT = Path("/usr/local/lib/news-deploy")
 ARCHIVE_LIMIT = 25 * 1024 * 1024
+# Cap the receiver's address space so a hostile archive cannot exhaust the small,
+# swapless shared host while parsing. The 25 MiB input cap does not by itself
+# bound header expansion in every interpreter, and this process also only needs
+# to buffer and parse the archive. Children (systemd-run, journalctl) inherit it;
+# the installer runs in its own systemd unit, not under this limit.
+ADDRESS_SPACE_LIMIT = 768 * 1024 * 1024
 # The deploy kit: these ops/ scripts and the ops/systemd units. The receiver
 # is installed in /usr/local/sbin; the other files go to KIT.
 SCRIPTS = ("receive-release", "install-server", "build-environment", "rebuild-environment")
@@ -114,27 +121,49 @@ def checked_members(archive):
     return members
 
 
+def limit_address_space():
+    """Cap this process's address space; children inherit it. Best effort."""
+    try:
+        soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    except (OSError, ValueError, AttributeError):
+        return
+    target = ADDRESS_SPACE_LIMIT if hard == resource.RLIM_INFINITY else min(ADDRESS_SPACE_LIMIT, hard)
+    try:
+        resource.setrlimit(resource.RLIMIT_AS, (target, hard))
+    except (OSError, ValueError):
+        pass
+
+
+def parse_and_extract(revision, data):
+    """Parse and extract the archive under the memory cap; return the chosen release directory."""
+    try:
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as archive:
+            members = checked_members(archive)
+            expected = kit_digest(kit_files(
+                (str(PurePosixPath(m.name)), archive.extractfile(m).read())
+                for m in members if m.isfile() and kit_name(str(PurePosixPath(m.name)))
+            ))
+            installed = installed_digest()
+            if installed != expected:
+                raise ValueError(
+                    f"The installed deploy kit ({installed[:12]}) does not match ops/ at {revision} ({expected[:12]}). "
+                    f"Nothing changed. From a trusted checkout, run bin/install-deploy-kit root@HOST {revision}, "
+                    "then rerun the deploy job.")
+            release = Path(tempfile.mkdtemp(prefix=revision + "-", dir=NEWS / "releases"))
+            release.chmod(0o755)
+            # The data filter also drops archive ownership, so root owns what it extracts.
+            archive.extractall(release, members=[m for m in members if PurePosixPath(m.name).parts[0] in EXTRACTED],
+                               filter="data")
+    except MemoryError:
+        raise ValueError("Release archive needs too much memory to parse; refused.") from None
+    return release, installed
+
+
 def deploy(revision, stdin):
     data = stdin.read(ARCHIVE_LIMIT + 1)
     if len(data) > ARCHIVE_LIMIT:
         raise ValueError(f"Release archive exceeds {ARCHIVE_LIMIT} bytes.")
-    with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as archive:
-        members = checked_members(archive)
-        expected = kit_digest(kit_files(
-            (str(PurePosixPath(m.name)), archive.extractfile(m).read())
-            for m in members if m.isfile() and kit_name(str(PurePosixPath(m.name)))
-        ))
-        installed = installed_digest()
-        if installed != expected:
-            raise ValueError(
-                f"The installed deploy kit ({installed[:12]}) does not match ops/ at {revision} ({expected[:12]}). "
-                f"Nothing changed. From a trusted checkout, run bin/install-deploy-kit root@HOST {revision}, "
-                "then rerun the deploy job.")
-        release = Path(tempfile.mkdtemp(prefix=revision + "-", dir=NEWS / "releases"))
-        release.chmod(0o755)
-        # The data filter also drops archive ownership, so root owns what it extracts.
-        archive.extractall(release, members=[m for m in members if PurePosixPath(m.name).parts[0] in EXTRACTED],
-                           filter="data")
+    release, installed = parse_and_extract(revision, data)
     (release / "REVISION").write_text(revision + "\n")
     print(f"Deploying {revision} with deploy kit {installed[:12]}.", flush=True)
     unit = "news-deploy-" + uuid.uuid4().hex
@@ -168,4 +197,5 @@ def main():
 
 
 if __name__ == "__main__":
+    limit_address_space()
     sys.exit(main())

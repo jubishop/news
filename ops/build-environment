@@ -36,7 +36,7 @@ systemd-run --wait --collect --pipe --quiet \
     --property=User=news --property=Group=news --property=UMask=0022 \
     --property=NoNewPrivileges=yes --property=PrivateTmp=yes --property=ProtectHome=yes \
     --property=ProtectSystem=strict --property=ReadWritePaths="$environment" \
-    --property=RuntimeMaxSec=10min \
+    --property=KillMode=control-group --property=RuntimeMaxSec=10min \
     /bin/sh -c "$build" build-environment "$python" "$environment" "$requirements"
 # Adopt only directories, regular files, and symbolic links, and no file with another name.
 unexpected=$(find "$environment" \( ! -type d ! -type f ! -type l \) -o \( -type f -links +1 \))
@@ -46,5 +46,22 @@ if [ -n "$unexpected" ]; then
     exit 1
 fi
 chown -R root:root "$environment"
-chmod -R go-w,ug-s "$environment"
+# Re-verify after taking ownership. The build unit's cgroup is killed when its
+# main process exits, but a news process could add a file in the window between
+# the scan above and this chown. Reject anything setuid, setgid, group- or
+# world-writable, and, whenever we actually hold root, anything not root-owned,
+# rather than silently normalizing it. (-perm -MODE and -maxdepth are portable.)
+modes='( -perm -4000 -o -perm -2000 -o -perm -0020 -o -perm -0002 )'
+if [ -n "$(find "$environment" -maxdepth 0 -user root)" ]; then
+    # shellcheck disable=SC2086 # modes is a deliberately unquoted find expression.
+    unsafe=$(find "$environment" \( ! -user root -o ! -group root -o \( ! -type l $modes \) \) -print)
+else
+    # shellcheck disable=SC2086 # modes is a deliberately unquoted find expression.
+    unsafe=$(find "$environment" ! -type l $modes -print)
+fi
+if [ -n "$unsafe" ]; then
+    echo "$environment has entries that are not root-owned or carry unsafe modes; nothing was installed:" >&2
+    printf '%s\n' "$unsafe" >&2
+    exit 1
+fi
 built=true

@@ -7,11 +7,15 @@ the receiver must agree on the kit's files and digest.
 
 from importlib.machinery import SourceFileLoader
 from importlib.util import module_from_spec, spec_from_loader
+import io
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
+import sys
+import tarfile
 import tempfile
 import unittest
 
@@ -145,6 +149,83 @@ class InstallDeployKitTests(unittest.TestCase):
         result = subprocess.run(["shellcheck", "--shell=sh", "-"], input=load_installer().INSTALL,
                                 text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stdout)
+
+
+def can_be_root():
+    if os.geteuid() == 0:
+        return True
+    return subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0
+
+
+@unittest.skipUnless(sys.platform == "linux" and can_be_root(),
+                     "Running the root install script needs a disposable root on Linux")
+class InstallScriptTests(unittest.TestCase):
+    """Run the real root INSTALL script in a chroot, against a fake receiver."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
+        for executable in ("sh", "tar", "install", "mktemp", "rm", "mv", "ln", "stat", "flock"):
+            source = Path(shutil.which(executable)).resolve()
+            for library in re.findall(r"(/[^\s()]+)", subprocess.check_output(["ldd", str(source)], text=True)):
+                self.copy(Path(library), library)
+            self.copy(source, "/bin/" + executable)
+        for directory in ("usr/local/lib", "usr/local/sbin", "run/lock", "tmp", "etc"):
+            (self.root / directory).mkdir(parents=True, exist_ok=True)
+        # The real `install -o root -g root` resolves these names in the chroot.
+        (self.root / "etc/passwd").write_text("root:x:0:0:root:/root:/bin/sh\n")
+        (self.root / "etc/group").write_text("root:x:0:\n")
+        # A stale kit file that the new kit does not include must be removed.
+        (self.root / "usr/local/lib/news-deploy").mkdir(parents=True)
+        (self.root / "usr/local/lib/news-deploy/old-helper").write_text("stale\n")
+
+    def copy(self, source, destination):
+        target = self.root / destination.lstrip("/")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not target.exists():
+            shutil.copy2(source, target)
+
+    def install(self, kit):
+        """Send a {name: (mode, bytes)} kit as a tar on stdin to the INSTALL script under chroot."""
+        stream = io.BytesIO()
+        with tarfile.open(fileobj=stream, mode="w") as archive:
+            for name, (mode, data) in sorted(kit.items()):
+                member = tarfile.TarInfo(name)
+                member.size, member.mode = len(data), mode
+                archive.addfile(member, io.BytesIO(data))
+        return subprocess.run(
+            self.prefix + ["chroot", str(self.root), "/bin/sh", "-c", load_installer().INSTALL],
+            input=stream.getvalue(),
+            env=os.environ | {"PATH": "/bin:/usr/bin:/usr/sbin:/sbin"}, capture_output=True,
+        )
+
+    def test_places_kit_files_with_modes_and_removes_stale_ones(self):
+        # A fake receiver avoids needing a Python interpreter in the chroot; it prints the final status.
+        receiver = b'#!/bin/sh\n[ "$SSH_ORIGINAL_COMMAND" = status ] && echo \'{"active":null,"kit":"0"}\'\n'
+        kit = {
+            "receive-release": (0o755, receiver),
+            "install-server": (0o644, b"# install-server\n"),
+            "build-environment": (0o644, b"# build-environment\n"),
+            "rebuild-environment": (0o755, b"# rebuild-environment\n"),
+            "news.service": (0o644, b"# unit\n"),
+        }
+        result = self.install(kit)
+        self.assertEqual(result.returncode, 0, result.stderr.decode())
+        lib = self.root / "usr/local/lib/news-deploy"
+        self.assertEqual((lib / "install-server").read_bytes(), b"# install-server\n")
+        self.assertEqual((self.root / "usr/local/sbin/news-receive-release").read_bytes(), receiver)
+        self.assertEqual(os.readlink(self.root / "usr/local/sbin/news-rebuild-environment"),
+                         "/usr/local/lib/news-deploy/rebuild-environment")
+        self.assertEqual((lib / "rebuild-environment").stat().st_mode & 0o777, 0o755)
+        self.assertEqual((lib / "install-server").stat().st_mode & 0o777, 0o644)
+        self.assertEqual((self.root / "usr/local/sbin/news-receive-release").stat().st_mode & 0o777, 0o755)
+        # The receiver is not left behind in the kit directory, and the stale helper is gone.
+        self.assertFalse((lib / "receive-release").exists())
+        self.assertFalse((lib / "old-helper").exists())
+        self.assertIn(b"Removed old-helper", result.stdout)
+        self.assertIn(b'{"active":null,"kit":"0"}', result.stdout)
 
 
 if __name__ == "__main__":

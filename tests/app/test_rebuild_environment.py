@@ -1,4 +1,4 @@
-"""Rebuild the active release's environment, with interpreters and runuser faked."""
+"""Rebuild the active release's environment, with interpreters and host commands faked."""
 
 import contextlib
 import fcntl
@@ -36,12 +36,6 @@ case "$1 $2" in
     *) exec "$TEST_PYTHON" -c "import sys; sys.version_info = (@TUPLE@); exec(sys.argv[1])" "$2" ;;
 esac
 """
-RUNUSER = r"""#!/bin/sh
-printf 'runuser|%s|%s\n' "$*" "$PWD" >> "$TEST_LOG"
-[ "$1 $2 $3" = '-u news --' ] || exit 64
-shift 3
-exec "$@"
-"""
 
 
 def load_command():
@@ -64,8 +58,6 @@ class RebuildEnvironmentTests(unittest.TestCase):
         self.log = self.base / "log"
         tools = self.base / "bin"
         tools.mkdir()
-        (tools / "runuser").write_text(RUNUSER)
-        (tools / "runuser").chmod(0o755)
         install_host_tools(tools)
         self.environment = {
             "PATH": str(tools) + os.pathsep + os.environ["PATH"],
@@ -115,6 +107,28 @@ class RebuildEnvironmentTests(unittest.TestCase):
     def active(self):
         return os.readlink(self.release / ".venv")
 
+    def test_malicious_pyvenv_cfg_does_not_hang_or_escalate_when_retiring(self):
+        # The build account writes pyvenv.cfg, so the replaced environment's copy is untrusted.
+        for kind in ("symlink-to-fifo", "fifo", "oversized"):
+            with self.subTest(kind=kind):
+                self.setUp()
+                self.legacy_environment("3.14.8")
+                config = self.release / ".venv/pyvenv.cfg"
+                config.unlink()
+                if kind == "symlink-to-fifo":
+                    fifo = self.base / "trap.fifo"
+                    os.mkfifo(fifo)
+                    config.symlink_to(fifo)  # Following it would block root forever.
+                elif kind == "fifo":
+                    os.mkfifo(config)
+                else:
+                    config.write_text("version = 3.14.8\n" + "padding\n" * 200000)
+                code, _, output = self.rebuild(self.interpreter("3.15.0"))
+                self.assertEqual(code, 0, output)
+                self.assertEqual(self.active(), ".venv-3.15.0")
+                # An unreadable or oversized config is not trusted for rollback; the old env is discarded.
+                self.assertEqual(self.environments(), [".venv", ".venv-3.15.0"])
+
     def test_first_rebuild_swaps_real_environment_for_link_and_keeps_it_for_rollback(self):
         self.legacy_environment("3.14.8")
         code, calls, output = self.rebuild(self.interpreter("3.15.0"))
@@ -126,8 +140,8 @@ class RebuildEnvironmentTests(unittest.TestCase):
         requirements = self.release / "requirements.txt"
         self.assertIn(f"{environment}/bin/python|-m pip install --no-cache-dir --disable-pip-version-check "
                       f"--require-hashes -r {requirements}|", "\n".join(calls))
-        verify = calls.index(f"runuser|-u news -- {environment}/bin/python -B -c import news|{self.release}")
-        self.assertEqual(calls[verify + 1], f"{environment}/bin/python|-B -c import news|{self.release}")
+        # The import check runs the environment's python under a news sandbox, from the release.
+        self.assertIn(f"{environment}/bin/python|-B -c import news|{self.release}", calls)
 
     def test_packages_build_as_news_through_the_kit_and_become_root_owned(self):
         self.legacy_environment("3.14.8")
@@ -142,6 +156,13 @@ class RebuildEnvironmentTests(unittest.TestCase):
         self.assertEqual(names[unit + 1:unit + 4], ["python3", "python", "chown"])
         self.assertEqual(calls[unit + 3].split("|")[1], f"-R root:root {environment}")
         self.assertEqual(names.count("python3"), 2)  # The version probe, then the unit's venv.
+        # The import check runs as news under the services' sandbox, not as root.
+        verify = names.index("systemd-run", unit + 1)
+        for option in ("--property=User=news", "--property=ProtectSystem=strict",
+                       f"--property=WorkingDirectory={self.release}"):
+            self.assertIn(option, calls[verify])
+        self.assertEqual(names[verify + 1], "python")
+        self.assertNotIn("runuser", names)
 
     def test_rollback_reuses_the_environment_for_the_previous_interpreter(self):
         self.legacy_environment("3.14.8")

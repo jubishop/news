@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -257,6 +258,30 @@ class ReceiverTests(unittest.TestCase):
         for version in ((3, 15, 0), (4, 0, 0)):
             with self.subTest(version=version), patch("sys.version_info", version):
                 self.assertEqual(self.receive("status")[0], 0)
+
+    def test_memory_pressure_while_parsing_is_a_clean_refusal(self):
+        # A hostile archive that exhausts memory must refuse, not crash, and change nothing.
+        with patch.object(self.receiver, "checked_members", side_effect=MemoryError):
+            code, calls, _, stderr = self.deploy()
+        self.assertEqual(code, 1)
+        self.assertIn("news-receive-release", stderr)
+        self.assertIn("memory", stderr)
+        self.assertFalse(calls)
+        self.assertEqual(self.releases(), [ACTIVE])
+
+    @unittest.skipUnless(sys.platform == "linux", "RLIMIT_AS is enforced on the Linux production host")
+    def test_address_space_cap_lowers_the_limit(self):
+        import resource
+        original = resource.getrlimit(resource.RLIMIT_AS)
+        try:
+            self.receiver.limit_address_space()
+            soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+            expected = (self.receiver.ADDRESS_SPACE_LIMIT if original[1] == resource.RLIM_INFINITY
+                        else min(self.receiver.ADDRESS_SPACE_LIMIT, original[1]))
+            self.assertEqual(soft, expected)
+            self.assertEqual(hard, original[1])
+        finally:
+            resource.setrlimit(resource.RLIMIT_AS, original)
 
 
 if __name__ == "__main__":

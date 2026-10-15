@@ -69,16 +69,19 @@ the key. The kit is [receive-release](../ops/receive-release), installed at
 - Every [systemd unit](../ops/systemd), which the installer copies to
   `/etc/systemd/system`.
 
-The receiver defines this list. The receiver extracts only `news/` and
-`requirements.txt` into a release, root-owned and read-only to `news`.
-Installing the requirements can run package build code, so build-environment
-runs `venv` and `pip` as `news` in a transient unit that can write only the new
-environment. Systemd stops any process the build leaves behind. Root then
-takes ownership of the environment after checking that it holds only
-directories, regular files without other names, and symbolic links. Root never
-runs the release's environment; migrations, maintenance, and the services run
-as `news`, and the database checkpoint uses the shared runtime as `news`. The
-key can still deploy any release whose kit files match, and that release's
+The receiver defines this list. It caps its own address space before parsing,
+so a hostile archive cannot exhaust the small, swapless shared host while it
+reads the upload. It extracts only `news/` and `requirements.txt` into a
+release, root-owned and read-only to `news`. Installing the requirements can
+run package build code, so build-environment runs `venv` and `pip` as `news`
+in a transient unit that can write only the new environment. Systemd stops any
+process the build leaves behind. Root then takes ownership of the environment
+and re-checks it, rejecting anything not root-owned or with unsafe modes, in
+case a lingering `news` process added a file during the handover. The migration
+and the import check run as `news` under the same sandbox as the services. Root
+never runs the release's environment; migrations, maintenance, and the services
+run as `news`, and the database checkpoint uses the shared runtime as `news`.
+The key can still deploy any release whose kit files match, and that release's
 code runs as `news` with the application's data and credentials.
 
 A deployment compares the archive's kit files, which `git archive` takes from
@@ -92,12 +95,22 @@ bin/install-deploy-kit root@YOUR_SSH_HOST REVISION
 ```
 
 It sends the kit files from `git archive REVISION ops/`, never the working
-tree. Under the deployment lock, the host replaces the kit, removes kit files
-that the revision no longer has, and reports the digest, which must match.
-Then rerun the failed deploy job with **Run workflow** on `main`. Installing
-a kit changes no running service; the next deployment installs its units. A
-later deployment of a revision with a different kit fails until its kit is
-installed. `status` prints the active revision and the installed kit digest.
+tree, and computes the digest by running that revision's own `receive-release`
+locally to select the kit, so the installer, the host receiver, and the deploy
+job agree on the files and digest. Under the deployment lock, the host replaces
+the kit, removes kit files that the revision no longer has, and reports the
+digest, which must match. Then rerun the failed deploy job with **Run
+workflow** on `main`. Installing a kit changes no running service; the next
+deployment installs its units. A later deployment of a revision with a
+different kit fails until its kit is installed. `status` prints the active
+revision and the installed kit digest.
+
+Each release builds its Python environment once as `news`, and
+[build-environment](../ops/build-environment) refuses a `.venv` that already
+exists. The receiver gives every deployment a fresh release directory, so this
+never affects automated releases. A manual `install-server` rerun against a
+release directory whose build already started must use a new directory (or a
+new deployment); do not rerun it over a partially built one.
 
 The workflow uses GitHub's
 [job dependencies](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds)

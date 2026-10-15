@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -61,10 +62,18 @@ def interpreter_version(python):
 
 
 def imports_news(environment, release):
-    """Check the environment as the service account, from the release like the units."""
-    clean = {key: value for key, value in os.environ.items() if not key.startswith("PYTHON")}
-    command = ["runuser", "-u", "news", "--", str(environment / "bin/python"), "-B", "-c", "import news"]
-    return subprocess.run(command, cwd=release, env=clean).returncode == 0
+    """Import News as the service account under the services' sandbox, with a clean environment."""
+    command = [
+        "systemd-run", "--wait", "--collect", "--pipe", "--quiet",
+        "--property=User=news", "--property=Group=news", "--property=UMask=0077",
+        "--property=NoNewPrivileges=yes", "--property=PrivateTmp=yes",
+        "--property=ProtectHome=yes", "--property=ProtectSystem=strict",
+        "--property=WorkingDirectory=" + str(release),
+        "--property=Environment=PYTHONDONTWRITEBYTECODE=1",
+        str(environment / "bin/python"), "-B", "-c", "import news",
+    ]
+    # systemd-run ignores the caller's environment and file descriptors; cwd matches WorkingDirectory.
+    return subprocess.run(command, cwd=release, stdin=subprocess.DEVNULL).returncode == 0
 
 
 def reusable(environment, python, release):
@@ -104,11 +113,31 @@ def exchange(first, second):
         raise OSError(error, os.strerror(error), str(second))
 
 
+def read_small(path, limit=64 * 1024):
+    """Read a small regular file without following a symlink, refusing specials and oversized files.
+
+    The build account writes pyvenv.cfg, so it could leave a symlink or a FIFO
+    that would otherwise hang or exhaust root while it holds the deploy lock.
+    """
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | getattr(os, "O_NONBLOCK", 0))
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
+            raise RebuildError(f"{path} is not a small regular file.")
+        return os.read(fd, limit).decode(errors="replace")
+    finally:
+        os.close(fd)
+
+
 def retire(old, release):
     """Keep a replaced real .venv for rollback when its version name is free."""
     try:
-        match = re.search(r"^version\s*=\s*(\d+\.\d+\.\d+)\s*$", (old / "pyvenv.cfg").read_text(), re.M)
-        keep = release / (".venv-" + match[1]) if match else None
+        text = read_small(old / "pyvenv.cfg")
+    except (OSError, RebuildError):
+        text = ""
+    match = re.search(r"^version\s*=\s*(\d+\.\d+\.\d+)\s*$", text, re.M)
+    keep = release / (".venv-" + match[1]) if match else None
+    try:
         if keep and not (keep.exists() or keep.is_symlink()):
             # Its scripts name <release>/.venv/bin/python, so it works whenever .venv points to it.
             old.rename(keep)

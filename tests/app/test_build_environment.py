@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -27,10 +28,17 @@ case "$1 $2" in
         case "$TEST_LEAVE" in
             hardlink) ln "$environment/lib/package.py" "$environment/lib/other.py" ;;
             fifo) mkfifo "$environment/lib/pipe" ;;
+            worldwritable) : > "$environment/lib/loose.py"; chmod 0666 "$environment/lib/loose.py" ;;
         esac
         ;;
 esac
 """
+
+
+def can_be_root():
+    if os.geteuid() == 0:
+        return True
+    return subprocess.run(["sudo", "-n", "true"], capture_output=True).returncode == 0
 
 
 class BuildEnvironmentTests(unittest.TestCase):
@@ -114,6 +122,59 @@ class BuildEnvironmentTests(unittest.TestCase):
                 self.assertTrue((self.environment / "kept").exists())
                 self.assertEqual(sorted(path.name for path in self.release.iterdir()),
                                  [".venv", "requirements.txt"])
+
+
+@unittest.skipUnless(sys.platform == "linux" and can_be_root(),
+                     "Real ownership normalization needs root on Linux")
+class BuildEnvironmentOwnershipTests(unittest.TestCase):
+    """Run the real chown and the post-chown verification, not a faked chown."""
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.base = Path(temporary.name).resolve()
+        self.release = self.base / "opt/news/releases/fixture"
+        self.release.mkdir(parents=True)
+        self.requirements = self.release / "requirements.txt"
+        self.requirements.touch()
+        self.environment = self.release / ".venv"
+        self.log = self.base / "log"
+        tools = self.base / "bin"
+        tools.mkdir()
+        install_host_tools(tools)
+        # Use the real chown so ownership is genuinely normalized to root.
+        (tools / "chown").unlink()
+        self.prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
+        self.python = self.base / "python/bin/python3"
+        self.python.parent.mkdir(parents=True)
+        self.python.write_text(FAKE_PYTHON)
+        self.python.chmod(0o755)
+        self.path = f"{tools}{os.pathsep}/usr/sbin:/usr/bin:/sbin:/bin"
+
+    def build(self, **extra):
+        self.log.unlink(missing_ok=True)
+        environment = {"PATH": self.path, "TEST_LOG": str(self.log),
+                       "TEST_FAIL": "", "TEST_LEAVE": extra.get("TEST_LEAVE", "")}
+        result = subprocess.run(
+            self.prefix + ["env", *(f"{k}={v}" for k, v in environment.items()),
+                           "sh", str(SCRIPT), str(self.python), str(self.environment), str(self.requirements)],
+            capture_output=True, text=True,
+        )
+        return result
+
+    def owners(self):
+        return {path.stat().st_uid for path in self.environment.rglob("*")} | {self.environment.stat().st_uid}
+
+    def test_build_leaves_everything_root_owned(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.owners(), {0})
+
+    def test_world_writable_leftover_is_rejected_and_discarded(self):
+        result = self.build(TEST_LEAVE="worldwritable")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsafe modes", result.stderr)
+        self.assertFalse(self.environment.exists())
 
 
 if __name__ == "__main__":
