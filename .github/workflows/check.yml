@@ -69,10 +69,21 @@ jobs:
     concurrency:
       group: news-production
       cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write # Join the tailnet through Tailscale workload identity federation.
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      # The VPS answers SSH only on its tailnet address. See docs/deployment.md.
+      - name: Join the tailnet
+        uses: tailscale/github-action@d1b6cd204f8dceda5b3eaad7f1f767be390056cd # v4.2.0
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          audience: ${{ secrets.TS_AUDIENCE }}
+          tags: tag:ci
+          ping: 100.91.85.40
       - name: Install deploy identity
         env:
           DEPLOY_KEY: ${{ secrets.NEWS_DEPLOY_SSH_KEY }}

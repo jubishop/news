@@ -8,6 +8,8 @@ type: reference
 
 News uses the shared `bishop` VPS at `5.78.193.133`, with the public hostname
 `news.jubishop.com`. These provisioning facts were verified September 25, 2026.
+Since October 15, 2026, the VPS answers SSH only on its tailnet address,
+`100.91.85.40`; see vps-infra `docs/tailscale.md`.
 Use the [deployment guide](../docs/deployment.md) for release behavior and the
 [operations guide](../docs/server-operations.md) for backup and recovery commands.
 Track rollout progress and remaining acceptance work in GitHub Issues.

@@ -181,14 +181,23 @@ still deploy releases whose code runs as `news`; protect `main` and the
 production environment accordingly. Installing or updating the kit is an
 explicit host administration step with the owner's access, outside releases.
 
+The VPS answers SSH only on its tailnet address, so the deploy job first joins
+the tailnet as an ephemeral `tag:ci` node with `tailscale/github-action` and
+pings the VPS. It authenticates through a Tailscale federated identity limited
+to the subject `repo:jubishop/news:environment:production`, which needs the
+job's `id-token: write` permission; no Tailscale secret is stored in GitHub.
+The tailnet policy and setup live in vps-infra `docs/tailscale.md`.
+
 Create the GitHub environment `production`, with a custom branch rule for
 `main`, and configure:
 
 | Kind | Name | Value |
 | --- | --- | --- |
 | Secret | `NEWS_DEPLOY_SSH_KEY` | Dedicated deployment private key. |
-| Secret | `NEWS_DEPLOY_KNOWN_HOSTS` | VPS SSH host key obtained through an already trusted connection. |
-| Variable | `NEWS_DEPLOY_HOST` | Shared VPS hostname or IP. |
+| Secret | `NEWS_DEPLOY_KNOWN_HOSTS` | VPS SSH host key for its tailnet address, obtained through an already trusted connection. |
+| Secret | `TS_OAUTH_CLIENT_ID` | The federated identity's client ID. |
+| Secret | `TS_AUDIENCE` | The federated identity's audience. |
+| Variable | `NEWS_DEPLOY_HOST` | The shared VPS's tailnet address. |
 
 Do not use an unchecked `ssh-keyscan` result or disable host verification.
 Application, Resend, and R2 credentials remain in `/etc/news` on the VPS.

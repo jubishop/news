@@ -13,7 +13,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     if sys.version_info < (3, 14):
         parser.error("News reporter administration requires Python 3.14 or later.")
-    parser.add_argument("--host", default="root@5.78.193.133")
+    parser.add_argument("--host", default="root@100.91.85.40")
     parser.add_argument("--release", default="/opt/news/current")
     parser.add_argument("--database", default="/var/lib/news/news.sqlite3")
     parser.add_argument("--backup-dir", default="/var/lib/news/reporter-backups")
