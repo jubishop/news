@@ -189,8 +189,13 @@ An [explicit retry](server-contract.md#explicit-retries) gives a failed run
 three new attempts. It keeps the original due date and earlier attempts and
 resolves the failure notice. Only the reporter's latest run qualifies, and
 only while the reporter is active. A failure that a later due date already
-covers stays closed. Fix the cause first: `--check` does not establish that
-the subscription has remaining allowance.
+covers stays closed. A reopened run due today is researched as itself. For a
+recurring reporter, the worker's next discovery folds a reopened run from an
+earlier day into a
+[catch-up](server-contract.md#calendar-pause-and-deletion-behavior) run due
+today, marks the original `superseded`, and researches the catch-up instead.
+Fix the cause first: `--check` does not establish that the subscription has
+remaining allowance.
 
 From the permanent checkout on the Mac, run this while no batch is running:
 
@@ -208,8 +213,8 @@ A batch can take up to 30 minutes per attempt, plus 15-minute retry rounds.
 Agents should run the command in the background and wait for it to finish.
 
 In the newsroom, use **Retry failed run** on the reporter's card or
-**Retry this run** in its reporting history. The worker researches the run at
-its next start. To start now, run the command above or start the installed
+**Retry this run** in its reporting history. The worker picks it up at its
+next start. To start now, run the command above or start the installed
 LaunchAgent, which writes `scheduled.log` like a scheduled batch:
 
 ```sh
