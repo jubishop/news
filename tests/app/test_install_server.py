@@ -96,9 +96,10 @@ exit 0
     def install(self, failure=None):
         if failure:
             (self.root / ("fail-" + failure)).touch()
-        # Keep the fixture log readable by the test runner after root writes it.
+        # Keep the fixture log and snapshot program readable by the test runner after root writes them.
         events_path = self.root / "events"
         events_path.touch(mode=0o600)
+        (self.root / "snapshot-program").touch(mode=0o600)
         result = subprocess.run(
             self.prefix + ["chroot", str(self.root), "/bin/sh", "/installer", "/opt/news/releases/fixture"],
             env=os.environ | {"PATH": "/bin:/usr/bin:/usr/sbin:/sbin"},
