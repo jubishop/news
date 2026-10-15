@@ -130,9 +130,10 @@ class BuildEnvironmentOwnershipTests(unittest.TestCase):
     """Run the real chown and the post-chown verification, not a faked chown."""
 
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.base = Path(temporary.name).resolve()
+        self.prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
+        self.base = Path(tempfile.mkdtemp()).resolve()
+        # Root creates directories here that only root can empty.
+        self.addCleanup(subprocess.run, self.prefix + ["rm", "-rf", str(self.base)], check=True)
         self.release = self.base / "opt/news/releases/fixture"
         self.release.mkdir(parents=True)
         self.requirements = self.release / "requirements.txt"
@@ -144,7 +145,6 @@ class BuildEnvironmentOwnershipTests(unittest.TestCase):
         install_host_tools(tools)
         # Use the real chown so ownership is genuinely normalized to root.
         (tools / "chown").unlink()
-        self.prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
         self.python = self.base / "python/bin/python3"
         self.python.parent.mkdir(parents=True)
         self.python.write_text(FAKE_PYTHON)
@@ -163,7 +163,8 @@ class BuildEnvironmentOwnershipTests(unittest.TestCase):
         return result
 
     def owners(self):
-        return {path.stat().st_uid for path in self.environment.rglob("*")} | {self.environment.stat().st_uid}
+        # lstat: the environment's bin/python is a link to an interpreter outside it.
+        return {path.lstat().st_uid for path in self.environment.rglob("*")} | {self.environment.lstat().st_uid}
 
     def test_build_leaves_everything_root_owned(self):
         result = self.build()

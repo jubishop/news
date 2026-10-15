@@ -163,10 +163,10 @@ class InstallScriptTests(unittest.TestCase):
     """Run the real root INSTALL script in a chroot, against a fake receiver."""
 
     def setUp(self):
-        temporary = tempfile.TemporaryDirectory()
-        self.addCleanup(temporary.cleanup)
-        self.root = Path(temporary.name)
         self.prefix = [] if os.geteuid() == 0 else ["sudo", "-n"]
+        self.root = Path(tempfile.mkdtemp())
+        # The install script creates root-owned directories that only root can empty.
+        self.addCleanup(subprocess.run, self.prefix + ["rm", "-rf", str(self.root)], check=True)
         for executable in ("sh", "tar", "install", "mktemp", "rm", "mv", "ln", "stat", "flock"):
             source = Path(shutil.which(executable)).resolve()
             for library in re.findall(r"(/[^\s()]+)", subprocess.check_output(["ldd", str(source)], text=True)):
