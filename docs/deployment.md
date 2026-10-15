@@ -184,7 +184,8 @@ explicit host administration step with the owner's access, outside releases.
 The VPS answers SSH only on its tailnet address, so the deploy job first joins
 the tailnet as an ephemeral `tag:ci` node with `tailscale/github-action` and
 pings the VPS. It authenticates through a Tailscale federated identity limited
-to the subject `repo:jubishop/news:environment:production`, which needs the
+to GitHub's immutable subject
+`repo:jubishop@13165/news@1386374380:environment:production`, which needs the
 job's `id-token: write` permission; no Tailscale secret is stored in GitHub.
 The tailnet policy and setup live in vps-infra `docs/tailscale.md`.
 
