@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+"""Install News's deploy kit on the production host from a Git revision.
+
+Usage: bin/install-deploy-kit root@HOST REVISION
+
+Run it from a trusted checkout with the owner's SSH access, never with the
+deploy key, which can run only the receiver. It reads the kit from
+`git archive REVISION ops/`, never the working tree: ops/receive-release goes
+to /usr/local/sbin/news-receive-release, and the other kit files go to
+/usr/local/lib/news-deploy, with /usr/local/sbin/news-rebuild-environment
+linked to the kit's copy. The host installs them under the deployment lock,
+then must report the kit digest that deployments of the revision require.
+See docs/deployment.md#deploy-kit.
+"""
+
+import io
+import json
+from pathlib import Path, PurePosixPath
+import re
+import shlex
+import subprocess
+import sys
+import tarfile
+import types
+
+ROOT = Path(__file__).resolve().parents[1]
+# Executed directly: the receiver by sshd, the rebuild command by python-update.
+EXECUTABLE = ("receive-release", "rebuild-environment")
+# Runs as root on the host with the kit as a tar stream on stdin.
+INSTALL = r'''
+set -eu
+umask 022
+kit=/usr/local/lib/news-deploy
+receiver=/usr/local/sbin/news-receive-release
+rebuild=/usr/local/sbin/news-rebuild-environment
+exec 9>>/run/lock/news-deploy.lock
+if ! flock -n 9; then
+    echo 'A News deployment or environment rebuild holds /run/lock/news-deploy.lock. Wait for it to finish, then rerun.' >&2
+    exit 1
+fi
+staging=$(mktemp -d)
+trap 'rm -rf "$staging"' EXIT
+tar -x -C "$staging" --no-same-owner
+test -f "$staging/receive-release"
+install -d -o root -g root -m 0755 "$kit"
+for path in "$kit"/* "$kit"/.[!.]*; do
+    name=${path##*/}
+    if { [ -e "$path" ] || [ -L "$path" ]; } && { [ ! -e "$staging/$name" ] || [ "$name" = receive-release ]; }; then
+        rm -f "$path"
+        echo "Removed $name, which this revision's kit does not include."
+    fi
+done
+for path in "$staging"/*; do
+    name=${path##*/}
+    if [ "$name" != receive-release ]; then
+        install -o root -g root -m "$(stat -c %a "$path")" "$path" "$kit/.$name.new"
+        mv -f "$kit/.$name.new" "$kit/$name"
+    fi
+done
+ln -sfn "$kit/rebuild-environment" "$rebuild.new"
+mv -Tf "$rebuild.new" "$rebuild"
+install -o root -g root -m 0755 "$staging/receive-release" "$receiver.new"
+mv -f "$receiver.new" "$receiver"
+SSH_ORIGINAL_COMMAND=status "$receiver"
+'''
+
+
+def git(*args, text=True):
+    return subprocess.run(("git", *args), check=True, cwd=ROOT, text=text, stdin=subprocess.DEVNULL,
+                          stdout=subprocess.PIPE).stdout
+
+
+def checked_kit(ops_tar):
+    """Return the revision's {name: bytes} kit and digest, using that revision's receiver."""
+    with tarfile.open(fileobj=io.BytesIO(ops_tar)) as tree:
+        entries = [(str(PurePosixPath(member.name)), tree.extractfile(member).read())
+                   for member in tree.getmembers() if member.isfile()]
+    sources = dict(entries)
+    if "ops/receive-release" not in sources:
+        raise ValueError("Missing deploy kit files: ops/receive-release")
+    # The receiver defines the kit, so the installed kit matches what that revision's deployments check.
+    receiver = types.ModuleType("news_receive_release")
+    exec(compile(sources["ops/receive-release"], "ops/receive-release", "exec"), receiver.__dict__)
+    files = receiver.kit_files(entries)
+    return files, receiver.kit_digest(files)
+
+
+def main():
+    if len(sys.argv) != 3:
+        raise ValueError("Usage: bin/install-deploy-kit root@HOST REVISION")
+    host, reference = sys.argv[1:]
+    if not re.fullmatch(r"root@[A-Za-z0-9][A-Za-z0-9.-]*", host):
+        raise ValueError("Name the host as root@HOST.")
+    try:
+        revision = git("rev-parse", "--verify", reference + "^{commit}").strip()
+    except subprocess.CalledProcessError as error:
+        raise ValueError(f"Unknown revision: {reference}") from error
+    files, expected = checked_kit(git("archive", "--format=tar", revision, "ops/", text=False))
+    stream = io.BytesIO()
+    with tarfile.open(fileobj=stream, mode="w") as kit:
+        for name, data in sorted(files.items()):
+            member = tarfile.TarInfo(name)
+            member.size = len(data)
+            member.mode = 0o755 if name in EXECUTABLE else 0o644
+            kit.addfile(member, io.BytesIO(data))
+    print(f"Installing deploy kit {expected[:12]} from {revision} on {host}.", flush=True)
+    result = subprocess.run(["ssh", "-o", "BatchMode=yes", host, shlex.join(("sh", "-c", INSTALL))],
+                            input=stream.getvalue(), stdout=subprocess.PIPE)
+    output = result.stdout.decode(errors="replace").splitlines()
+    for line in output[:-1]:
+        print(line, flush=True)
+    if result.returncode != 0:
+        raise ValueError(f"Installation exited with status {result.returncode}; see its output above.")
+    try:
+        reported = json.loads(output[-1])["kit"]
+    except (IndexError, ValueError, KeyError, TypeError) as error:
+        raise ValueError("The host did not report its deploy kit.") from error
+    if reported != expected:
+        raise ValueError(f"The host reports deploy kit {reported}, which does not match {expected} from {revision}.")
+    print(f"Installed deploy kit {expected[:12]} from {revision} on {host}. "
+          "Deployments of revisions with this kit can proceed.")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (OSError, ValueError, tarfile.TarError, subprocess.SubprocessError) as error:
+        print(f"INSTALL FAILED: {error}", file=sys.stderr)
+        sys.exit(1)

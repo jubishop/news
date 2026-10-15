@@ -1,28 +1,35 @@
 #!/bin/sh
-# Run on the VPS with one reviewed, immutable source tree already uploaded.
+# Install one release directory that holds news/ and requirements.txt.
+# Root runs only the deploy kit's copy, /usr/local/lib/news-deploy/install-server,
+# which bin/install-deploy-kit installs from Git; news-receive-release starts it.
+# It runs nothing from the release as root and installs units only from the kit.
 set -eu
 umask 077
+kit=/usr/local/lib/news-deploy
 [ "$(id -u)" -eq 0 ] || { echo 'Run as root on the VPS.' >&2; exit 1; }
-[ "$#" -eq 1 ] || { echo 'Usage: ops/install-server /opt/news/releases/REVISION' >&2; exit 1; }
+[ "$#" -eq 1 ] || { echo "Usage: sh $kit/install-server /opt/news/releases/REVISION" >&2; exit 1; }
 release=$(realpath "$1")
 case "$release" in /opt/news/releases/*) ;; *) echo 'Release must be under /opt/news/releases.' >&2; exit 1 ;; esac
-for required in "$release/news/schema.sql" /etc/news/app.env /etc/news/backup.env; do
+for required in "$release/news/schema.sql" "$release/requirements.txt" /etc/news/app.env /etc/news/backup.env; do
     [ -f "$required" ] || { echo "Missing $required. Complete News provisioning before deployment." >&2; exit 1; }
+done
+for required in build-environment news.service; do
+    [ -f "$kit/$required" ] || { echo "Missing $kit/$required. Install the deploy kit with bin/install-deploy-kit." >&2; exit 1; }
 done
 # This also serializes manual installs with deployments started through SSH.
 exec 9>/run/lock/news-deploy.lock
 flock -n 9 || { echo 'Another News deployment is running.' >&2; exit 1; }
 # The shared VPS runtime; news-rebuild-environment moves releases to its updates.
 python=/opt/python/current/bin/python3
-"$python" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 14) else "News requires Python 3.14 or later.")'
+"$python" -I -c 'import sys; sys.exit(0 if sys.version_info >= (3, 14) else "News requires Python 3.14 or later.")'
 command -v restic >/dev/null
 command -v curl >/dev/null
 id news >/dev/null 2>&1 || useradd --system --home /var/lib/news --shell /usr/sbin/nologin news
 install -d -o news -g news -m 0700 /var/lib/news /var/lib/news-backup /var/cache/news-restic
-"$python" -m venv "$release/.venv"
-"$release/.venv/bin/python" -m pip install --require-hashes -r "$release/requirements.txt"
+# Release code is root's and read-only to news; news builds the packages, which root then owns.
 chown -R root:root "$release"
 chmod -R go+rX "$release"
+sh "$kit/build-environment" "$python" "$release/.venv" "$release/requirements.txt"
 # Stop every writer before migration. Do not silently downgrade data on failure.
 stopped=false
 cleanup() {
@@ -45,18 +52,24 @@ for unit in news-maintain.timer news-backup.timer news-restore-check.timer \
     fi
 done
 if [ -f /var/lib/news/news.sqlite3 ]; then
-    "$release/.venv/bin/python" - <<'PY'
+    # As news, with the shared runtime: no release code runs, and root never opens the database.
+    runuser -u news -- "$python" -I - <<'PY'
 from contextlib import closing
+import os
 import sqlite3
+target = '/var/lib/news-backup/pre-release.sqlite3'
+partial = target + '.partial'
+if os.path.lexists(partial):
+    os.unlink(partial)
 with closing(sqlite3.connect('/var/lib/news/news.sqlite3')) as source:
-    with closing(sqlite3.connect('/var/lib/news-backup/pre-release.sqlite3')) as backup:
+    with closing(sqlite3.connect(partial)) as backup:
         source.backup(backup)
+os.replace(partial, target)
 PY
 fi
 ln -s "$release" "/opt/news/next.$$"
 mv -Tf "/opt/news/next.$$" /opt/news/current
-install -m 0644 "$release"/ops/systemd/news*.service "$release"/ops/systemd/news*.timer /etc/systemd/system/
-install -m 0755 "$release/ops/rebuild-environment" /usr/local/sbin/news-rebuild-environment
+install -m 0644 "$kit"/news*.service "$kit"/news*.timer /etc/systemd/system/
 systemctl daemon-reload
 if ! systemd-run --wait --collect --pipe --unit=news-migrate --property=User=news --property=Group=news \
     --property=WorkingDirectory=/opt/news/current --property=EnvironmentFile=/etc/news/app.env \

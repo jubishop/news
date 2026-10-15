@@ -1,0 +1,50 @@
+#!/bin/sh
+# Build a News Python environment as the news user, then give it to root.
+# Usage: build-environment PYTHON ENVIRONMENT REQUIREMENTS
+#
+# Root runs the deploy kit's copy, from install-server and
+# news-rebuild-environment. REQUIREMENTS comes from a release, and installing
+# it can run package build code, so that runs as news in a transient unit that
+# can write only ENVIRONMENT. Systemd ends any process the build leaves behind.
+# Root then takes ownership, so the service account cannot change its packages.
+set -eu
+[ "$(id -u)" -eq 0 ] || { echo 'Run as root.' >&2; exit 1; }
+[ "$#" -eq 3 ] || { echo 'Usage: build-environment PYTHON ENVIRONMENT REQUIREMENTS' >&2; exit 1; }
+python=$1
+environment=$2
+requirements=$3
+case "$environment" in
+    /*/.venv|/*/.venv-*) ;;
+    *) echo "Unexpected environment path $environment." >&2; exit 1 ;;
+esac
+if [ -e "$environment" ] || [ -L "$environment" ]; then
+    echo "$environment already exists. Build into a new path." >&2
+    exit 1
+fi
+built=false
+cleanup() {
+    status=$?
+    if [ "$built" = false ]; then rm -rf -- "$environment"; fi
+    exit "$status"
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+install -d -o news -g news -m 0755 "$environment"
+# shellcheck disable=SC2016 # The unit's shell expands its own arguments.
+build='"$1" -m venv "$2" && "$2/bin/python" -m pip install --no-cache-dir --disable-pip-version-check --require-hashes -r "$3"'
+systemd-run --wait --collect --pipe --quiet \
+    --property=User=news --property=Group=news --property=UMask=0022 \
+    --property=NoNewPrivileges=yes --property=PrivateTmp=yes --property=ProtectHome=yes \
+    --property=ProtectSystem=strict --property=ReadWritePaths="$environment" \
+    --property=RuntimeMaxSec=10min \
+    /bin/sh -c "$build" build-environment "$python" "$environment" "$requirements"
+# Adopt only directories, regular files, and symbolic links, and no file with another name.
+unexpected=$(find "$environment" \( ! -type d ! -type f ! -type l \) -o \( -type f -links +1 \))
+if [ -n "$unexpected" ]; then
+    echo "The build left unexpected files in $environment; nothing was installed:" >&2
+    printf '%s\n' "$unexpected" >&2
+    exit 1
+fi
+chown -R root:root "$environment"
+chmod -R go-w,ug-s "$environment"
+built=true

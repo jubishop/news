@@ -85,11 +85,12 @@ still requires Python 3.14 or later.
 
 Before `python-update` switches the runtime, it runs
 `/usr/local/sbin/news-rebuild-environment` with the new interpreter's versioned
-path. Each release installs that command from
-[rebuild-environment](../ops/rebuild-environment). For the active release, it
-builds `.venv-VERSION` beside the active environment from the hash-locked
-`requirements.txt`, verifies that the `news` account can import News, and then
-atomically points `.venv` at it. It reuses an existing environment for the same
+path. That command links to the [deploy kit's](deployment.md#deploy-kit)
+[rebuild-environment](../ops/rebuild-environment), which `bin/install-deploy-kit`
+installs; releases do not install it. For the active release, it has the kit's
+build-environment build `.venv-VERSION` beside the active environment from the
+hash-locked `requirements.txt` as `news`, verifies that the `news` account can
+import News, and then atomically points `.venv` at it. It reuses an existing environment for the same
 interpreter, so rolling back to the previous interpreter is immediate. The
 first rebuild of a release swaps the installer's real `.venv` directory for a
 link and keeps that directory as `.venv-VERSION` for rollback unless an
@@ -166,17 +167,21 @@ were checked September 25, 2026. Verify provider configuration again at rollout.
 
 ## Release and first rollout
 
-Only deploy a reviewed revision with successful full validation. Export that
-revision (for example with `git archive`) into `/opt/news/releases/REVISION` on
-the VPS. Do not copy `.venv`, caches, local `.env` files, or preview databases.
-Run the uploaded `ops/install-server /opt/news/releases/REVISION` as root.
+Only deploy a reviewed revision with successful full validation. Install that
+revision's [deploy kit](deployment.md#deploy-kit) with `bin/install-deploy-kit`.
+Export only its `news` and `requirements.txt` (for example with `git archive`)
+into a new `/opt/news/releases/REVISION` directory on the VPS, with a
+`REVISION` file. Do not copy `ops`, `.venv`, caches, local `.env` files, or
+preview databases. Run the kit's copy as root, never a release's:
+`sh /usr/local/lib/news-deploy/install-server /opt/news/releases/REVISION`.
 The [automatic workflow](deployment.md) performs this sequence for material
 deliveries to `main`; reviewed immaterial changes can skip deployment under
 the [deployment policy](deployment.md#deployment-decisions). Use manual
 installation only for operator-led recovery or setup.
 
-The installer builds the production environment before stopping any service.
-It uses a dedicated unprivileged `news` account and root-owned release code.
+The installer builds the production environment as `news` before stopping any
+service. It uses a dedicated unprivileged `news` account and root-owned release
+code and packages.
 It stops all News writers, makes a consistent local pre-release SQLite backup
 when a database exists, switches the release link, applies migrations, starts
 the web service, checks loopback health, and runs maintenance once. It then

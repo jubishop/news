@@ -31,16 +31,19 @@ The workflow uses these entry points:
 1. [deploy-main](../ops/deploy-main) exports the tested commit with `git archive`.
    Only `news`, `ops`, and the production requirements are uploaded. Local
    environment files, databases, Git credentials, and test fixtures are absent.
-2. [receive-release](../ops/receive-release) accepts only `deploy COMMIT_SHA`
-   through a restricted SSH key. It rejects archive traversal, links, special
-   files, and archives over 25 MiB. Each attempt gets a separate release
-   directory under `/opt/news/releases`, with a `REVISION` file.
-3. [install-server](../ops/install-server) takes a host lock shared by manual
-   and automated installs. It installs locked dependencies before downtime,
-   stops all News writers, takes a consistent local SQLite checkpoint, switches
-   the release link, installs systemd units and the
-   [Python rebuild command](server-operations.md#production-python), and runs
-   `news.cli init-db`.
+2. [receive-release](../ops/receive-release), the restricted SSH key's forced
+   command, accepts only `status` and `deploy COMMIT_SHA`. It rejects archive
+   traversal, links, special files, and archives over 25 MiB. It also refuses
+   the release, before changing anything, when the archive's
+   [deploy kit](#deploy-kit) files differ from the installed kit. Each attempt
+   gets a separate release directory under `/opt/news/releases` that holds
+   only `news/`, `requirements.txt`, and a `REVISION` file.
+3. The kit's [install-server](../ops/install-server) takes a host lock shared
+   by manual and automated installs. Before downtime, the kit's
+   [build-environment](../ops/build-environment) installs the locked
+   dependencies as `news`. The installer then stops all News writers, takes a
+   consistent local SQLite checkpoint as `news`, switches the release link,
+   installs the kit's systemd units, and runs `news.cli init-db` as `news`.
 4. The installer starts the web service, checks loopback health, runs
    `news-maintain.service` once, and enables the maintenance and backup timers.
    GitHub then checks public HTTPS health before reporting deployment success.
@@ -48,6 +51,53 @@ The workflow uses these entry points:
 Systemd owns the release process, with a 15-minute limit. An SSH disconnect
 does not kill the installer. Its output is in `journalctl -u news-deploy-*`
 and is copied into the GitHub Actions log when the SSH session completes.
+
+### Deploy kit
+
+The deploy key's `authorized_keys` entry runs as root, so root runs only a
+deploy kit that the owner installs from Git, never anything that arrives over
+the key. The kit is [receive-release](../ops/receive-release), installed at
+`/usr/local/sbin/news-receive-release`, and these files in
+`/usr/local/lib/news-deploy`, all root-owned:
+
+- [install-server](../ops/install-server), which installs a release.
+- [build-environment](../ops/build-environment), which builds a release's
+  Python environment.
+- [rebuild-environment](../ops/rebuild-environment), linked from
+  `/usr/local/sbin/news-rebuild-environment` for
+  [Python runtime updates](server-operations.md#production-python).
+- Every [systemd unit](../ops/systemd), which the installer copies to
+  `/etc/systemd/system`.
+
+The receiver defines this list. The receiver extracts only `news/` and
+`requirements.txt` into a release, root-owned and read-only to `news`.
+Installing the requirements can run package build code, so build-environment
+runs `venv` and `pip` as `news` in a transient unit that can write only the new
+environment. Systemd stops any process the build leaves behind. Root then
+takes ownership of the environment after checking that it holds only
+directories, regular files without other names, and symbolic links. Root never
+runs the release's environment; migrations, maintenance, and the services run
+as `news`, and the database checkpoint uses the shared runtime as `news`. The
+key can still deploy any release whose kit files match, and that release's
+code runs as `news` with the application's data and credentials.
+
+A deployment compares the archive's kit files, which `git archive` takes from
+the tested commit, with the installed kit by digest. When a commit changes a
+kit file, its deployment fails with a message naming
+`bin/install-deploy-kit`. From a trusted checkout, with the owner's SSH
+access rather than the deploy key, run:
+
+```sh
+bin/install-deploy-kit root@YOUR_SSH_HOST REVISION
+```
+
+It sends the kit files from `git archive REVISION ops/`, never the working
+tree. Under the deployment lock, the host replaces the kit, removes kit files
+that the revision no longer has, and reports the digest, which must match.
+Then rerun the failed deploy job with **Run workflow** on `main`. Installing
+a kit changes no running service; the next deployment installs its units. A
+later deployment of a revision with a different kit fails until its kit is
+installed. `status` prints the active revision and the installed kit digest.
 
 The workflow uses GitHub's
 [job dependencies](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idneeds)
@@ -102,9 +152,9 @@ DNS, TLS, Cloudflare Access, private settings, and the initialized backup
 repository must exist before the first successful release. A merge cannot
 create provider credentials that the deployment does not have.
 
-On the VPS, create `/opt/news/releases` and install `ops/receive-release` as
-root-owned mode 0755 at `/usr/local/sbin/news-receive-release`. Install
-`restic`, `curl`, and `util-linux` (for `flock`), and confirm the shared
+On the VPS, create `/opt/news/releases` and install the [deploy kit](#deploy-kit)
+with `bin/install-deploy-kit`. Install `restic`, `curl`, and `util-linux`
+(for `flock` and `runuser`), and confirm the shared
 [Python runtime](server-operations.md#production-python). Add a
 dedicated public deployment key to root's `authorized_keys` with:
 
@@ -113,9 +163,10 @@ restrict,command="/usr/local/sbin/news-receive-release" ssh-ed25519 PUBLIC_KEY n
 ```
 
 This key cannot open an interactive shell, transfer arbitrary files, or create
-SSH forwarding tunnels. It can install trusted release code with root privileges;
-protect `main` and the production environment accordingly. Updating the SSH
-receiver itself is an explicit host administration step, outside normal releases.
+SSH forwarding tunnels, and root runs only the installed kit for it. It can
+still deploy releases whose code runs as `news`; protect `main` and the
+production environment accordingly. Installing or updating the kit is an
+explicit host administration step with the owner's access, outside releases.
 
 Create the GitHub environment `production`, with a custom branch rule for
 `main`, and configure:
@@ -179,5 +230,5 @@ systemd result before retrying.
 Installer tests use disposable Linux roots with external commands replaced
 at their boundaries. They exercise the real shell script, including failure
 paths, without accessing host service or database paths. These tests run in
-Linux CI; macOS skips them. The release client and archive receiver tests run
-on both platforms.
+Linux CI; macOS skips them. The release client, archive receiver, environment
+build, and kit installer tests run on both platforms.

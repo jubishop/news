@@ -15,7 +15,8 @@ COMMANDS = (
     ["python", "-B", "-c", "import news"],
     ["python", "-B", "-m", "unittest", "discover", "-s", "tests/app", "-v"],
     ["python", "-B", "tests/test_browser.py"],
-    ["shellcheck", "--shell=sh", "ops/install-server", "ops/deploy-main", "ops/install-worker", "bin/worker"],
+    ["shellcheck", "--shell=sh", "ops/install-server", "ops/build-environment", "ops/deploy-main",
+     "ops/install-worker", "bin/worker"],
 )
 RECORDER = (
     "import json, os, sys\n"

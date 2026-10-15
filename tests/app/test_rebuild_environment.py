@@ -13,9 +13,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+from host_tools import install_host_tools
+
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / "ops/rebuild-environment"
+BUILD = ROOT / "ops/build-environment"
 SHARED_PYTHON = "#!/opt/python/current/bin/python3\n"
 # A fake CPython: it answers the version probe, creates a minimal venv whose
 # python links back to it, and records pip and import checks.
@@ -63,6 +66,7 @@ class RebuildEnvironmentTests(unittest.TestCase):
         tools.mkdir()
         (tools / "runuser").write_text(RUNUSER)
         (tools / "runuser").chmod(0o755)
+        install_host_tools(tools)
         self.environment = {
             "PATH": str(tools) + os.pathsep + os.environ["PATH"],
             "TEST_LOG": str(self.log),
@@ -95,6 +99,7 @@ class RebuildEnvironmentTests(unittest.TestCase):
             patch.object(self.command, "NEWS", self.news),
             patch.object(self.command, "LOCK", self.base / "deploy.lock"),
             patch.object(self.command, "LOCK_WAIT", 0),
+            patch.object(self.command, "BUILD", BUILD),
             patch("os.geteuid", return_value=uid),
             patch.dict(os.environ, self.environment | {"TEST_FAIL": failure}),
             contextlib.redirect_stdout(output),
@@ -119,9 +124,24 @@ class RebuildEnvironmentTests(unittest.TestCase):
         self.assertTrue((self.release / ".venv-3.14.8/legacy").exists())
         environment = self.release / ".venv-3.15.0"
         requirements = self.release / "requirements.txt"
-        self.assertIn(f"{environment}/bin/python|-m pip install --require-hashes -r {requirements}|", "\n".join(calls))
+        self.assertIn(f"{environment}/bin/python|-m pip install --no-cache-dir --disable-pip-version-check "
+                      f"--require-hashes -r {requirements}|", "\n".join(calls))
         verify = calls.index(f"runuser|-u news -- {environment}/bin/python -B -c import news|{self.release}")
         self.assertEqual(calls[verify + 1], f"{environment}/bin/python|-B -c import news|{self.release}")
+
+    def test_packages_build_as_news_through_the_kit_and_become_root_owned(self):
+        self.legacy_environment("3.14.8")
+        code, calls, output = self.rebuild(self.interpreter("3.15.0"))
+        self.assertEqual(code, 0, output)
+        environment = self.release / ".venv-3.15.0"
+        names = [call.split("|")[0].rsplit("/", 1)[-1] for call in calls]
+        unit = names.index("systemd-run")
+        self.assertIn("--property=User=news", calls[unit])
+        self.assertIn(f"--property=ReadWritePaths={environment}", calls[unit])
+        # The interpreter and pip run only inside the news unit; root then takes ownership.
+        self.assertEqual(names[unit + 1:unit + 4], ["python3", "python", "chown"])
+        self.assertEqual(calls[unit + 3].split("|")[1], f"-R root:root {environment}")
+        self.assertEqual(names.count("python3"), 2)  # The version probe, then the unit's venv.
 
     def test_rollback_reuses_the_environment_for_the_previous_interpreter(self):
         self.legacy_environment("3.14.8")
@@ -223,10 +243,12 @@ class RebuildEnvironmentTests(unittest.TestCase):
                 self.assertEqual(self.environments(), [".venv"])
 
     def test_host_entry_points_use_the_shared_python(self):
-        for name in ("receive-release", "rebuild-environment"):
+        # The deploy key's forced command also ignores PYTHON* settings and user site-packages.
+        for name, shebang in (("receive-release", SHARED_PYTHON[:-1] + " -I\n"),
+                              ("rebuild-environment", SHARED_PYTHON)):
             with self.subTest(name):
                 path = ROOT / "ops" / name
-                self.assertEqual(path.read_text().splitlines(keepends=True)[0], SHARED_PYTHON)
+                self.assertEqual(path.read_text().splitlines(keepends=True)[0], shebang)
                 self.assertTrue(os.access(path, os.X_OK))
 
 

@@ -91,13 +91,19 @@ The sender is `News <news@jubishop.com>`.
 GitHub's `production` environment permits `main`. It contains the dedicated
 SSH key and pinned host-key secrets and the VPS host variable. The root SSH
 authorized-key entry forces `/usr/local/sbin/news-receive-release` with SSH
-restrictions. It cannot open a shell or create forwarding tunnels. It can
-install trusted releases as root, so protect changes to `main`.
+restrictions. It cannot open a shell or create forwarding tunnels. Since
+October 14, 2026 (Pacific), root runs only the [deploy kit](../docs/deployment.md#deploy-kit)
+for it; the key can still deploy releases whose code runs as `news`, so
+protect changes to `main`. Before then, the receiver ran each uploaded
+release's installer as root.
 
-The receiver is installed separately from application releases. The selected
-release is `/opt/news/current`; its `REVISION` file records the deployed commit.
-The receiver uses the shared Python runtime. Its prior versions are retained
-in `/opt/news/receiver-backups`, owned by root with mode 0600, for operator-led
-recovery: `receive-release-before-python314` (system Python 3.12) and
-`receive-release-before-shared-python` (dedicated 3.14 interpreter).
+The owner installs the receiver and kit with `bin/install-deploy-kit`,
+separately from application releases. The selected release is
+`/opt/news/current`; its `REVISION` file records the deployed commit. The
+receiver uses the shared Python runtime. Its prior versions are retained in
+`/opt/news/receiver-backups`, owned by root with mode 0600, for operator-led
+recovery: `receive-release-before-python314` (system Python 3.12),
+`receive-release-before-shared-python` (dedicated 3.14 interpreter), and
+`receive-release-before-deploy-kit` with `rebuild-environment-before-deploy-kit`
+(the release-run installer design).
 Keep provider credentials out of GitHub deployment logs and release archives.

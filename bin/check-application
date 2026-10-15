@@ -6,4 +6,4 @@ cd "$root"
 .venv/bin/python -B -c 'import news'
 .venv/bin/python -B -m unittest discover -s tests/app -v
 .venv/bin/python -B tests/test_browser.py
-shellcheck --shell=sh ops/install-server ops/deploy-main ops/install-worker bin/worker
+shellcheck --shell=sh ops/install-server ops/build-environment ops/deploy-main ops/install-worker bin/worker

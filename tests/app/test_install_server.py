@@ -1,4 +1,9 @@
-"""Run the real installer in a disposable Linux root, never against host paths."""
+"""Run the real installer in a disposable Linux root, never against host paths.
+
+The installer is the deploy kit's copy. The fixture release holds only what
+the receiver extracts, news/ and requirements.txt, so these tests also show
+that the installer needs nothing from a release's ops/ directory.
+"""
 
 import os
 from pathlib import Path
@@ -27,9 +32,8 @@ class InstallerTests(unittest.TestCase):
                 self.copy(Path(library), library)
             self.copy(source, "/bin/" + executable)
         for directory in (
-            "etc/news", "etc/systemd/system", "run/lock", "dev",
-            "opt/news/releases/fixture/news", "opt/news/releases/fixture/ops/systemd",
-            "opt/news/releases/fixture/.venv/bin", "var/lib/news", "var/lib/news-backup",
+            "etc/news", "etc/systemd/system", "run/lock", "dev", "usr/local/lib/news-deploy",
+            "opt/news/releases/fixture/news", "var/lib/news", "var/lib/news-backup",
             "opt/news/releases/previous/news", "opt/news/releases/older/news",
             "opt/news/releases/failed/news",
         ):
@@ -44,9 +48,12 @@ class InstallerTests(unittest.TestCase):
             "news-restore-check.service", "news-maintain.timer", "news-backup.timer",
             "news-restore-check.timer",
         ]
+        self.kit = self.root / "usr/local/lib/news-deploy"
         for unit in self.units:
             (self.root / "etc/systemd/system" / unit).touch()
-            (self.root / "opt/news/releases/fixture/ops/systemd" / unit).touch()
+            (self.kit / unit).write_text("# kit " + unit + "\n")
+        (self.kit / "build-environment").write_text(
+            "printf 'build-environment %s\\n' \"$*\" >> /events\n[ ! -f /fail-build ] || exit 1\n")
         shim = self.root / "bin/boundary"
         shim.write_text('''#!/bin/sh
 name=${0##*/}
@@ -62,8 +69,9 @@ case "$name" in
   systemd-run) [ ! -f /fail-migrate ] || exit 1 ;;
   curl) [ ! -f /fail-health ] || exit 1 ;;
   flock) [ ! -f /fail-lock ] || exit 1 ;;
-  python)
-    if [ "$1" = - ]; then cat > /snapshot-program; printf 'saved' > /var/lib/news-backup/pre-release.sqlite3; fi
+  runuser) [ "$1 $2 $3" = '-u news --' ] || exit 64; shift 3; exec "$@" ;;
+  python3)
+    if [ "$1 $2" = '-I -' ]; then cat > /snapshot-program; printf 'saved' > /var/lib/news-backup/pre-release.sqlite3; fi
     ;;
 esac
 exit 0
@@ -71,13 +79,12 @@ exit 0
         shim.chmod(0o755)
         for name in (
             "id", "realpath", "readlink", "systemctl", "systemd-run", "curl",
-            "flock", "restic", "install", "useradd", "chown", "chmod",
+            "flock", "restic", "install", "useradd", "chown", "chmod", "runuser",
         ):
             (self.root / "bin" / name).symlink_to("boundary")
         # Only the shared runtime exists; the retired dedicated interpreter is absent.
         (self.root / "opt/python/current/bin").mkdir(parents=True)
         (self.root / "opt/python/current/bin/python3").symlink_to("/bin/boundary")
-        (self.root / "opt/news/releases/fixture/.venv/bin/python").symlink_to("/bin/boundary")
         installer = Path(os.environ.get("TEST_INSTALLER_SOURCE", ROOT / "ops/install-server"))
         self.copy(installer, "/installer")
 
@@ -113,17 +120,42 @@ exit 0
         result, events = self.install()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual((self.root / "var/lib/news-backup/pre-release.sqlite3").read_text(), "saved")
+        kit = "/usr/local/lib/news-deploy"
         positions = [events.index(event) for event in (
-            "python3 -m venv /opt/news/releases/fixture/.venv\n",
-            "systemctl stop news.service", "python -\n",
-            "install -m 0755 /opt/news/releases/fixture/ops/rebuild-environment "
-            "/usr/local/sbin/news-rebuild-environment\n",
+            "chown -R root:root /opt/news/releases/fixture\n",
+            f"build-environment /opt/python/current/bin/python3 /opt/news/releases/fixture/.venv "
+            f"/opt/news/releases/fixture/requirements.txt\n",
+            "systemctl stop news.service",
+            # The snapshot runs as news with the shared runtime, not the release's environment.
+            "runuser -u news -- /opt/python/current/bin/python3 -I -\n",
+            f"install -m 0644 {kit}/news-backup.service {kit}/news-maintain.service "
+            f"{kit}/news-restore-check.service {kit}/news.service {kit}/news-backup.timer "
+            f"{kit}/news-maintain.timer {kit}/news-restore-check.timer /etc/systemd/system/\n",
             "systemd-run --wait",
             "systemctl enable --now news.service", "curl --fail",
             "systemctl start news-maintain.service", "systemctl enable --now news-maintain.timer",
         )]
         self.assertEqual(positions, sorted(positions))
+        self.assertIn("os.replace(partial, target)", (self.root / "snapshot-program").read_text())
+        self.assertNotIn("/usr/local/sbin", events)
         self.assertEqual(os.readlink(self.root / "opt/news/current"), "/opt/news/releases/fixture")
+
+    def test_missing_deploy_kit_fails_before_changing_services(self):
+        for name in ("build-environment", "news.service"):
+            with self.subTest(name):
+                (self.kit / name).rename(self.root / name)
+                result, events = self.install()
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("bin/install-deploy-kit", result.stderr)
+                self.assertNotIn("systemctl", events)
+                (self.root / name).rename(self.kit / name)
+                (self.root / "events").unlink()
+
+    def test_failed_build_leaves_running_release_alone(self):
+        result, events = self.install("build")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn("systemctl", events)
+        self.assertFalse(os.path.lexists(self.root / "opt/news/current"))
 
     def releases(self):
         return sorted(path.name for path in (self.root / "opt/news/releases").iterdir())

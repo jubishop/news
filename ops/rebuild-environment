@@ -1,11 +1,13 @@
 #!/opt/python/current/bin/python3
 """Rebuild the active News release's environment for a Python interpreter.
 
-ops/install-server installs this at /usr/local/sbin/news-rebuild-environment.
-The shared runtime's python-update calls it with an interpreter path. It builds
-or reuses <release>/.venv-<version>, verifies that the news user can import
-News with it, and then atomically points <release>/.venv at it. On failure it
-exits nonzero and leaves the active environment unchanged.
+bin/install-deploy-kit installs this with the deploy kit in
+/usr/local/lib/news-deploy and links /usr/local/sbin/news-rebuild-environment
+to it. The shared runtime's python-update calls it as root with an interpreter
+path. It builds or reuses <release>/.venv-<version>, verifies that the news
+user can import News with it, and then atomically points <release>/.venv at it.
+The kit's build-environment installs the release's requirements as news. On
+failure it exits nonzero and leaves the active environment unchanged.
 """
 
 from contextlib import contextmanager
@@ -21,6 +23,7 @@ import time
 
 
 NEWS = Path("/opt/news")
+BUILD = Path("/usr/local/lib/news-deploy/build-environment")
 LOCK = Path("/run/lock/news-deploy.lock")
 LOCK_WAIT = 20 * 60  # Seconds; longer than a deployment's 15-minute limit.
 PROBE = (
@@ -78,10 +81,8 @@ def remove(path):
 
 def build(python, environment, release):
     try:
-        # Match install-server: a stdlib venv with the release's hash-locked requirements.
-        subprocess.run([python, "-m", "venv", environment], check=True, umask=0o022)
-        subprocess.run([environment / "bin/python", "-m", "pip", "install", "--require-hashes",
-                        "-r", release / "requirements.txt"], check=True, umask=0o022)
+        # Like install-server: news installs the release's hash-locked requirements, then root owns them.
+        subprocess.run(["/bin/sh", BUILD, python, environment, release / "requirements.txt"], check=True)
         if not imports_news(environment, release):
             raise RebuildError(f"{environment} cannot import News; nothing changed.")
     except BaseException:

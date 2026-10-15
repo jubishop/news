@@ -1,7 +1,27 @@
-#!/opt/python/current/bin/python3
-"""Restricted SSH entry point. Install at /usr/local/sbin/news-receive-release."""
+#!/opt/python/current/bin/python3 -I
+"""Forced command for News's production deploy key.
 
+bin/install-deploy-kit installs this file at /usr/local/sbin/news-receive-release.
+Root's authorized_keys entry for the GitHub Actions deploy key forces it:
+
+    restrict,command="/usr/local/sbin/news-receive-release" ssh-ed25519 KEY news-github-deploy
+
+The key can then run only these commands, read from SSH_ORIGINAL_COMMAND:
+
+    status           Print the active revision and the installed deploy kit's digest as JSON.
+    deploy REVISION  Check the release archive on stdin and install it with the deploy kit.
+
+Root runs only the deploy kit that bin/install-deploy-kit installed from Git:
+this file and /usr/local/lib/news-deploy. A deployment stops before it changes
+anything when the archive's ops/ kit files differ from the installed kit.
+Nothing that arrives over the connection runs or is installed as root: the
+receiver extracts only news/ and requirements.txt, and the release's code and
+Python packages run as the news user.
+"""
+
+import hashlib
 import io
+import json
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -11,53 +31,141 @@ import tarfile
 import tempfile
 import uuid
 
+NEWS = Path("/opt/news")
+KIT = Path("/usr/local/lib/news-deploy")
+ARCHIVE_LIMIT = 25 * 1024 * 1024
+# The deploy kit: these ops/ scripts and the ops/systemd units. The receiver
+# is installed in /usr/local/sbin; the other files go to KIT.
+SCRIPTS = ("receive-release", "install-server", "build-environment", "rebuild-environment")
+UNIT = re.compile(r"ops/systemd/(news[A-Za-z0-9@_.-]*\.(?:service|timer))")
+# A release keeps only these; every file root runs or installs comes from KIT.
+EXTRACTED = ("news", "requirements.txt")
+# The kit's installer gets a fresh systemd environment; these commands get this one.
+ENVIRONMENT = {"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C.UTF-8"}
 
-def main():
-    if sys.version_info < (3, 14):
-        raise ValueError("News requires Python 3.14 or later.")
-    if os.geteuid() != 0:
-        raise ValueError("Run as root through the restricted deploy key.")
-    match = re.fullmatch(r"deploy ([0-9a-f]{40})", os.environ.get("SSH_ORIGINAL_COMMAND", ""))
-    if not match:
-        raise ValueError("Only 'deploy COMMIT_SHA' is accepted.")
-    revision = match[1]
-    limit = 25 * 1024 * 1024
-    data = sys.stdin.buffer.read(limit + 1)
-    if len(data) > limit:
-        raise ValueError("Release archive exceeds 25 MiB.")
+
+def kit_name(path):
+    """Return the kit file name for an ops/ archive path, or None if it is not in the kit."""
+    if path.startswith("ops/") and path[len("ops/"):] in SCRIPTS:
+        return path[len("ops/"):]
+    match = UNIT.fullmatch(path)
+    return match[1] if match else None
+
+
+def kit_files(entries):
+    """Select the kit from (archive path, bytes) pairs, as `git archive REVISION ops/` names them."""
+    files = {}
+    for path, data in entries:
+        name = kit_name(path)
+        if name:
+            files[name] = data
+    missing = ["ops/" + name for name in SCRIPTS if name not in files]
+    if not any(UNIT.fullmatch("ops/systemd/" + name) for name in files):
+        missing.append("ops/systemd/news.service")
+    if missing:
+        raise ValueError("Missing deploy kit files: " + ", ".join(missing))
+    return files
+
+
+def kit_digest(files):
+    """Digest {name: bytes}; bin/install-deploy-kit and every deployment compare these."""
+    listing = "".join(hashlib.sha256(data).hexdigest() + "  " + name + "\n" for name, data in sorted(files.items()))
+    return hashlib.sha256(listing.encode()).hexdigest()
+
+
+def installed_digest():
+    files = {"receive-release": Path(__file__).read_bytes()}
+    if KIT.exists():
+        for path in KIT.iterdir():
+            if path.is_symlink() or not path.is_file():
+                raise ValueError(f"Unexpected entry {path.name} in the deploy kit. "
+                                 "Reinstall it with bin/install-deploy-kit.")
+            files[path.name] = path.read_bytes()
+    return kit_digest(files)
+
+
+def active_revision():
+    try:
+        revision = (NEWS / "current/REVISION").read_text().strip()
+    except OSError:
+        return None
+    return revision if re.fullmatch(r"[0-9a-f]{40}", revision) else None
+
+
+def checked_members(archive):
+    """Accept only directories and regular files under news/, ops/, and requirements.txt, each once."""
+    names = set()
+    members = archive.getmembers()
+    for member in members:
+        path = PurePosixPath(member.name)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or not path.parts
+            or path.parts[0] not in {"news", "ops", "requirements.txt"}
+            or not (member.isfile() or member.isdir())
+            or member.mode & 0o7000
+            or str(path) in names
+        ):
+            raise ValueError("Release archive contains an unsupported path or file type.")
+        names.add(str(path))
+    if not {"news/schema.sql", "requirements.txt"} <= {str(PurePosixPath(m.name)) for m in members if m.isfile()}:
+        raise ValueError("Release archive is incomplete.")
+    return members
+
+
+def deploy(revision, stdin):
+    data = stdin.read(ARCHIVE_LIMIT + 1)
+    if len(data) > ARCHIVE_LIMIT:
+        raise ValueError(f"Release archive exceeds {ARCHIVE_LIMIT} bytes.")
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:") as archive:
-        members = archive.getmembers()
-        for member in members:
-            path = PurePosixPath(member.name)
-            if (
-                path.is_absolute()
-                or ".." in path.parts
-                or not path.parts
-                or path.parts[0] not in {"news", "ops", "requirements.txt"}
-                or not (member.isfile() or member.isdir())
-                or member.mode & 0o7000
-            ):
-                raise ValueError("Release archive contains an unsupported path or file type.")
-        required = {"ops/install-server", "news/schema.sql", "requirements.txt"}
-        if not required.issubset({m.name for m in members if m.isfile()}):
-            raise ValueError("Release archive is incomplete.")
-        release = Path(tempfile.mkdtemp(prefix=revision + "-", dir="/opt/news/releases"))
-        archive.extractall(release, filter="data")
+        members = checked_members(archive)
+        expected = kit_digest(kit_files(
+            (str(PurePosixPath(m.name)), archive.extractfile(m).read())
+            for m in members if m.isfile() and kit_name(str(PurePosixPath(m.name)))
+        ))
+        installed = installed_digest()
+        if installed != expected:
+            raise ValueError(
+                f"The installed deploy kit ({installed[:12]}) does not match ops/ at {revision} ({expected[:12]}). "
+                f"Nothing changed. From a trusted checkout, run bin/install-deploy-kit root@HOST {revision}, "
+                "then rerun the deploy job.")
+        release = Path(tempfile.mkdtemp(prefix=revision + "-", dir=NEWS / "releases"))
+        release.chmod(0o755)
+        # The data filter also drops archive ownership, so root owns what it extracts.
+        archive.extractall(release, members=[m for m in members if PurePosixPath(m.name).parts[0] in EXTRACTED],
+                           filter="data")
     (release / "REVISION").write_text(revision + "\n")
+    print(f"Deploying {revision} with deploy kit {installed[:12]}.", flush=True)
     unit = "news-deploy-" + uuid.uuid4().hex
     # No --pipe: systemd owns the installer even if SSH or Actions disconnects.
     result = subprocess.run([
         "systemd-run", "--wait", "--collect", "--unit=" + unit,
-        "--property=Type=exec", "--property=RuntimeMaxSec=15min",
-        "--property=UMask=0077", "/bin/sh", str(release / "ops/install-server"), str(release),
-    ])
-    subprocess.run(["journalctl", "--no-pager", "--unit=" + unit])
+        "--property=Type=exec", "--property=RuntimeMaxSec=15min", "--property=UMask=0077",
+        "/bin/sh", str(KIT / "install-server"), str(release),
+    ], env=ENVIRONMENT, stdin=subprocess.DEVNULL)
+    subprocess.run(["journalctl", "--no-pager", "--unit=" + unit], env=ENVIRONMENT, stdin=subprocess.DEVNULL)
     return result.returncode
 
 
-if __name__ == "__main__":
+def main():
     try:
-        sys.exit(main())
+        if sys.version_info < (3, 14):
+            raise ValueError("News requires Python 3.14 or later.")
+        if os.geteuid() != 0:
+            raise ValueError("Run as root through the restricted deploy key.")
+        command = os.environ.get("SSH_ORIGINAL_COMMAND", "")
+        if command == "status":
+            print(json.dumps({"active": active_revision(), "kit": installed_digest()}), flush=True)
+            return 0
+        match = re.fullmatch(r"deploy ([0-9a-f]{40})", command)
+        if not match:
+            raise ValueError("Refused: the deploy key accepts only 'status' and 'deploy COMMIT_SHA'.")
+        return deploy(match[1], sys.stdin.buffer)
     except (OSError, ValueError, tarfile.TarError) as error:
-        print(str(error), file=sys.stderr)
-        sys.exit(1)
+        print(f"news-receive-release: {error}", file=sys.stderr, flush=True)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
