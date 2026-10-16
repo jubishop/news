@@ -43,9 +43,9 @@ The [GitHub Actions workflow](../.github/workflows/check.yml) runs
 Chromium; it checks Python 3.14 and the latest stable Python, uses read-only
 repository permissions, and does not
 persist checkout credentials. This initial setup does not enforce branch
-protection, so full local validation is required before delivering a change
-to code the application runs. Verify the workflow result for the exact pushed
-commit. Changes outside the runtime need neither.
+protection, so full local validation is required before delivering any code
+change, including tests and CI. Verify the workflow result for the exact pushed
+commit. Text-only changes need neither.
 
 ## Runtime and toolchain versions
 
