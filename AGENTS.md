@@ -50,7 +50,8 @@ and acceptance criteria.
 application tests, the browser test, and ShellCheck for the operations and
 worker scripts. Run relevant application checks explicitly for code edits.
 CI does not enforce branch protection, so run `bin/check --full` locally
-before delivery.
+before delivering a change to code the application runs. Changes outside the
+runtime need no checks.
 
 Before pushing or merging to `main`, assess the complete delivery under the
 [deployment policy](docs/deployment.md#deployment-decisions). Record a skip
