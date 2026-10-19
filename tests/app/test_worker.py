@@ -318,10 +318,20 @@ print(json.dumps(final))
             "Use only direct HTTPS image URLs that you found on a page; never invent or guess image URLs",
             "Credit and link the image source nearby",
             "The supervisor removes images that do not load",
+            "Write about the story, not your research",
+            "Do not write in the first person or mention pages, fetches, or tools",
+            "Do not add sections about what you could not find or confirm",
+            "attribute it to the outlet that reported it, or leave it out",
+            "Mention a gap only when the reader needs it, once, as a fact about the story",
+            "work around it instead of reporting it",
+            "fetch the redirect URL it reports",
+            "NCBI E-utilities efetch",
             "If News history search or retrieval fails, return a retryable failed outcome",
         ):
             with self.subTest(editorial_requirement=requirement):
                 self.assertIn(requirement, instructions)
+        # Readers saw "I could not open..." in most articles when the prompt asked to explain gaps.
+        self.assertNotIn("explain material gaps", instructions)
         self.assertNotIn("archive.jsonl", capture["prompt"])
         self.assertIn("id: old", capture["article"]["content"][0]["resource"]["text"])
         self.assertIn("https://example.com/story", capture["article"]["content"][0]["resource"]["text"])

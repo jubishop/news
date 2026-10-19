@@ -100,8 +100,9 @@ passing schema checks alone cannot establish the usefulness of the shortlist.
 Under the [best-effort rule](product-design.md#best-effort-assignments) accepted
 on September 26, 2026, fewer supported picks or unavailable practical details
 do not by themselves fail the assignment. Publish useful supported material,
-explain material gaps briefly, and do not invent details to fill the requested
-format. Evaluate this behavior alongside the cases above.
+state material gaps briefly as facts about the story, and do not invent
+details to fill the requested format. Evaluate this behavior alongside the
+cases above.
 
 ### Open questions exposed by this example
 

@@ -406,6 +406,15 @@ Best effort does not permit invented facts or concealment of material gaps.
 Keep research failures distinct from successful partial reporting and the
 existing successful "nothing to publish" outcome.
 
+Accepted on October 19, 2026: a material gap is a fact about the story, not
+about the research. On October 19, 14 of the 24 articles from the previous ten
+days had 40 first-person sentences such as "I could not open the NHTSA record,"
+and three had sections about what the reporter could not confirm. The owner
+found them useless. Reporters state a gap that matters to the reader once,
+such as "Toyota has not announced U.S. pricing." They credit a detail they
+could not check against its primary source to the outlet that reported it, or
+leave it out. They never describe pages, fetches, or tools.
+
 ### Runs with nothing to publish
 
 Accepted on September 24, 2026: a run may publish no articles when it finds no
