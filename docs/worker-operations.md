@@ -121,6 +121,17 @@ The assignment determines coverage. There is no computed lookback or special
 morning cutoff. Best effort permits useful partial reporting. Prompts require
 source checks and clear uncertainty, but tests cannot establish factual quality.
 
+Claude Code's WebFetch often returns a result that contains nothing usable
+without marking it as an error. On October 19, 2026, 51 of 183 fetches from
+the previous ten days were like this: 20 sites returned HTTP 403, mostly news
+and journal publishers that block AI fetchers. Nine were redirects to another
+host, which WebFetch reports instead of following. Seven were PubMed cookie
+walls and five were PDFs returned as undecoded binary. Reporters had written
+these failures into articles. The prompt now tells them to fetch a reported
+redirect, find another copy of blocked or unreadable material, and use NCBI
+E-utilities instead of PubMed pages. It also bars mentioning research in
+articles, as the [gap rule](product-design.md#best-effort-assignments) requires.
+
 Accepted on September 26, 2026: each research attempt has at most 30 minutes.
 The owner considers this sufficient and wants stuck research to stop. Its entire process group is killed
 on timeout. Failed processes, invalid JSON, invalid articles, and context-fetch

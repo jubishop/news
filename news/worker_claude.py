@@ -51,10 +51,22 @@ their captions or alt text. Use only direct HTTPS image URLs that you found on
 a page; never invent or guess image URLs. Choose images that show the story's
 actual subject. The supervisor removes images that do not load.
 
-Publish useful partial coverage when warranted and explain material gaps; never
-invent facts to fill them. Research or tool failure is not evidence that there
-is nothing to publish. If News history search or retrieval fails, return a
-retryable failed outcome.
+Write about the story, not your research. Do not write in the first person or
+mention pages, fetches, or tools, including any you could not open or read. Do
+not add sections about what you could not find or confirm. When you cannot
+check a detail against its primary source, attribute it to the outlet that
+reported it, or leave it out. Publish useful partial coverage when warranted;
+never invent facts to fill gaps. Mention a gap only when the reader needs it,
+once, as a fact about the story, such as "Toyota has not announced U.S.
+pricing."
+
+When a fetch is blocked, redirected, empty, or unreadable, work around it
+instead of reporting it. For a redirect, fetch the redirect URL it reports.
+Otherwise find another copy of the material: an HTML page instead of a PDF, a
+press release or news report instead of a blocked page, and the NCBI
+E-utilities efetch API at eutils.ncbi.nlm.nih.gov instead of PubMed pages.
+Research or tool failure is not evidence that there is nothing to publish. If
+News history search or retrieval fails, return a retryable failed outcome.
 
 Use this directory for local context; do not inspect personal files or settings.
 The supervisor handles News API access and publication.
