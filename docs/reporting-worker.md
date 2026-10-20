@@ -124,6 +124,16 @@ the worker's machine rather than requested through the newsroom.
 
 ## Model engine
 
+Accepted on October 19, 2026: reporters read web pages through the worker's
+own [page browser](worker-operations.md#page-browser) instead of Claude Code's
+WebFetch. The owner asked for Haiku to load pages however possible and get
+around blocks; WebFetch returned nothing usable for 51 of 183 recent fetches.
+The browser is Playwright's Chromium, already a development dependency, with
+an ordinary desktop user agent and macOS PDFKit for PDFs. This supersedes
+built-in fetch in the decisions below; built-in web search remains. The
+tradeoff is more integration code the project owns and a local browser for
+each attempt.
+
 Accepted on October 9, 2026: run reporting research with the Claude Code CLI
 and Claude Haiku 5.5 (`claude-haiku-5-5`) through the owner's existing Claude
 subscription. This supersedes the Codex CLI engine and the GPT-6.1 Sol model

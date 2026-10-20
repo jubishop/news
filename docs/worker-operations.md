@@ -4,11 +4,12 @@ status: current
 
 # Reporting worker operations
 
-The Mac worker runs the Claude Code CLI with Claude Haiku 5.5 and Claude
-Code's built-in web search and fetch. Python handles the News API, eight
+The Mac worker runs the Claude Code CLI with Claude Haiku 5.5, Claude Code's
+built-in web search, and the worker's own [page browser](#page-browser) in
+place of Claude Code's WebFetch. Python handles the News API, eight
 concurrent reporters, durable results, and retries. A private QMD MCP
 connection provides [semantic article history search](article-history-search.md).
-There are no worker plugins or paid search API keys. The
+There are no Claude Code plugins or paid search API keys. The
 [worker decisions](reporting-worker.md) explain this choice and the daily
 06:00 Pacific LaunchAgent.
 
@@ -23,7 +24,9 @@ version and the Claude subscription login before starting research. Install
 Claude Code with its official installer; the native Mac binary needs no Node
 runtime. QMD has its own [runtime and model setup](article-history-search.md#installation-and-checks).
 Install from a permanent checkout with `bin/setup` and `bin/app-setup`.
-The application adds no new Python dependencies.
+The page browser uses Playwright and its Chromium, which `bin/app-setup`
+installs from the development dependency group. The server does not install
+them.
 
 Copy [the configuration example](../ops/worker.example.json) to
 `~/.config/news/worker.json`. Keep its parent directory mode 0700 and the file
@@ -55,10 +58,10 @@ Each attempt runs `claude --print` in restricted mode from a private attempt
 directory. Restricted mode ignores user, project, and local settings, so
 personal plugins and hooks do not load. It removes the shell and other
 code-running tools and confines file tools to the attempt directory. The
-worker enables only Read, Glob, Grep, WebSearch, and WebFetch, plus News
-history `query` and `get`. It hides QMD's other tools, and `dontAsk`
-permission mode denies anything else. `--strict-mcp-config` loads only the
-News history server. Slash commands and skills are disabled, subagents are
+worker enables only Read, Glob, Grep, and WebSearch, plus News history
+`query` and `get` and the page browser's `fetch_page`. It hides QMD's other
+tools, and `dontAsk` permission mode denies anything else.
+`--strict-mcp-config` loads only those two MCP servers. Slash commands and skills are disabled, subagents are
 unavailable, and sessions are not saved. Environment switches also disable
 instruction files such as `CLAUDE.md` and `AGENTS.md`, auto-memory, and the
 Git status snapshot. The default state directory sits inside the owner's home
@@ -72,11 +75,67 @@ the instruction-file switch removed. The News credential is never included in
 the prompt, archive, child environment, or diagnostic log. The supervisor
 alone authenticates to the News API.
 
+## Page browser
+
+Accepted on October 19, 2026: reporters read pages with the worker's
+`fetch_page` tool instead of Claude Code's WebFetch, under the
+[page browser decision](reporting-worker.md#model-engine). WebFetch often
+returns a result with nothing usable and does not mark it as an error. On
+October 19, 51 of 183 fetches from the previous ten days were like this. 20
+were HTTP 403 responses, mostly from news and journal publishers that block AI
+fetchers. Nine were redirects to another host, which WebFetch reports instead
+of following. Seven were PubMed cookie walls and five were PDFs returned as
+undecoded binary.
+
+[`news/worker_fetch.py`](../news/worker_fetch.py) is a stdio MCP server that
+Claude Code starts for each attempt with the worker's Python and the attempt's
+environment. It starts Playwright's Chromium before answering, so a browser
+that cannot start fails the connection and the attempt. `bin/worker --check`
+starts it too.
+
+- Chromium presents an ordinary desktop Chrome user agent and hides its
+  automation flag. On October 19, Cloudflare and other bot checks turned away
+  the default HeadlessChrome agent at The EV Report, InsideEVs, Motor1,
+  Capitol Hill Seattle, HPCwire, and The Lancet. The ordinary agent loaded
+  all six. Each page also loads in a fresh browser session. In the first live
+  run, Cloudflare blocked the second page from The EV Report and electrive
+  after the first one loaded; fresh sessions loaded all five pages tried.
+  A page still showing a bot check gets up to 15 seconds to clear.
+  PubMed answers with a reCAPTCHA, so the prompt sends reporters to NCBI
+  E-utilities instead. The browser has no sign-ins, so paywalled text stays
+  out of reach.
+- The browser follows redirects and runs scripts. It returns the page text
+  without navigation, footer, and aside regions. Up to 12 image URLs with alt
+  text and captions follow, then up to 40 links with substantive labels.
+  Text, JSON, and XML responses come back as served. macOS PDFKit reads PDFs
+  up to 50 MB, whether the browser displays or downloads them.
+- Long results continue from a `start` offset. Each response holds about
+  7,500 characters, and non-Latin characters count three each. This keeps
+  each response under the 5,000-token MCP output budget; Claude Code rejects
+  larger results rather than truncating them. In the first live run, a
+  12,092-character list of links exceeded that budget. Each page loads once
+  per attempt, and later sections come from memory. A page that returned an
+  HTTP error loads again in a fresh session when requested again, because bot
+  blocks are intermittent: on October 20, The Lancet's home page stayed on its
+  Cloudflare check while its current-issue page loaded.
+- At most four pages load at once per attempt, and each load has two
+  minutes.
+
+Every browser connection passes through a proxy inside the server. The proxy
+resolves each host itself and connects to the vetted address only when every
+answer is a public internet address. Pages, redirects, subresources, and DNS
+answers therefore cannot reach loopback, private, or link-local addresses on
+the owner's Mac or network. WebRTC sends no unproxied UDP. The tool accepts
+only http and https URLs, and TLS errors still fail. Chromium runs in the
+research process group: on October 19, no browser process survived the
+guardian's group kill.
+
 ## Daily batch and recovery
 
 Run `bin/worker --config ~/.config/news/worker.json` to process a batch.
-`--check` verifies the CLI and QMD versions, Claude subscription login, and
-authenticated API access without claiming jobs or calling a model. It does not establish that the
+`--check` verifies the CLI and QMD versions, Claude subscription login, that
+the page browser starts, and authenticated API access without claiming jobs or
+calling a model. It does not establish that the
 subscription has enough remaining allowance for research.
 
 The worker first acquires an OS file lock. A duplicate start exits without
@@ -121,17 +180,6 @@ The assignment determines coverage. There is no computed lookback or special
 morning cutoff. Best effort permits useful partial reporting. Prompts require
 source checks and clear uncertainty, but tests cannot establish factual quality.
 
-Claude Code's WebFetch often returns a result that contains nothing usable
-without marking it as an error. On October 19, 2026, 51 of 183 fetches from
-the previous ten days were like this: 20 sites returned HTTP 403, mostly news
-and journal publishers that block AI fetchers. Nine were redirects to another
-host, which WebFetch reports instead of following. Seven were PubMed cookie
-walls and five were PDFs returned as undecoded binary. Reporters had written
-these failures into articles. The prompt now tells them to fetch a reported
-redirect, find another copy of blocked or unreadable material, and use NCBI
-E-utilities instead of PubMed pages. It also bars mentioning research in
-articles, as the [gap rule](product-design.md#best-effort-assignments) requires.
-
 Accepted on September 26, 2026: each research attempt has at most 30 minutes.
 The owner considers this sufficient and wants stuck research to stop. Its entire process group is killed
 on timeout. Failed processes, invalid JSON, invalid articles, and context-fetch
@@ -142,10 +190,11 @@ does not revoke a valid result, so routine renewals are unnecessary.
 
 Claude Code streams JSON events to the attempt log. Its final `result` event
 carries the schema-validated draft in `structured_output`. The worker accepts
-a draft only when that event reports success and the startup event shows the
-News history server connected. Codex refused to start research without that
-connection; Claude Code continues without it, so a lost connection costs one
-attempt and becomes a retryable failure. A missing or unsuccessful final event
+a draft only when that event reports success and the startup event shows both
+the News history server and the page browser connected. Codex refused to
+start research without history search; Claude Code continues without either
+server, so a lost connection costs one attempt and becomes a retryable
+failure. A missing or unsuccessful final event
 is also a retryable failure.
 
 The output schema and shared instructions require `article_date`,
@@ -263,8 +312,8 @@ The prompt names visual subjects that usually deserve a photo, such as games,
 products, events, places, and people in the news. It asks for a `lead_image`
 with alt text and a linked credit, and for further body photos where they help,
 such as one per roundup entry. Abstract research usually gets none. It
-suggests official and press pages and Wikimedia Commons, and asks reporters to
-request a page's image URLs while fetching it. Reporters must use only image
+suggests official and press pages and Wikimedia Commons, and `fetch_page`
+lists the images each page shows. Reporters must use only image
 URLs they found, never invented or guessed ones.
 
 An unusable lead photo, such as one with a non-HTTPS URL or an empty credit,

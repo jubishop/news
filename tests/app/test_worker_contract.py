@@ -60,7 +60,7 @@ else:
     assert assignment["reporter"]["schedule"] == {{"cadence": "once", "dates": {dates!r}}}
     assert assignment["expected_date"] == "2026-10-05"
     assert assignment["run_kind"] == "catch_up"
-    print(json.dumps({{"type": "system", "subtype": "init", "mcp_servers": [{{"name": "news_history", "status": "connected"}}]}}))
+    print(json.dumps({{"type": "system", "subtype": "init", "mcp_servers": [{{"name": "news_history", "status": "connected"}}, {{"name": "news_fetch", "status": "connected"}}]}}))
     print(json.dumps({{"type": "result", "subtype": "success", "is_error": False, "structured_output": {{"outcome": "nothing_to_publish", "articles": [], "reason": "Nothing useful", "error": None}}}}))
 ''')
             executable.chmod(0o700)
@@ -94,7 +94,7 @@ if "--version" in sys.argv:
 elif sys.argv[1:3] == ["auth", "status"]:
     print(json.dumps({"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty"}))
 else:
-    print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": "connected"}]}))
+    print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": "connected"}, {"name": "news_fetch", "status": "connected"}]}))
     print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "structured_output": {"outcome": "nothing_to_publish", "articles": [], "reason": "Nothing new", "error": None}}))
 ''')
             executable.chmod(0o700)
@@ -138,7 +138,7 @@ else:
     assignment = json.loads(prompt.split("Assignment JSON:\\n", 1)[1])
     assert assignment["reporter"]["id"] == {reporter!r}
     assert assignment["expected_date"] == "2026-09-27"
-    print(json.dumps({{"type": "system", "subtype": "init", "mcp_servers": [{{"name": "news_history", "status": "connected"}}]}}))
+    print(json.dumps({{"type": "system", "subtype": "init", "mcp_servers": [{{"name": "news_history", "status": "connected"}}, {{"name": "news_fetch", "status": "connected"}}]}}))
     print(json.dumps({{"type": "result", "subtype": "success", "is_error": False, "structured_output": {{"outcome": "published", "articles": [{article!r}], "reason": "", "error": None}}}}))
 ''')
             executable.chmod(0o700)
