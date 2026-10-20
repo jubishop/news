@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from . import validation as v
 from .desktop_alerts import notify
 from .errors import Problem
-from .worker_claude import preflight, research
+from .worker_claude import browser_preflight, preflight, research
 from .worker_history import History, preflight as history_preflight
 from .worker_images import remove_broken
 from .worker_io import APIError, NewsAPI, WorkerError, read_json, remove_file, save_json
@@ -295,8 +295,9 @@ def main():
             settings.setdefault("claude", shutil.which("claude") or "claude")
             preflight(settings)
             history_preflight(settings)
+            browser_preflight()
             NewsAPI(settings).call("/articles/search?limit=1")
-            print("Claude Code subscription login, QMD version, and News API access verified. No model was called.")
+            print("Claude Code subscription login, QMD version, page browser, and News API access verified. No model was called.")
             return 0
         return run(settings, retry_failed=args.retry_failed)
     except (WorkerError, OSError, ValueError, KeyError, Problem) as exc:

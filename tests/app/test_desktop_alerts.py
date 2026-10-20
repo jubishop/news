@@ -37,7 +37,7 @@ elif sys.argv[1:3] == ["auth", "status"]:
     print(json.dumps({"loggedIn": True, "authMethod": "claude.ai", "apiProvider": "firstParty"}))
 else:
     sys.stdin.read()
-    print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": "connected"}]}))
+    print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": "connected"}, {"name": "news_fetch", "status": "connected"}]}))
     print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "structured_output": {
         "outcome": "failed", "articles": [], "reason": None,
         "error": {"code": "research_failed", "message": "private detail", "retryable": True}}}))

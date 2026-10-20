@@ -189,7 +189,9 @@ config = json.loads((root / "fake.json").read_text())
 prompt = sys.stdin.read()
 time.sleep(config.get("startup_delay", 0))
 endpoint = json.loads(pathlib.Path(sys.argv[sys.argv.index("--mcp-config") + 1]).read_text())["mcpServers"]["news_history"]["url"]
-print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [{"name": "news_history", "status": config.get("history_status", "connected")}]}), flush=True)
+print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [
+    {"name": "news_history", "status": config.get("history_status", "connected")},
+    {"name": "news_fetch", "status": config.get("fetch_status", "connected")}]}), flush=True)
 def tool(name, arguments):
     body = json.dumps({"jsonrpc":"2.0", "id":1, "method":"tools/call", "params":{"name":name,"arguments":arguments}}).encode()
     req = urllib.request.Request(endpoint, data=body, headers={"Content-Type":"application/json","Accept":"application/json, text/event-stream"})
@@ -280,13 +282,24 @@ print(json.dumps(final))
         self.assertEqual(invocation["model"], "claude-haiku-5-5")
         for flag in ("--print", "--restricted", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"):
             self.assertIn(flag, argv)
-        self.assertEqual(option("--tools"), "Read,Glob,Grep,WebSearch,WebFetch")
+        self.assertEqual(option("--tools"), "Read,Glob,Grep,WebSearch")
         self.assertEqual(option("--permission-mode"), "dontAsk")
-        self.assertEqual(option("--allowedTools"), "Read,Glob,Grep,WebSearch,WebFetch,mcp__news_history__query,mcp__news_history__get")
+        self.assertEqual(option("--allowedTools"), "Read,Glob,Grep,WebSearch,mcp__news_history__query,mcp__news_history__get,"
+                                                   "mcp__news_fetch__fetch_page")
         self.assertEqual(option("--disallowedTools"), "mcp__news_history__multi_get,mcp__news_history__status")
         servers = json.loads(Path(option("--mcp-config")).read_text())["mcpServers"]
-        self.assertEqual(list(servers), ["news_history"])
+        self.assertEqual(list(servers), ["news_history", "news_fetch"])
         self.assertEqual(servers["news_history"]["type"], "http")
+        fetch = servers["news_fetch"]
+        self.assertEqual((fetch["type"], fetch["command"], fetch["args"][0]), ("stdio", sys.executable, "-B"))
+        self.assertEqual(Path(fetch["args"][1]).resolve(), Path(__file__).resolve().parents[2] / "news" / "worker_fetch.py")
+        # The configured page browser starts in the environment Claude Code received.
+        handshake = "".join(json.dumps({"jsonrpc": "2.0", "id": n, "method": method, "params": {}}) + "\n"
+                            for n, method in ((1, "initialize"), (2, "tools/list")))
+        started = subprocess.run([fetch["command"], *fetch["args"]], input=handshake, capture_output=True, text=True,
+                                 env=capture["env"], cwd=capture["cwd"], timeout=120)
+        replies = {reply["id"]: reply for reply in map(json.loads, started.stdout.splitlines())}
+        self.assertEqual([tool["name"] for tool in replies[2]["result"]["tools"]], ["fetch_page"], started.stderr)
         environment = capture["env"]
         for name in ("CLAUDE_CODE_DISABLE_CLAUDE_MDS", "CLAUDE_CODE_DISABLE_AUTO_MEMORY", "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS"):
             self.assertEqual(environment[name], "1")
@@ -318,13 +331,16 @@ print(json.dumps(final))
             "Use only direct HTTPS image URLs that you found on a page; never invent or guess image URLs",
             "Credit and link the image source nearby",
             "The supervisor removes images that do not load",
+            "fetch_page lists the images a page shows with their alt text and captions",
             "Write about the story, not your research",
             "Do not write in the first person or mention pages, fetches, or tools",
             "Do not add sections about what you could not find or confirm",
             "attribute it to the outlet that reported it, or leave it out",
             "Mention a gap only when the reader needs it, once, as a fact about the story",
-            "work around it instead of reporting it",
-            "fetch the redirect URL it reports",
+            "Read web pages and PDFs with fetch_page",
+            "follows redirects, and waits out bot checks",
+            "continue a long result from the start offset it gives",
+            "find another copy of the material instead of reporting the failure",
             "NCBI E-utilities efetch",
             "If News history search or retrieval fails, return a retryable failed outcome",
         ):
@@ -332,6 +348,7 @@ print(json.dumps(final))
                 self.assertIn(requirement, instructions)
         # Readers saw "I could not open..." in most articles when the prompt asked to explain gaps.
         self.assertNotIn("explain material gaps", instructions)
+        self.assertNotIn("WebFetch", instructions)
         self.assertNotIn("archive.jsonl", capture["prompt"])
         self.assertIn("id: old", capture["article"]["content"][0]["resource"]["text"])
         self.assertIn("https://example.com/story", capture["article"]["content"][0]["resource"]["text"])
@@ -831,6 +848,28 @@ print(json.dumps(final))
         self.assertEqual(len(self.captures()), 3)
         self.assertEqual(len(self.server.results), 3)
         self.assertTrue(all(r["outcome"] == "failed" and r["error"]["retryable"] and not r["articles"] for r in self.server.results))
+
+    def test_unavailable_page_browser_cannot_publish(self):
+        self.server.add()
+        self.fake_config["fetch_status"] = "failed"
+        self.assertEqual(self.execute(), 1)
+        self.assertEqual(len(self.captures()), 3)
+        self.assertTrue(all(r["outcome"] == "failed" and r["error"]["retryable"] and not r["articles"] for r in self.server.results))
+        failures = [json.loads(p.read_text())["message"] for p in (self.root / "state" / "attempts").glob("*/failure.json")]
+        self.assertEqual(failures, ["Claude Code could not start the News page browser."] * 3)
+
+    def test_check_starts_the_page_browser_without_claiming_work(self):
+        self.server.add()
+        config = self.root / "worker.json"
+        config.write_text(json.dumps(self.settings))
+        config.chmod(0o600)
+        (self.root / "fake.json").write_text(json.dumps(self.fake_config))
+        result = subprocess.run([sys.executable, "-B", "-m", "news.worker", "--config", str(config), "--check"],
+                                capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("page browser", result.stdout)
+        self.assertEqual(self.server.claims, {})
+        self.assertEqual(self.captures(), [])
 
     def test_history_preparation_claims_no_work_and_calls_no_reporter(self):
         self.server.add()

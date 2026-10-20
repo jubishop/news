@@ -46,10 +46,10 @@ Add more photos to the body where they help, such as one for each entry in a
 roundup, with Markdown ![descriptive alt text](https://...) in body_markdown;
 do not repeat the lead image in the body. Credit and link the image source
 nearby. Official, press, publisher, venue, event, and Wikimedia Commons pages
-are good sources; when fetching a page, ask for the image URLs it shows with
-their captions or alt text. Use only direct HTTPS image URLs that you found on
-a page; never invent or guess image URLs. Choose images that show the story's
-actual subject. The supervisor removes images that do not load.
+are good sources; fetch_page lists the images a page shows with their alt text
+and captions. Use only direct HTTPS image URLs that you found on a page; never
+invent or guess image URLs. Choose images that show the story's actual subject.
+The supervisor removes images that do not load.
 
 Write about the story, not your research. Do not write in the first person or
 mention pages, fetches, or tools, including any you could not open or read. Do
@@ -60,13 +60,14 @@ never invent facts to fill gaps. Mention a gap only when the reader needs it,
 once, as a fact about the story, such as "Toyota has not announced U.S.
 pricing."
 
-When a fetch is blocked, redirected, empty, or unreadable, work around it
-instead of reporting it. For a redirect, fetch the redirect URL it reports.
-Otherwise find another copy of the material: an HTML page instead of a PDF, a
-press release or news report instead of a blocked page, and the NCBI
-E-utilities efetch API at eutils.ncbi.nlm.nih.gov instead of PubMed pages.
-Research or tool failure is not evidence that there is nothing to publish. If
-News history search or retrieval fails, return a retryable failed outcome.
+Read web pages and PDFs with fetch_page. It loads them in a browser, follows
+redirects, and waits out bot checks; continue a long result from the start
+offset it gives. When a page still does not load, find another copy of the
+material instead of reporting the failure, such as a press release or news
+report. Use the NCBI E-utilities efetch API at eutils.ncbi.nlm.nih.gov instead
+of PubMed pages. Research or tool failure is not evidence that there is nothing
+to publish. If News history search or retrieval fails, return a retryable failed
+outcome.
 
 Use this directory for local context; do not inspect personal files or settings.
 The supervisor handles News API access and publication.
@@ -163,10 +164,17 @@ def validate_result(value):
 
 MODEL = "claude-haiku-5-5"
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
-TOOLS = ("Read", "Glob", "Grep", "WebSearch", "WebFetch")
+TOOLS = ("Read", "Glob", "Grep", "WebSearch")
 HISTORY_TOOLS = ("mcp__news_history__query", "mcp__news_history__get")
 # QMD also serves these; reporters receive only search and article reading.
 HIDDEN_HISTORY_TOOLS = ("mcp__news_history__multi_get", "mcp__news_history__status")
+# The page browser replaces WebFetch, which bot blocks, redirects, and PDFs defeat.
+FETCH_TOOLS = ("mcp__news_fetch__fetch_page",)
+FETCH_SERVER = Path(__file__).with_name("worker_fetch.py")
+SERVERS = {
+    "news_history": "Claude Code could not connect to News history search.",
+    "news_fetch": "Claude Code could not start the News page browser.",
+}
 
 
 def child_environment():
@@ -206,8 +214,16 @@ def preflight(settings):
         raise WorkerError("Claude Code preflight failed. Check its executable and subscription login.") from None
 
 
+def browser_preflight():
+    try:
+        subprocess.run([sys.executable, "-B", str(FETCH_SERVER), "--check"], capture_output=True, timeout=120,
+                       env=claude_environment(), check=True)
+    except (OSError, subprocess.SubprocessError):
+        raise WorkerError("The News page browser could not start. Run bin/app-setup to install Playwright's Chromium.") from None
+
+
 def final_result(events_path):
-    history = final = None
+    servers, final = {}, None
     with events_path.open("rb") as events:
         for line in events:
             if not line.strip():
@@ -216,13 +232,14 @@ def final_result(events_path):
             if not isinstance(event, dict):
                 raise ValueError("Claude Code emitted an invalid event.")
             if event.get("type") == "system" and event.get("subtype") == "init":
-                servers = event.get("mcp_servers")
-                history = next((server.get("status") for server in servers if isinstance(server, dict)
-                                and server.get("name") == "news_history"), None) if isinstance(servers, list) else None
+                listed = event.get("mcp_servers")
+                servers = {server.get("name"): server.get("status") for server in listed
+                           if isinstance(server, dict)} if isinstance(listed, list) else {}
             elif event.get("type") == "result":
                 final = event
-    if history != "connected":
-        raise WorkerError("Claude Code could not connect to News history search.")
+    for name, problem in SERVERS.items():
+        if servers.get(name) != "connected":
+            raise WorkerError(problem)
     if not isinstance(final, dict) or final.get("subtype") != "success" or final.get("is_error"):
         raise WorkerError("Claude Code did not finish successfully; inspect the private attempt log.")
     if not isinstance(final.get("structured_output"), dict):
@@ -233,7 +250,10 @@ def final_result(events_path):
 def research(settings, directory, assignment, lock_fd, history_endpoint):
     directory = Path(directory)
     save_json(directory / "schema.json", RESULT_SCHEMA)
-    save_json(directory / "mcp.json", {"mcpServers": {"news_history": {"type": "http", "url": history_endpoint}}})
+    save_json(directory / "mcp.json", {"mcpServers": {
+        "news_history": {"type": "http", "url": history_endpoint},
+        "news_fetch": {"type": "stdio", "command": sys.executable, "args": ["-B", str(FETCH_SERVER)]},
+    }})
     prompt = INSTRUCTIONS + "\nAssignment JSON:\n" + json.dumps(assignment, ensure_ascii=False)
     (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
     model = settings.get("model", MODEL)
@@ -242,7 +262,7 @@ def research(settings, directory, assignment, lock_fd, history_endpoint):
         "--output-format", "stream-json", "--verbose", "--json-schema", json.dumps(RESULT_SCHEMA),
         "--no-session-persistence", "--restricted", "--disable-slash-commands",
         "--tools", ",".join(TOOLS), "--permission-mode", "dontAsk",
-        "--allowedTools", ",".join(TOOLS + HISTORY_TOOLS), "--disallowedTools", ",".join(HIDDEN_HISTORY_TOOLS),
+        "--allowedTools", ",".join(TOOLS + HISTORY_TOOLS + FETCH_TOOLS), "--disallowedTools", ",".join(HIDDEN_HISTORY_TOOLS),
         "--strict-mcp-config", "--mcp-config", str(directory / "mcp.json"),
     ]
     save_json(directory / "invocation.json", {"command": command, "model": model})

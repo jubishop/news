@@ -237,7 +237,8 @@ jobs and context and submit articles or explicit run outcomes. The newsroom
 can monitor overdue work without performing the reporting itself.
 
 The [model decision](reporting-worker.md#model-engine) selects Claude Code
-with Claude Haiku 5.5, high effort, and built-in web search and fetch. The [worker host](reporting-worker.md#worker-location)
+with Claude Haiku 5.5, high effort, built-in web search, and the worker's
+[page browser](worker-operations.md#page-browser). The [worker host](reporting-worker.md#worker-location)
 is the current Mac. The [operations guide](worker-operations.md) covers the
 implementation. The worker API remains separate from the model interface.
 
