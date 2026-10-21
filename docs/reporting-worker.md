@@ -128,7 +128,11 @@ Accepted on October 19, 2026: reporters read web pages through the worker's
 own [page browser](worker-operations.md#page-browser) instead of Claude Code's
 WebFetch. The owner asked for Haiku to load pages however possible and get
 around blocks; WebFetch returned nothing usable for 51 of 183 recent fetches.
-The browser is Playwright's Chromium, already a development dependency, with
+Prompt recovery rules alone did not get past blocked sources: on October 19, a
+live probe reran the October 16 EV-report assignment with the corrected prompt,
+and 7 of its 19 fetches still failed with HTTP 403 or 502
+([PR #44](https://github.com/jubishop/news/pull/44)). The browser is
+Playwright's Chromium, already a development dependency, with
 an ordinary desktop user agent and macOS PDFKit for PDFs. This supersedes
 built-in fetch in the decisions below; built-in web search remains. The
 tradeoff is more integration code the project owns and a local browser for
