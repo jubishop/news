@@ -380,10 +380,11 @@ After the PR is merged and its full checks pass:
    revision without disturbing unrelated work. Run `bin/app-setup` there if
    its environment is missing or dependencies changed.
 2. Commission the dedicated Cloudflare **Service Auth** token for the News API
-   application. The server-only deployment currently denies API access. Keep
-   the owner application's audience and policy separate. Use the private
-   [hosting record](../memory/production-hosting.md) for provider configuration
-   locations. Save the new token only in mode-0600 worker configuration.
+   application, replacing the policy that denies all API access during the
+   server-only phase. Keep the owner application's audience and policy
+   separate. Use the private [hosting record](../memory/production-hosting.md)
+   for provider configuration locations and the live policy. Save the new
+   token only in mode-0600 worker configuration.
 3. Confirm `claude auth status --text` shows the owner's Claude subscription.
    Run `bin/worker --config ~/.config/news/worker.json --check`. Verify API
    authentication and that the service token still fails on owner routes.

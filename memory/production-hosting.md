@@ -37,15 +37,24 @@ Track rollout progress and remaining acceptance work in GitHub Issues.
   for other applications. Do not change the whole zone to strict without
   checking their origin certificates.
 - Separate Access applications cover `/newsroom` plus `/newsroom/*`, and
-  `/api` plus `/api/*`. The newsroom allows only the selected owner. The API
-  denies everyone during the server-only phase. Its worker service token is a
-  separate commissioning step. Keep worker monitoring disabled until then.
+  `/api` plus `/api/*`. The newsroom allows only the selected owner. The
+  `News worker` API application has one policy, `News Mac worker service
+  token`, a Service Auth rule that admits only that token; a request without
+  it gets 403. The token was commissioned with the worker in
+  [#4](https://github.com/jubishop/news/issues/4), closed September 27, 2026.
+  Worker monitoring is enabled: `/etc/news/app.env` sets
+  `NEWS_MONITOR_WORKER="true"` and `NEWS_MONITOR_START_DATE="2026-09-27"`.
+  The policy, the 403, and these settings were verified October 23, 2026.
+- The worker application's `allowed_idps` list is empty, which Cloudflare
+  treats as every identity provider in the account, including one-time PIN.
+  That is harmless while Service Auth is its only policy. Restrict its
+  providers before adding an identity policy to it.
 - The Access issuer is `https://jubishop.cloudflareaccess.com`. App identifiers
   and distinct audiences are recorded privately in `~/.config/news/cloudflare.json`.
 - On September 26, 2026, the owner application and shared Access organization
   login session were set to `730h` (one month) and verified through the API.
   The owner policy inherits the application duration. The worker application
-  retains its separate `12h` duration and deny policy.
+  retains its separate `12h` duration.
 - The owner application uses only the shared Google identity provider, with
   automatic redirect to Google. Browser sign-in was verified on September 26,
   2026. The shared provider and its private credential recovery location are
