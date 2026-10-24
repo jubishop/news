@@ -343,6 +343,10 @@ print(json.dumps(final))
             "find another copy of the material instead of reporting the failure",
             "NCBI E-utilities efetch",
             "If News history search or retrieval fails, return a retryable failed outcome",
+            # Reporters chose 20-30 results or whole articles, which Claude Code rejected as over its MCP budget.
+            "query with limit 5, at most 10, and get with maxLines 40, continuing from fromLine",
+            "An oversized result is rejected",
+            "repeat the call with a smaller limit or maxLines",
         ):
             with self.subTest(editorial_requirement=requirement):
                 self.assertIn(requirement, instructions)
