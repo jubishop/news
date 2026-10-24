@@ -22,7 +22,9 @@ from urllib.parse import urlsplit
 from urllib.request import HTTPHandler, HTTPSHandler
 from urllib.response import addinfourl
 
+from news.errors import Problem
 from news.worker import run
+from news.worker_claude import validate_result
 from history_support import Archive, fake_qmd
 from news.worker_io import APIError
 
@@ -446,6 +448,31 @@ print(json.dumps(final))
         self.assertEqual(delivered["articles"], [ARTICLE])
         saved = json.loads((Path(capture["cwd"]) / "result.json").read_text())
         self.assertEqual(saved, self.fake_config["result"])
+
+    def test_blank_error_placeholder_publishes_without_repeating_research(self):
+        self.server.add()
+        self.fake_config["result"] = dict(RESULT, error={"code": "", "message": "", "retryable": False})
+        self.assertEqual(self.execute(), 0)
+        capture, = self.captures()
+        delivered, = self.server.results
+        self.assertEqual((delivered["outcome"], delivered["articles"]), ("published", [ARTICLE]))
+        self.assertNotIn("error", delivered)
+        saved = json.loads((Path(capture["cwd"]) / "result.json").read_text())
+        self.assertEqual(saved, self.fake_config["result"])
+        nothing = dict(RESULT, outcome="nothing_to_publish", articles=[], reason="Nothing new",
+                       error={"code": " ", "message": "", "retryable": True})
+        self.assertEqual(validate_result(nothing), {
+            "outcome": "nothing_to_publish", "articles": [], "reason": "Nothing new"})
+
+    def test_successful_results_with_a_real_error_still_fail_validation(self):
+        nothing = dict(RESULT, outcome="nothing_to_publish", articles=[], reason="Nothing new")
+        for result in (RESULT, nothing):
+            for code, message in (("research_failed", ""), ("", "History search failed."),
+                                  ("research_failed", "History search failed.")):
+                with self.subTest(outcome=result["outcome"], code=code, message=message):
+                    error = {"code": code, "message": message, "retryable": False}
+                    with self.assertRaisesRegex(Problem, "Successful results cannot contain an error."):
+                        validate_result(dict(result, error=error))
 
     def test_images_that_do_not_load_are_removed_before_publication(self):
         self.server.add()
