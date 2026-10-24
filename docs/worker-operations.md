@@ -62,11 +62,13 @@ worker enables only Read, Glob, Grep, and WebSearch, plus News history
 `query` and `get` and the page browser's `fetch_page`. It hides QMD's other
 tools, and `dontAsk` permission mode denies anything else.
 `--strict-mcp-config` loads only those two MCP servers. Slash commands and skills are disabled, subagents are
-unavailable, and sessions are not saved. Environment switches also disable
-instruction files such as `CLAUDE.md` and `AGENTS.md`, auto-memory, and the
-Git status snapshot. The default state directory sits inside the owner's home
-Git repository, and that snapshot otherwise reaches the model. Claude Code's
-default system prompt and built-in plugins remain.
+unavailable, and sessions are not saved, though Claude Code still saves some
+files outside the attempt; see [private state](#private-state-and-diagnostics).
+Environment switches also disable instruction files such as `CLAUDE.md` and
+`AGENTS.md`, auto-memory, and the Git status snapshot. The default state
+directory sits inside the owner's home Git repository, and that snapshot
+otherwise reaches the model. Claude Code's default system prompt and built-in
+plugins remain.
 
 Probes with Claude Code 2.1.296 on October 9, 2026 verified these boundaries.
 A file outside the workspace was denied. A canary `AGENTS.md` and `CLAUDE.md`
@@ -371,6 +373,23 @@ The default state directory is `~/.local/state/news-worker`, mode 0700:
 - `scheduled.log`: stdout/stderr from the most recent LaunchAgent batch,
   replaced at each scheduled start. Detailed per-attempt logs retain the
   seven-day history. The retired `cron.log` is no longer written.
+
+Claude Code also saves files for each attempt outside the state directory, in
+a directory named for the attempt path with every character other than ASCII
+letters and digits replaced by `-`, such as
+`-Users-<user>--local-state-news-worker-attempts-<request id>`:
+
+- `~/.claude/projects/` (under `CLAUDE_CONFIG_DIR` when set): tool results too
+  large to return to the model, such as News history results, saved even with
+  session persistence off. WebFetch saved downloaded PDFs and images here
+  before the page browser replaced it.
+- `~/Library/Caches/claude-cli-nodejs/`: MCP connection logs with tool names
+  and timings.
+
+Both share the attempt's seven-day retention: startup cleanup removes them
+once their attempt directory is gone. Claude Code truncates names longer than
+200 characters, which this cleanup does not match; the default state path is
+far shorter.
 
 Do not paste private prompts, archive content, ownership tokens, or raw logs
 into the public issue tracker. The worker saves operation state with atomic
