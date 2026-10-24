@@ -105,10 +105,22 @@ starts it too.
   E-utilities instead. The browser has no sign-ins, so paywalled text stays
   out of reach.
 - The browser follows redirects and runs scripts. It returns the page text
-  without navigation, footer, and aside regions. Up to 12 image URLs with alt
-  text and captions follow, then up to 40 links with substantive labels.
-  Text, JSON, and XML responses come back as served. macOS PDFKit reads PDFs
-  up to 50 MB, whether the browser displays or downloads them.
+  without navigation, footer, and aside regions, then up to 40 links with
+  substantive labels. Text, JSON, and XML responses come back as served.
+  macOS PDFKit reads PDFs up to 50 MB, whether the browser displays or
+  downloads them.
+- Ahead of the text, so reporters see them, a page lists up to 12 HTTPS
+  images with alt text and captions: its `og:image`, then the images it
+  shows outside navigation, footer, and aside regions. SVGs are left out, as
+  are images under 150 by 100 pixels by file size or by a declared size such
+  as `width="0px"`. Images the page hides with `display: none` are left out
+  too, and so are images with a zero-size box, unless their source, such as a
+  lazy-loaded one, has not loaded yet. The list may fill only half of a
+  section, so an image whose entry would overflow it is skipped. In the batches of October 21 to 23, 2026, hidden ad and
+  tracking pixels with URLs of up to about 1,800 characters filled up to
+  7,187 characters of the first section on komonews.com and
+  seattlerefined.com, and one reporter never saw a KOMO article's text. The
+  longest list of real images then was 3,213 characters.
 - Long results continue from a `start` offset. Each response holds about
   7,500 characters, and non-Latin characters count three each. This keeps
   each response under the 5,000-token MCP output budget; Claude Code rejects

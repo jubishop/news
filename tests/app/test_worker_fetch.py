@@ -14,6 +14,17 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 SERVER = ROOT / "news" / "worker_fetch.py"
 LONG = "\n".join(f"<p>Sentence {n:04} explains one more detail of the long report.</p>" for n in range(600))
+# Like KOMO News on October 23, 2026: ad and tracking pixels with long URLs that the page hides.
+TRACKERS = "\n".join(f'<img width="0px" height="0px" style="display:none" src="https://ads.news.test/{n}?{"q" * 1_800}">'
+                     for n in range(11)) + '\n<img style="width:0;height:0" src="https://ads.news.test/zero">'
+# Lazy images far below the first screen have not loaded: their boxes may be empty, so they are judged by declared size.
+BELOW = """<div style="height:20000px"></div>
+<img loading="lazy" src="https://images.news.test/below.jpg" alt="A photo below the fold">
+<img loading="lazy" src="https://images.news.test/wide.jpg" width="100%" alt="A full-width photo">
+<img loading="lazy" style="display:none" src="https://ads.news.test/hidden">
+<img loading="lazy" width="0px" height="0px" src="https://ads.news.test/late">"""
+GALLERY = "\n".join(f'<img src="https://images.news.test/{n}.jpg?{"w" * 1_000}" width="800" height="600" alt="Photo {n}">'
+                    for n in range(12))
 
 
 def minimal_pdf(text):
@@ -58,6 +69,15 @@ class Origin(BaseHTTPRequestHandler):
 <footer>FOOTER TEXT</footer>"""),
             "/challenge": ("text/html", "<title>Just a moment...</title><p>Checking your browser.</p>"
                                         "<script>setTimeout(() => location.replace('/article'), 1500)</script>"),
+            "/tracked": ("text/html", f"""<!doctype html><title>Storm closes ferry</title>
+<meta property="og:image" content="https://images.news.test/ferry.jpg">
+<main>{TRACKERS}<h1>Storm closes ferry</h1>
+<p>{"High winds closed the ferry route between the two islands for a second day. " * 10}</p>
+<figure><img src="https://images.news.test/dock.jpg" width="800px" height="600px" alt="The empty dock">
+<figcaption>Photo: Example Agency</figcaption></figure>
+<img data-src="https://images.news.test/lazy.jpg">
+{BELOW}</main>"""),
+            "/gallery": ("text/html", f"<title>Gallery</title><main>{GALLERY}<p>GALLERY-STORY-TEXT</p></main>"),
             "/long": ("text/html", f"<title>Long report</title><main>{LONG}<p>END-OF-LONG-PAGE</p></main>"),
             "/japanese": ("text/html", "<title>長い記事</title><main><p>" + "電気自動車の新しいモデルが発表されました。" * 600 + "</p></main>"),
             "/abstract.txt": ("text/plain", "PMID 42864371. Vitamin D raised serum levels in children."),
@@ -165,6 +185,23 @@ class PageBrowserTests(unittest.TestCase):
         self.assertIn(f"- Regulators publish the full recall report today: {self.base}/next-story", text)
         for chrome in ("NAVIGATION MENU", "FOOTER TEXT", "Navigation link"):
             self.assertNotIn(chrome, text)
+
+    def test_hidden_tracking_images_are_not_listed(self):
+        text, error = self.fetch(self.base + "/tracked")
+        self.assertFalse(error)
+        images = [line for line in text.split("\n\n", 1)[0].splitlines() if line.startswith("- ")]
+        self.assertEqual(images, ["- https://images.news.test/ferry.jpg | alt: none",
+                                  "- https://images.news.test/dock.jpg | alt: The empty dock | caption: Photo: Example Agency",
+                                  "- https://images.news.test/lazy.jpg | alt: none",
+                                  "- https://images.news.test/below.jpg | alt: A photo below the fold",
+                                  "- https://images.news.test/wide.jpg | alt: A full-width photo"])
+        self.assertIn("High winds closed the ferry route", text)
+
+    def test_long_image_lists_leave_the_text_in_the_first_section(self):
+        text, error = self.fetch(self.base + "/gallery")
+        self.assertFalse(error)
+        self.assertIn("- https://images.news.test/0.jpg?", text)
+        self.assertIn("GALLERY-STORY-TEXT", text)
 
     def test_redirects_and_bot_checks_reach_the_page(self):
         text, error = self.fetch(self.base + "/moved")
