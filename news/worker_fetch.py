@@ -24,6 +24,8 @@ from urllib.parse import urlsplit
 # lists run near two characters a token and non-Latin text near one, so a
 # section holds 7,500 characters and other scripts count three each.
 SECTION = 7_500
+# Images come first so reporters see them, but may fill only half of the first section, leaving the rest for text.
+IMAGES = SECTION // 2
 PAGES = 4
 NAVIGATION_MS = 30_000
 CALL_SECONDS = 120
@@ -64,12 +66,18 @@ EXTRACT = """() => {
   if (og) image(absolute(og.content), document.querySelector('meta[property="og:image:alt"]')?.content, '');
   for (const img of root.querySelectorAll('img')) {
     if (img.closest(skip)) continue;
-    // A failed image renders as a small alt-text box; judge size by the file or its declared size.
-    const width = img.naturalWidth || Number(img.getAttribute('width')) || 0;
-    const height = img.naturalHeight || Number(img.getAttribute('height')) || 0;
-    if ((width && width < 150) || (height && height < 100)) continue;
     const lazy = img.dataset.src || img.dataset.lazySrc || (img.srcset || '').split(/\\s+/)[0];
     const current = img.currentSrc || img.src;
+    // Skip images the page does not show, such as hidden ad and tracking pixels. A lazy image keeps a
+    // zero-size box until its source loads; lazy loaders never load one under display: none.
+    const box = img.getBoundingClientRect();
+    const pending = (!current || current.startsWith('data:')) && lazy || !img.complete;
+    if (!img.getClientRects().length || (!box.width || !box.height) && !pending) continue;
+    // A failed image renders as a small alt-text box; judge size by the file or its declared size, such as 0px.
+    // A percentage or another unit says nothing about the file.
+    const declared = name => Number(/^\\s*(\\d*\\.?\\d+)(px)?\\s*$/i.exec(img.getAttribute(name) || '')?.[1] ?? NaN);
+    const width = img.naturalWidth || declared('width'), height = img.naturalHeight || declared('height');
+    if (width < 150 || height < 100) continue;
     image(absolute(current && !current.startsWith('data:') ? current : lazy), img.alt,
           img.closest('figure')?.querySelector('figcaption')?.innerText);
   }
@@ -178,14 +186,23 @@ def tidy(text):
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
+def weight(text):
+    return sum(3 if ord(character) > 0x2FF else 1 for character in text)
+
+
 def document(url, status, title, text, images=(), links=()):
     lines = [f"URL: {url}", f"HTTP status: {status}"]
     if title:
         lines.append(f"Title: {title.strip()}")
-    if images:
-        lines.append("Images:")
-        lines += [f"- {i['src']} | alt: {i['alt'] or 'none'}" + (f" | caption: {i['caption']}" if i["caption"] else "")
-                  for i in images]
+    listed, room = [], IMAGES
+    for i in images:
+        line = f"- {i['src']} | alt: {i['alt'] or 'none'}" + (f" | caption: {i['caption']}" if i["caption"] else "")
+        # Leave out an image that does not fit, such as one with a long tracking URL; a shorter one may still fit.
+        if weight(line) < room:
+            listed.append(line)
+            room -= weight(line) + 1
+    if listed:
+        lines += ["Images:", *listed]
     result = "\n".join(lines) + "\n\n" + (tidy(text) or "The page has no readable text.")
     if links:
         result += "\n\nLinks:\n" + "\n".join(f"- {link['label']}: {link['href']}" for link in links)
@@ -197,7 +214,7 @@ def section(text, start):
         return f"[The result has {len(text)} characters; start={start} is past its end.]"
     end, used = start, 0
     while end < len(text) and used < SECTION:
-        used += 3 if ord(text[end]) > 0x2FF else 1
+        used += weight(text[end])
         end += 1
     if end < len(text):
         # Prefer a line break or space so a continuation does not split a word.
