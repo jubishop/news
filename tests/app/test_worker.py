@@ -9,6 +9,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import sys
 import subprocess
@@ -177,7 +178,7 @@ class WorkerTests(unittest.TestCase):
         self.addCleanup(self.http.shutdown)
         self.fake = self.root / "claude"
         self.fake.write_text(f"#!{sys.executable}\n" + '''
-import fcntl, json, os, pathlib, signal, subprocess, sys, time, urllib.request
+import fcntl, json, os, pathlib, re, signal, subprocess, sys, time, urllib.request
 root = pathlib.Path(__file__).parent
 if "--version" in sys.argv:
     print("2.1.296 (Claude Code)")
@@ -203,6 +204,14 @@ found = tool("query", {"query":"related prior coverage", "limit":5})
 matches = found["structuredContent"]["results"]
 article = tool("get", {"file":matches[0]["file"], "maxLines":80}) if matches else None
 (root / ("capture-" + str(os.getpid()) + ".json")).write_text(json.dumps({"prompt": prompt, "argv": sys.argv, "env": dict(os.environ), "cwd": os.getcwd(), "search":found,"article":article}))
+if config.get("claude_stores"):
+    # Claude Code saves oversized tool results and MCP logs in directories named for the cwd.
+    name = re.sub("[^a-zA-Z0-9]", "-", os.getcwd())
+    config_dir = pathlib.Path(os.environ.get("CLAUDE_CONFIG_DIR") or pathlib.Path.home() / ".claude")
+    for saved in (config_dir / "projects" / name / "session/tool-results",
+                  pathlib.Path.home() / "Library/Caches/claude-cli-nodejs" / name / "mcp-logs-news-history"):
+        saved.mkdir(parents=True)
+        (saved / "saved.txt").write_text(prompt)
 if config.get("kill_supervisor"):
     while not (root / "supervisor.pid").exists():
         time.sleep(.01)
@@ -602,6 +611,37 @@ print(json.dumps(final))
         self.assertEqual(len(self.captures()), 1)
         self.assertEqual(self.server.results[0], self.server.results[1])
         self.assertEqual(list((self.root / "state").rglob("prompt.txt")), [])
+
+    def test_expired_attempts_take_claude_code_saved_files_with_them(self):
+        home = self.root / "home"
+        self.server.add(0)
+        self.server.add(1)
+        self.fake_config["claude_stores"] = True
+        with patch.dict(os.environ, {"HOME": str(home)}):
+            os.environ.pop("CLAUDE_CONFIG_DIR", None)
+            self.assertEqual(self.execute(), 0)
+            logs = (self.root / "state/attempts").resolve()
+            expired, current = sorted(logs.iterdir())
+            stores = (home / ".claude/projects", home / "Library/Caches/claude-cli-nodejs")
+
+            def saved(path):
+                return [store / re.sub("[^a-zA-Z0-9]", "-", str(path)) for store in stores]
+
+            for directory in saved(current) + saved(expired):
+                self.assertTrue(directory.is_dir())
+            stale = saved(logs / ("0" * 32))
+            unrelated = [store / name for store in stores for name in (
+                "-Users-owner-project", saved(logs / "notes")[0].name)]
+            for directory in stale + unrelated:
+                directory.mkdir(parents=True)
+            finished = expired / "finished.json"
+            finished.write_text(json.dumps(dict(json.loads(finished.read_text()), at=0)))
+            self.assertEqual(self.execute(), 0)
+        self.assertFalse(expired.exists())
+        for directory in saved(expired) + stale:
+            self.assertFalse(directory.exists(), directory)
+        for directory in [current] + saved(current) + unrelated:
+            self.assertTrue(directory.is_dir(), directory)
 
     def test_overlapping_start_does_not_claim_twice(self):
         self.server.add()

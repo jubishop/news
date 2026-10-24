@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from . import validation as v
 from .desktop_alerts import notify
 from .errors import Problem
-from .worker_claude import browser_preflight, preflight, research
+from .worker_claude import browser_preflight, preflight, remove_saved_files, research
 from .worker_history import History, preflight as history_preflight
 from .worker_images import remove_broken
 from .worker_io import APIError, NewsAPI, WorkerError, read_json, remove_file, save_json
@@ -71,6 +71,7 @@ class Batch:
             stamp = read_json(finished)["at"] if finished.exists() else directory.stat().st_mtime
             if stamp < cutoff:
                 shutil.rmtree(directory)
+        remove_saved_files(self.logs)
 
     def deliver(self, path, record):
         result = record["result"]

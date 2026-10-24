@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -230,6 +231,23 @@ def browser_preflight():
                        env=claude_environment(), check=True)
     except (OSError, subprocess.SubprocessError):
         raise WorkerError("The News page browser could not start. Run bin/app-setup to install Playwright's Chromium.") from None
+
+
+def remove_saved_files(attempts):
+    """Remove what Claude Code saved for attempt directories that no longer exist."""
+    # Despite --no-session-persistence, Claude Code saves oversized tool results
+    # under its configuration directory and MCP logs under its cache, each in a
+    # directory named for the attempt path with every character other than ASCII
+    # letters and digits replaced by "-".
+    config = os.environ.get("CLAUDE_CONFIG_DIR")
+    prefix = re.sub("[^a-zA-Z0-9]", "-", str(attempts)) + "-"
+    for store in ((Path(config) if config else Path.home() / ".claude") / "projects",
+                  Path.home() / "Library/Caches/claude-cli-nodejs"):
+        for saved in store.iterdir() if store.is_dir() else ():
+            request_id = saved.name.removeprefix(prefix)
+            if (saved.name.startswith(prefix) and re.fullmatch("[0-9a-f]{32}", request_id)
+                    and saved.is_dir() and not saved.is_symlink() and not (attempts / request_id).exists()):
+                shutil.rmtree(saved)
 
 
 def final_result(events_path):
