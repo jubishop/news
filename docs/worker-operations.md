@@ -308,9 +308,9 @@ structure, emphasis, and length to the assignment and editorial judgment.
 The shared principles retain the clarity goal from
 [issue #21](https://github.com/jubishop/news/issues/21): clear titles and summaries,
 plain language, useful context, checked sources, and honest uncertainty. Past
-articles supply context without dictating style. History search, failure
-handling, workspace boundaries, and the output contract remain shared rules.
-Search tactics and article structure are not prescribed.
+articles supply context without dictating style. History search and its
+result limits, failure handling, workspace boundaries, and the output contract
+remain shared rules. Search tactics and article structure are not prescribed.
 
 For [issue #25](https://github.com/jubishop/news/issues/25), the shared prompt
 also asks reporters to find and include photos or illustrations when they help

@@ -92,12 +92,30 @@ worker hides QMD's other tools. It receives no News credentials and no full
 archive file. It has no shell, and its file tools are confined to the attempt
 directory.
 
-Prompts request five results, at most ten, and article reads of 80 lines with
-further pages as needed. Claude Code applies one MCP output budget to every
-tool; the worker sets it to 5,000 tokens. Codex had a separate 3,000-token
-budget for search, so search results can now use more context. Result counts
-and read lengths are agent instructions; the output token cap is the enforced
-context bound. Reporters are instructed to return a retryable
+The shared prompt asks for five search results, at most ten, and article reads
+of 40 lines, continuing with `fromLine`. Claude Code applies one MCP output
+budget to every tool; the worker sets it to 5,000 tokens. Codex had a separate
+3,000-token budget for search, so search results can now use more context.
+Claude Code rejects a larger result instead of truncating it, and names a saved
+copy outside the attempt directory that restricted `Read` cannot open. The
+prompt tells reporters to repeat a rejected call with a smaller `limit` or
+`maxLines`.
+
+The limits had dropped out of the shared prompt. From October 16 to 23, 2026,
+Claude Code rejected 6 history results in 5 of 15 attempts
+([issue #50](https://github.com/jubishop/news/issues/50)): searches with
+`limit` 20 or 30, and reads of a whole article or 120 lines, from 12,474 to
+18,488 characters. The largest accepted result had 10,982 characters, and
+ten-result searches returned 5,600 to 7,100. In the 97-article archive, 80
+lines of an article can reach 13,700 characters; 40 lines stay under 8,300.
+Most articles fit in one 40-line read.
+
+Result counts and read lengths remain agent instructions; the output token cap
+is the enforced context bound. Clamping `limit` and `maxLines` would need a
+proxy in front of QMD's separate MCP server. In four of the five affected
+attempts, reporters searched again with a smaller limit even without an
+instruction. Reconsider enforcement if later batches still show
+rejected history results. Reporters are instructed to return a retryable
 failure for explicit tool errors. QMD can also hide embedding, expansion, or
 reranker failures behind ordinary results. Before accepting each research result,
 the supervisor checks the search process and its known model-failure diagnostics.
