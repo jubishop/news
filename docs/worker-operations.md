@@ -215,6 +215,11 @@ If a completed draft instead supplies an ISO timestamp with an explicit UTC
 offset or `Z`, the worker converts that instant to a Pacific date before
 validation. It retains the original draft in `result.json`. Missing offsets,
 unknown `-00:00` offsets, invalid dates, and reversed coverage ranges still fail.
+The instructions also require a null error on success. When a published or
+nothing-to-publish draft instead supplies an error object whose code and
+message are both blank, the worker treats it as no error and likewise keeps the
+original draft. A successful draft with a non-blank error code or message still
+fails validation.
 Validation failures include the specific contract error in the run history so
 later attempts can correct it. Other research failures retain private diagnostics.
 The server continues to accept dates only.

@@ -138,6 +138,13 @@ def usable_lead_image(article):
     return article
 
 
+def blank_error(error):
+    # A successful draft sometimes fills the error with an empty placeholder instead of null.
+    return isinstance(error, dict) and all(
+        isinstance(error.get(key), str) and not error[key].strip() for key in ("code", "message")
+    )
+
+
 def validate_result(value):
     v.object_fields(value, ("outcome", "articles", "reason", "error"), ("outcome", "articles", "reason", "error"))
     outcome, articles = value["outcome"], value["articles"]
@@ -158,7 +165,7 @@ def validate_result(value):
         if type(error["retryable"]) is not bool:
             raise Problem("retryable must be a boolean.")
         result["error"] = error
-    if outcome != "failed" and value["error"] is not None:
+    if outcome != "failed" and value["error"] is not None and not blank_error(value["error"]):
         raise Problem("Successful results cannot contain an error.")
     if len(json.dumps(result, ensure_ascii=False).encode()) > 1_990_000:
         raise Problem("Agent output exceeds the server request limit.")
