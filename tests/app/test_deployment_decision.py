@@ -44,6 +44,18 @@ BELOW_DASHES = (
     "News-Deploy: skip\nNews-Deploy-Reason: Documentation only.\n" + CO_AUTHOR
 )
 UNREAD = "that Git doesn't read as trailers"
+INVALID = "don't form a valid skip"
+# Each readable but invalid decision, with the problem its error must name.
+INVALID_DECISIONS = (
+    ("News-Deploy: skip", "no News-Deploy-Reason"),
+    ("News-Deploy: skip\nNews-Deploy-Reason:", "an empty News-Deploy-Reason"),
+    ("News-Deploy: skip\nNews-Deploy-Reason: Docs.\nNews-Deploy-Reason: Tests.",
+     "2 News-Deploy-Reason trailers"),
+    ("News-Deploy: skip\nNews-Deploy: deploy\nNews-Deploy-Reason: Documentation.",
+     "2 News-Deploy trailers (skip, deploy)"),
+    ("News-Deploy: maybe\nNews-Deploy-Reason: Documentation.", 'News-Deploy is "maybe"'),
+    ("News-Deploy-Reason: Documentation.", "no News-Deploy"),
+)
 
 
 class DeploymentDecisionTests(unittest.TestCase):
@@ -137,15 +149,42 @@ class DeploymentDecisionTests(unittest.TestCase):
                 result = self.decide(message, "pull_request", "refs/pull/1/merge")
                 self.assertEqual(result.stdout, "deploy=false\n")
 
-    def test_incomplete_or_conflicting_decisions_keep_deployment(self):
-        for trailers in (
-            "News-Deploy: skip",
-            "News-Deploy: skip\nNews-Deploy-Reason:",
-            "News-Deploy: skip\nNews-Deploy: deploy\nNews-Deploy-Reason: Documentation.",
-            "News-Deploy: maybe\nNews-Deploy-Reason: Documentation.",
-        ):
+    def test_push_warns_and_deploys_when_the_decision_is_invalid(self):
+        for trailers, problem in INVALID_DECISIONS:
             with self.subTest(trailers=trailers):
-                self.assertEqual(self.decide("Change\n\n" + trailers).stdout, "deploy=true\n")
+                result = self.decide("Change\n\n" + trailers, actions=True)
+                self.assertEqual(result.stdout, "deploy=true\n")
+                self.assertTrue(result.stderr.startswith("::warning::"), result.stderr)
+                self.assertIn(INVALID, result.stderr)
+                self.assertIn(problem, result.stderr)
+
+    def test_pull_request_fails_when_the_decision_is_invalid(self):
+        for trailers, problem in INVALID_DECISIONS:
+            with self.subTest(trailers=trailers):
+                result = self.run_decision("Change\n\n" + trailers, "pull_request", "refs/pull/1/merge")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, "")
+                self.assertIn(INVALID, result.stderr)
+                self.assertIn(problem, result.stderr)
+
+    def test_pull_request_names_unread_and_invalid_decisions_together(self):
+        message = "Change\n\nNews-Deploy: skip\nNews-Deploy-Reason: Docs.\n\nNews-Deploy: maybe"
+        result = self.run_decision(message, "pull_request", "refs/pull/1/merge")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(UNREAD, result.stderr)
+        self.assertIn('News-Deploy is "maybe"', result.stderr)
+
+    def test_skip_value_compares_case_insensitively(self):
+        message = "Documentation\n\nNews-Deploy: Skip\nNews-Deploy-Reason: Documentation only."
+        for event, ref, expected in (
+            ("push", "refs/heads/main", "deploy=false\n"),
+            ("pull_request", "refs/pull/1/merge", "deploy=false\n"),
+        ):
+            with self.subTest(event=event):
+                result = self.decide(message, event, ref)
+                self.assertEqual(result.stdout, expected)
+                self.assertNotIn(INVALID, result.stderr)
+        self.assertIn("Documentation only", self.decide(message).stderr)
 
     def test_mentioning_the_trailer_in_prose_is_not_a_decision(self):
         result = self.decide(

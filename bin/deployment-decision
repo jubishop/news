@@ -2,7 +2,8 @@
 """Report whether a validated workflow run should deploy production.
 
 For a pull request, fail when its head commit has News-Deploy lines that Git
-doesn't read as trailers, so the decision its merge should carry is fixed first.
+doesn't read as trailers, or trailers that don't form a valid skip, so the
+decision its merge should carry is fixed first.
 """
 
 import argparse
@@ -14,6 +15,7 @@ import sys
 
 DECISION_LINE = re.compile(r"(news-deploy(?:-reason)?)[ \t]*:", re.IGNORECASE)
 UNREAD = "Commit {} has News-Deploy lines that Git doesn't read as trailers"
+INVALID = "Commit {} has News-Deploy trailers that don't form a valid skip: {}"
 
 
 def annotate(level, message):
@@ -51,6 +53,26 @@ def read_decision(revision):
     return decisions, reasons, bool(unread)
 
 
+def invalid_decision(decisions, reasons):
+    """List what keeps the decision trailers from forming a valid skip; none means valid or absent."""
+    if not decisions and not reasons:
+        return []
+    problems = []
+    if not decisions:
+        problems.append("no News-Deploy")
+    elif len(decisions) > 1:
+        problems.append(f"{len(decisions)} News-Deploy trailers ({', '.join(decisions)})")
+    elif decisions[0].lower() != "skip":
+        problems.append(f'News-Deploy is "{decisions[0]}", not skip')
+    if not reasons:
+        problems.append("no News-Deploy-Reason")
+    elif len(reasons) > 1:
+        problems.append(f"{len(reasons)} News-Deploy-Reason trailers")
+    elif not reasons[0]:
+        problems.append("an empty News-Deploy-Reason")
+    return problems
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("event")
@@ -58,21 +80,37 @@ def main():
     parser.add_argument("revision")
     args = parser.parse_args()
     deploy = args.ref == "refs/heads/main" and args.event in {"push", "workflow_dispatch"}
+    commit = args.revision[:7]
     if args.event == "pull_request":
-        _, _, unread = read_decision(args.revision)
+        decisions, reasons, unread = read_decision(args.revision)
+        errors = []
         if unread:
-            raise ValueError(
-                UNREAD.format(args.revision[:7]) + ". Git reads trailers only from a message's "
+            errors.append(
+                UNREAD.format(commit) + ". Git reads trailers only from a message's "
                 "last paragraph, so keep News-Deploy and News-Deploy-Reason there with "
                 "Co-Authored-By and any other trailers, with no blank line between them."
             )
+        if problems := invalid_decision(decisions, reasons):
+            errors.append(
+                INVALID.format(commit, "; ".join(problems)) + ". A skip needs exactly one "
+                "News-Deploy: skip and one non-empty News-Deploy-Reason; to deploy, remove both."
+            )
+        if errors:
+            raise ValueError(" ".join(errors))
     elif deploy and args.event == "push":
         decisions, reasons, unread = read_decision(args.revision)
-        if decisions == ["skip"] and len(reasons) == 1 and reasons[0]:
+        problems = invalid_decision(decisions, reasons)
+        if decisions and not problems:
             deploy = False
             print("Skipping deployment: " + reasons[0], file=sys.stderr)
-        elif unread:
-            annotate("warning", UNREAD.format(args.revision[:7]) + ", so this push deploys by default.")
+        else:
+            if unread:
+                annotate("warning", UNREAD.format(commit) + ", so this push deploys by default.")
+            if problems:
+                annotate(
+                    "warning",
+                    INVALID.format(commit, "; ".join(problems)) + ", so this push deploys by default.",
+                )
     print("deploy=" + str(deploy).lower())
 
 

@@ -155,9 +155,8 @@ prints `deploy=false` for a readable skip.
 Preserve the trailers in the final squash or merge commit that reaches `main`.
 GitHub's default squash message for several commits ends with a paragraph of
 co-authors alone, which drops them, so give such a squash a message that ends
-with the head commit's trailers. An unmarked commit, a missing reason, or
-conflicting decisions keeps deployment enabled. Do not use a CI-skip marker:
-all validation still runs.
+with the head commit's trailers. An unmarked commit keeps deployment enabled.
+Do not use a CI-skip marker: all validation still runs.
 
 [deployment-decision](../bin/deployment-decision) reads the tested commit's
 trailers and supplies the deploy job's condition. A skipped deployment never
@@ -167,10 +166,14 @@ agent's assessment; it is not an automatic proof that two versions behave alike.
 
 On a pull request, Repository checks fail when the head commit has a
 `News-Deploy` or `News-Deploy-Reason` line that Git doesn't read as a trailer,
-so the layout is fixed before merging. On `main`, such a line warns on the run's
-summary page and keeps deployment enabled. A commit whose last paragraph holds
-a readable skip still skips, even when a squash lists earlier commits'
-decisions above it.
+or readable trailers other than exactly one `News-Deploy: skip` and one
+non-empty `News-Deploy-Reason`: a missing or empty reason, two reasons,
+conflicting or unknown decisions, or a reason without a decision. The error
+names the problem, so it is fixed before merging. On `main`, either problem
+warns on the run's summary page and keeps deployment enabled. The `skip` value
+compares case-insensitively, like the trailer keys, so `News-Deploy: Skip` also
+skips. A commit whose last paragraph holds a readable skip still skips, even
+when a squash lists earlier commits' decisions above it.
 
 Use **Run workflow** on `main` when an explicit deployment or retry is needed,
 including for a commit that previously skipped deployment.
