@@ -37,6 +37,12 @@ REBUILT_SQUASH = (
     "* Record the review decision\n\n"
     "News-Deploy: skip\nNews-Deploy-Reason: Review ledger only.\n" + CO_AUTHOR
 )
+# A "---" line ends a patch email's message, but a commit message has no patch to divide.
+BELOW_DASHES = (
+    "Clarify project instructions\n\n"
+    "Before\n---\nAfter\n\n"
+    "News-Deploy: skip\nNews-Deploy-Reason: Documentation only.\n" + CO_AUTHOR
+)
 UNREAD = "that Git doesn't read as trailers"
 
 
@@ -86,6 +92,13 @@ class DeploymentDecisionTests(unittest.TestCase):
         result = self.decide(READABLE)
         self.assertEqual(result.stdout, "deploy=false\n")
         self.assertNotIn(UNREAD, result.stderr)
+
+    def test_dash_line_in_the_body_keeps_the_final_trailers(self):
+        for event, ref in (("push", "refs/heads/main"), ("pull_request", "refs/pull/1/merge")):
+            with self.subTest(event=event):
+                result = self.decide(BELOW_DASHES, event, ref)
+                self.assertEqual(result.stdout, "deploy=false\n")
+                self.assertNotIn(UNREAD, result.stderr)
 
     def test_push_warns_and_deploys_when_git_does_not_read_the_decision(self):
         for name, message in (("separate co-author", SEPARATE_CO_AUTHOR), ("GitHub squash", GITHUB_SQUASH)):

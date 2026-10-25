@@ -30,8 +30,9 @@ def read_decision(revision):
         ["git", "show", "-s", "--format=%B", revision],
         check=True, capture_output=True, text=True,
     ).stdout
+    # A commit message holds no patch, so read it as git log's %(trailers) does, past any "---" line.
     trailers = subprocess.run(
-        ["git", "interpret-trailers", "--parse"],
+        ["git", "interpret-trailers", "--parse", "--no-divider"],
         input=message, check=True, capture_output=True, text=True,
     ).stdout
     decisions, reasons = [], []
