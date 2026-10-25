@@ -1,10 +1,53 @@
 #!/usr/bin/env python3
-"""Report whether a validated workflow run should deploy production."""
+"""Report whether a validated workflow run should deploy production.
+
+For a pull request, fail when its head commit has News-Deploy lines that Git
+doesn't read as trailers, so the decision its merge should carry is fixed first.
+"""
 
 import argparse
+from collections import Counter
+import os
 import re
 import subprocess
 import sys
+
+DECISION_LINE = re.compile(r"(news-deploy(?:-reason)?)[ \t]*:", re.IGNORECASE)
+UNREAD = "Commit {} has News-Deploy lines that Git doesn't read as trailers"
+
+
+def annotate(level, message):
+    """Print to stderr, and under GitHub Actions also on the run's summary page."""
+    prefix = f"::{level}::" if os.environ.get("GITHUB_ACTIONS") == "true" else ""
+    print(prefix + message, file=sys.stderr)
+
+
+def read_decision(revision):
+    """Return the commit's decision and reason trailers, and whether other decision lines exist."""
+    if not re.fullmatch(r"[0-9a-f]{40}", revision):
+        raise ValueError("Expected a full commit SHA.")
+    message = subprocess.run(
+        ["git", "show", "-s", "--format=%B", revision],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    trailers = subprocess.run(
+        ["git", "interpret-trailers", "--parse"],
+        input=message, check=True, capture_output=True, text=True,
+    ).stdout
+    decisions, reasons = [], []
+    for line in trailers.splitlines():
+        key, _, value = line.partition(":")
+        if key.lower() == "news-deploy":
+            decisions.append(value.strip())
+        elif key.lower() == "news-deploy-reason":
+            reasons.append(value.strip())
+    # Git reads trailers only from a message's last paragraph; count the rest by key.
+    written = Counter(
+        match.group(1).lower() for line in message.splitlines()
+        if (match := DECISION_LINE.match(line))
+    )
+    unread = written - Counter({"news-deploy": len(decisions), "news-deploy-reason": len(reasons)})
+    return decisions, reasons, bool(unread)
 
 
 def main():
@@ -14,27 +57,21 @@ def main():
     parser.add_argument("revision")
     args = parser.parse_args()
     deploy = args.ref == "refs/heads/main" and args.event in {"push", "workflow_dispatch"}
-    if deploy and args.event == "push":
-        if not re.fullmatch(r"[0-9a-f]{40}", args.revision):
-            raise ValueError("Expected a full commit SHA.")
-        message = subprocess.run(
-            ["git", "show", "-s", "--format=%B", args.revision],
-            check=True, capture_output=True, text=True,
-        ).stdout
-        trailers = subprocess.run(
-            ["git", "interpret-trailers", "--parse"],
-            input=message, check=True, capture_output=True, text=True,
-        ).stdout
-        decisions, reasons = [], []
-        for line in trailers.splitlines():
-            key, _, value = line.partition(":")
-            if key.lower() == "news-deploy":
-                decisions.append(value.strip())
-            elif key.lower() == "news-deploy-reason":
-                reasons.append(value.strip())
+    if args.event == "pull_request":
+        _, _, unread = read_decision(args.revision)
+        if unread:
+            raise ValueError(
+                UNREAD.format(args.revision[:7]) + ". Git reads trailers only from a message's "
+                "last paragraph, so keep News-Deploy and News-Deploy-Reason there with "
+                "Co-Authored-By and any other trailers, with no blank line between them."
+            )
+    elif deploy and args.event == "push":
+        decisions, reasons, unread = read_decision(args.revision)
         if decisions == ["skip"] and len(reasons) == 1 and reasons[0]:
             deploy = False
             print("Skipping deployment: " + reasons[0], file=sys.stderr)
+        elif unread:
+            annotate("warning", UNREAD.format(args.revision[:7]) + ", so this push deploys by default.")
     print("deploy=" + str(deploy).lower())
 
 
@@ -42,5 +79,5 @@ if __name__ == "__main__":
     try:
         main()
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
-        print(str(error), file=sys.stderr)
+        annotate("error", str(error))
         sys.exit(1)

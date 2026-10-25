@@ -143,17 +143,34 @@ final commit message, after a blank line, with a specific reason:
 ```text
 News-Deploy: skip
 News-Deploy-Reason: Agent instructions only; production contains all material changes.
+Co-Authored-By: Example Agent <agent@example.com>
 ```
 
+Git reads trailers only from a message's last paragraph. The deploy trailers
+share it with `Co-Authored-By` and any other trailers, with no blank line
+between them; a decision in an earlier paragraph is ignored. Confirm a commit's
+layout with `bin/deployment-decision push refs/heads/main <full-sha>`, which
+prints `deploy=false` for a readable skip.
+
 Preserve the trailers in the final squash or merge commit that reaches `main`.
-An unmarked commit, a missing reason, or conflicting decisions keeps deployment
-enabled. Do not use a CI-skip marker: all validation still runs.
+GitHub's default squash message for several commits ends with a paragraph of
+co-authors alone, which drops them, so give such a squash a message that ends
+with the head commit's trailers. An unmarked commit, a missing reason, or
+conflicting decisions keeps deployment enabled. Do not use a CI-skip marker:
+all validation still runs.
 
 [deployment-decision](../bin/deployment-decision) reads the tested commit's
 trailers and supplies the deploy job's condition. A skipped deployment never
 starts that job or loads its production credentials. The decision and reason
 remain reviewable in Git and in the decision job's log. This relies on the
 agent's assessment; it is not an automatic proof that two versions behave alike.
+
+On a pull request, Repository checks fail when the head commit has a
+`News-Deploy` or `News-Deploy-Reason` line that Git doesn't read as a trailer,
+so the layout is fixed before merging. On `main`, such a line warns on the run's
+summary page and keeps deployment enabled. A commit whose last paragraph holds
+a readable skip still skips, even when a squash lists earlier commits'
+decisions above it.
 
 Use **Run workflow** on `main` when an explicit deployment or retry is needed,
 including for a commit that previously skipped deployment.

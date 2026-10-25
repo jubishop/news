@@ -1,5 +1,6 @@
 """Exercise the CI deployment decision through its command and real commits."""
 
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -8,6 +9,35 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+CO_AUTHOR = "Co-Authored-By: Claude <noreply@anthropic.com>"
+READABLE = (
+    "Clarify project instructions\n\n"
+    "News-Deploy: skip\nNews-Deploy-Reason: Documentation only.\n" + CO_AUTHOR
+)
+# A blank line puts the co-author in a final paragraph of its own, as in #56's head commit.
+SEPARATE_CO_AUTHOR = (
+    "Fix worker output\n\n"
+    "News-Deploy: skip\nNews-Deploy-Reason: Mac reporting worker only.\n\n" + CO_AUTHOR
+)
+# GitHub's default squash of several commits ends with its co-authors alone, as on e4e3689.
+GITHUB_SQUASH = (
+    "Fix worker images (#54)\n\n"
+    "* Fix worker images\n\n"
+    "News-Deploy: skip\nNews-Deploy-Reason: Mac reporting worker only.\n" + CO_AUTHOR + "\n\n"
+    "* Record the review decision\n\n"
+    "News-Deploy: skip\nNews-Deploy-Reason: Review ledger only.\n" + CO_AUTHOR + "\n\n"
+    "---------\n\n"
+    "Co-authored-by: Claude <noreply@anthropic.com>"
+)
+# A squash body rebuilt to end with the head commit's trailers keeps earlier commits' decisions above them.
+REBUILT_SQUASH = (
+    "Fix worker images (#54)\n\n"
+    "* Fix worker images\n\n"
+    "News-Deploy: skip\nNews-Deploy-Reason: Mac reporting worker only.\n" + CO_AUTHOR + "\n\n"
+    "* Record the review decision\n\n"
+    "News-Deploy: skip\nNews-Deploy-Reason: Review ledger only.\n" + CO_AUTHOR
+)
+UNREAD = "that Git doesn't read as trailers"
 
 
 class DeploymentDecisionTests(unittest.TestCase):
@@ -24,13 +54,19 @@ class DeploymentDecisionTests(unittest.TestCase):
             ["git", *args], cwd=self.directory, check=True, capture_output=True, text=True
         ).stdout.strip()
 
-    def decide(self, message, event="push", ref="refs/heads/main"):
+    def run_decision(self, message, event="push", ref="refs/heads/main", actions=False):
         self.git("-c", "core.hooksPath=/dev/null", "commit", "--allow-empty", "-qm", message)
         revision = self.git("rev-parse", "HEAD")
-        result = subprocess.run(
+        environment = {key: value for key, value in os.environ.items() if key != "GITHUB_ACTIONS"}
+        if actions:
+            environment["GITHUB_ACTIONS"] = "true"
+        return subprocess.run(
             [sys.executable, str(ROOT / "bin/deployment-decision"), event, ref, revision],
-            cwd=self.directory, capture_output=True, text=True,
+            cwd=self.directory, env=environment, capture_output=True, text=True,
         )
+
+    def decide(self, message, event="push", ref="refs/heads/main", actions=False):
+        result = self.run_decision(message, event, ref, actions)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result
 
@@ -45,6 +81,48 @@ class DeploymentDecisionTests(unittest.TestCase):
         )
         self.assertEqual(result.stdout, "deploy=false\n")
         self.assertIn("Instructions only", result.stderr)
+
+    def test_decision_shares_the_final_paragraph_with_co_authors(self):
+        result = self.decide(READABLE)
+        self.assertEqual(result.stdout, "deploy=false\n")
+        self.assertNotIn(UNREAD, result.stderr)
+
+    def test_push_warns_and_deploys_when_git_does_not_read_the_decision(self):
+        for name, message in (("separate co-author", SEPARATE_CO_AUTHOR), ("GitHub squash", GITHUB_SQUASH)):
+            with self.subTest(name):
+                result = self.decide(message)
+                self.assertEqual(result.stdout, "deploy=true\n")
+                self.assertIn(UNREAD, result.stderr)
+
+    def test_push_warning_is_a_github_annotation_in_actions(self):
+        result = self.decide(SEPARATE_CO_AUTHOR, actions=True)
+        self.assertEqual(result.stdout, "deploy=true\n")
+        self.assertTrue(result.stderr.startswith("::warning::"), result.stderr)
+
+    def test_push_reads_final_trailers_below_earlier_commits_decisions(self):
+        result = self.decide(REBUILT_SQUASH)
+        self.assertEqual(result.stdout, "deploy=false\n")
+        self.assertIn("Review ledger only", result.stderr)
+        self.assertNotIn(UNREAD, result.stderr)
+
+    def test_pull_request_fails_when_git_does_not_read_the_decision(self):
+        for name, message in (("separate co-author", SEPARATE_CO_AUTHOR), ("GitHub squash", GITHUB_SQUASH)):
+            with self.subTest(name):
+                result = self.run_decision(message, "pull_request", "refs/pull/1/merge")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.stdout, "")
+                self.assertIn(UNREAD, result.stderr)
+
+    def test_pull_request_accepts_unmarked_and_readable_decisions(self):
+        for message in (
+            "Change server behavior",
+            READABLE,
+            "Document the News-Deploy: skip convention\n\n"
+            "Use News-Deploy-Reason: to explain an immaterial change.",
+        ):
+            with self.subTest(message=message):
+                result = self.decide(message, "pull_request", "refs/pull/1/merge")
+                self.assertEqual(result.stdout, "deploy=false\n")
 
     def test_incomplete_or_conflicting_decisions_keep_deployment(self):
         for trailers in (

@@ -19,18 +19,22 @@ concurrency:
 
 jobs:
   deployment-decision:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
       deploy: ${{ steps.decision.outputs.deploy }}
     steps:
+      # On a pull request, check the head commit, whose trailers its squash merge should keep.
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Decide whether deployment is needed
         id: decision
-        run: bin/deployment-decision "$GITHUB_EVENT_NAME" "$GITHUB_REF" "$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+        env:
+          REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bin/deployment-decision "$GITHUB_EVENT_NAME" "$GITHUB_REF" "$REVISION" >> "$GITHUB_OUTPUT"
 
   check:
     runs-on: ubuntu-latest
