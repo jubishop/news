@@ -458,7 +458,7 @@ when a worker outage affects several reporters. Keep their individual missing
 results visible while sending one outage email without daily reminders. The
 owner can also [retry a failed run explicitly](#newsroom-controls).
 
-Accepted on October 1, 2026 (td-07237e): add immediate, local macOS notices for
+Accepted on October 1, 2026: add immediate, local macOS notices for
 final reporter failures and worker operational errors caught by the Mac worker.
 Keep the existing server email alerts. The local worker does not poll for server
 incidents, send desktop notices for server-only alerts, retry notifications in
