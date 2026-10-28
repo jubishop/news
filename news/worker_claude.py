@@ -13,7 +13,7 @@ from zoneinfo import ZoneInfo
 
 from . import validation as v
 from .errors import Problem
-from .worker_io import WorkerError, save_json
+from .worker_io import WorkerError, read_env, save_json
 from .worker_process import TIMEOUT_EXIT
 
 
@@ -175,6 +175,10 @@ def validate_result(value):
 
 MODEL = "claude-haiku-5-5"
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
+# The worker's own Anthropic API key, read from the checkout's gitignored .env
+# under a name that other Anthropic clients do not pick up.
+API_KEY = "NEWS_ANTHROPIC_API_KEY"
+ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 TOOLS = ("Read", "Glob", "Grep", "WebSearch")
 HISTORY_TOOLS = ("mcp__news_history__query", "mcp__news_history__get")
 # QMD also serves these; reporters receive only search and article reading.
@@ -186,6 +190,19 @@ SERVERS = {
     "news_history": "Claude Code could not connect to News history search.",
     "news_fetch": "Claude Code could not start the News page browser.",
 }
+# A run on the API key that ends with one of these reruns on the subscription
+# login, so reporting continues once the key's credit or spend limit runs out.
+# Claude Code types some API errors and keeps the API's message as text, the
+# fallback it documents for consumers; both change between releases.
+FALLBACKS = {
+    "credit_balance": "the API key's credit balance is too low",
+    "usage_limit": "the API key reached its usage limits",
+    "key_rejected": "the API key was rejected",
+}
+LOW_CREDIT = re.compile(r"credit balance (?:is )?too low", re.I)
+USAGE_LIMIT = re.compile(r"usage limits", re.I)
+REJECTED_KEY = re.compile(r"invalid api key|x-api-key|api key authentication is disabled|disabled organization", re.I)
+REJECTED_KEY_ERRORS = ("api_key_auth_disabled", "org_disabled_credential", "invalid_credential_header")
 
 
 def child_environment():
@@ -195,34 +212,61 @@ def child_environment():
     )}
 
 
-def claude_environment():
-    # Credential variables would replace the owner's subscription login, so
-    # only the allowlist above passes through. The flags below keep personal
+def claude_environment(key=None):
+    # Only the allowlist above passes through, so inherited credentials never
+    # reach Claude Code. It bills ANTHROPIC_API_KEY when set, so research uses
+    # the worker's own key only when one is passed here, and the owner's
+    # subscription login otherwise. The flags below keep personal
     # instructions, memory, and the home Git repository out of the context.
-    return child_environment() | {
+    environment = child_environment() | {
         "CLAUDE_CODE_DISABLE_CLAUDE_MDS": "1", "CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1",
         "CLAUDE_CODE_DISABLE_GIT_INSTRUCTIONS": "1", "DISABLE_AUTOUPDATER": "1",
         "MCP_TIMEOUT": "30000", "MCP_TOOL_TIMEOUT": "180000", "MAX_MCP_OUTPUT_TOKENS": "5000",
     }
+    return environment | {"ANTHROPIC_API_KEY": key} if key else environment
+
+
+def api_key(settings):
+    """The worker's own API key from its env file, or None to use the subscription login."""
+    if not settings.get("env_file"):
+        return None
+    path = Path(settings["env_file"]).expanduser()
+    try:
+        key = read_env(path).get(API_KEY, "")
+        private = not path.stat().st_mode & 0o077
+    except FileNotFoundError:
+        return None
+    except (OSError, UnicodeError):
+        raise WorkerError(f"Could not read {path}.") from None
+    if key and not private:
+        raise WorkerError(f"{path} contains credentials: set its permissions to 0600.")
+    if key and not re.fullmatch(r"[!-~]+", key):
+        raise WorkerError(f"{API_KEY} in {path} must be a single value without spaces.")
+    return key or None
 
 
 def preflight(settings):
+    """Check Claude Code and its subscription login; return whether research uses an API key first."""
     if "codex" in settings or "reasoning_effort" in settings:
         raise WorkerError("Worker config still has Codex settings. Replace codex and reasoning_effort with claude and effort.")
     if settings.get("effort", "high") not in EFFORTS:
         raise WorkerError("effort must be one of: " + ", ".join(EFFORTS) + ".")
+    key = api_key(settings)
     executable = settings["claude"]
     try:
         result = subprocess.run([executable, "--version"], capture_output=True, text=True, timeout=15, env=claude_environment(), check=True)
         match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+) \(Claude Code\)\s*", result.stdout)
         if not match or tuple(map(int, match.groups())) < (2, 1, 296):
             raise WorkerError("News requires Claude Code 2.1.296 or later. Update Claude Code.")
+        # Without the key, Claude Code reports the subscription login that
+        # research falls back to.
         result = subprocess.run([executable, "auth", "status", "--json"], capture_output=True, text=True, timeout=15, env=claude_environment(), check=False)
         status = json.loads(result.stdout)
         if not isinstance(status, dict) or status.get("loggedIn") is not True or status.get("authMethod") != "claude.ai":
             raise WorkerError("Sign in to Claude Code with a Claude subscription before starting the worker.")
     except (OSError, subprocess.SubprocessError, ValueError):
         raise WorkerError("Claude Code preflight failed. Check its executable and subscription login.") from None
+    return key is not None
 
 
 def browser_preflight():
@@ -275,12 +319,80 @@ def final_result(events_path):
     return final["structured_output"]
 
 
+def key_failure(events_path):
+    """Which fallback, if any, the API error that ended a run on the API key calls for."""
+    trigger = None
+    try:
+        lines = events_path.read_bytes().splitlines()
+    except OSError:
+        return None
+    for line in lines:
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        if event.get("type") == "result" and event.get("subtype") == "success" and not event.get("is_error"):
+            return None
+        if (event.get("type") == "assistant" and event.get("is_api_error_message")
+                or event.get("type") == "result" and event.get("is_error")):
+            trigger = api_error_trigger(event) or trigger
+    return trigger
+
+
+def api_error_trigger(event):
+    texts = [event.get("result")]
+    message = event.get("message")
+    if isinstance(message, dict) and isinstance(message.get("content"), list):
+        texts += [block.get("text") for block in message["content"] if isinstance(block, dict)]
+    text = " ".join(part for part in texts if isinstance(part, str))
+    if event.get("error") == "billing_error" or LOW_CREDIT.search(text):
+        return "credit_balance"
+    if USAGE_LIMIT.search(text):
+        return "usage_limit"
+    if (event.get("error") == "authentication_failed" or event.get("api_error_status") in (401, 403)
+            or event.get("api_error") in REJECTED_KEY_ERRORS or REJECTED_KEY.search(text)):
+        return "key_rejected"
+    return None
+
+
+def run_claude(command, directory, deadline, lock_fd, environment):
+    guardian = [
+        sys.executable, "-B", str(Path(__file__).with_name("worker_process.py")),
+        str(deadline), str(lock_fd),
+    ]
+    with (
+        (directory / "events.jsonl").open("wb") as events,
+        (directory / "stderr.txt").open("wb") as errors,
+        (directory / "prompt.txt").open("rb") as prompt_input,
+    ):
+        try:
+            process = subprocess.Popen(
+                guardian + command, cwd=directory, env=environment, stdin=prompt_input,
+                stdout=events, stderr=errors, start_new_session=True, pass_fds=(lock_fd,),
+            )
+        except OSError:
+            raise WorkerError("Claude Code could not start.") from None
+        try:
+            process.wait()
+        except BaseException:
+            process.terminate()
+            process.wait()
+            raise
+    return process.returncode
+
+
 def research(settings, directory, assignment, lock_fd, history_endpoint):
     directory = Path(directory)
+    key = api_key(settings)
     save_json(directory / "schema.json", RESULT_SCHEMA)
+    # Claude Code passes its environment, the API key included, to stdio MCP
+    # servers. The page browser loads untrusted pages and never needs the key.
     save_json(directory / "mcp.json", {"mcpServers": {
         "news_history": {"type": "http", "url": history_endpoint},
-        "news_fetch": {"type": "stdio", "command": sys.executable, "args": ["-B", str(FETCH_SERVER)]},
+        "news_fetch": {"type": "stdio", "command": "/usr/bin/env",
+                       "args": ["-u", "ANTHROPIC_API_KEY", sys.executable, "-B", str(FETCH_SERVER)]},
     }})
     prompt = INSTRUCTIONS + "\nAssignment JSON:\n" + json.dumps(assignment, ensure_ascii=False)
     (directory / "prompt.txt").write_text(prompt, encoding="utf-8")
@@ -293,34 +405,22 @@ def research(settings, directory, assignment, lock_fd, history_endpoint):
         "--allowedTools", ",".join(TOOLS + HISTORY_TOOLS + FETCH_TOOLS), "--disallowedTools", ",".join(HIDDEN_HISTORY_TOOLS),
         "--strict-mcp-config", "--mcp-config", str(directory / "mcp.json"),
     ]
-    save_json(directory / "invocation.json", {"command": command, "model": model})
+    save_json(directory / "invocation.json", {"command": command, "model": model, "auth": "api_key" if key else "subscription"})
     timeout = settings.get("attempt_timeout_seconds", 1800)
+    # A fallback rerun shares the attempt's deadline.
     deadline = time.monotonic() + timeout
-    guardian = [
-        sys.executable, "-B", str(Path(__file__).with_name("worker_process.py")),
-        str(deadline), str(lock_fd),
-    ]
-    with (
-        (directory / "events.jsonl").open("wb") as events,
-        (directory / "stderr.txt").open("wb") as errors,
-        (directory / "prompt.txt").open("rb") as prompt_input,
-    ):
-        try:
-            process = subprocess.Popen(
-                guardian + command, cwd=directory, env=claude_environment(), stdin=prompt_input,
-                stdout=events, stderr=errors, start_new_session=True, pass_fds=(lock_fd,),
-            )
-        except OSError:
-            raise WorkerError("Claude Code could not start.") from None
-        try:
-            process.wait()
-        except BaseException:
-            process.terminate()
-            process.wait()
-            raise
-    if process.returncode == TIMEOUT_EXIT:
+    returncode = run_claude(command, directory, deadline, lock_fd, claude_environment(key))
+    trigger = key and returncode != TIMEOUT_EXIT and key_failure(directory / "events.jsonl")
+    if trigger:
+        # Keep the API key's run beside the rerun for diagnosis.
+        for name in ("events.jsonl", "stderr.txt"):
+            (directory / name).replace(directory / f"api-key-{name}")
+        save_json(directory / "fallback.json", {"trigger": trigger, "at": time.time()})
+        print(f"Attempt {directory.name}: {FALLBACKS[trigger]} ({trigger}); rerunning it on the Claude subscription login.", flush=True)
+        returncode = run_claude(command, directory, deadline, lock_fd, claude_environment())
+    if returncode == TIMEOUT_EXIT:
         raise subprocess.TimeoutExpired(command, timeout)
-    if process.returncode:
+    if returncode:
         raise WorkerError("Claude Code exited unsuccessfully; inspect the private attempt log.")
     draft = final_result(directory / "events.jsonl")
     # Keep the model's original draft beside the event log for diagnosis.

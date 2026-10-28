@@ -124,6 +124,25 @@ the worker's machine rather than requested through the newsroom.
 
 ## Model engine
 
+Accepted on October 28, 2026: bill reporting research to the worker's own
+Anthropic API key, with the owner's Claude subscription as an automatic
+fallback. This supersedes subscription-only billing in the October 9 decision
+below. Haiku 5.5 remains the shared default model, and this Mac's private
+worker config selects Claude Sonnet 5.5 (`claude-sonnet-5-5`) at the default
+high effort; Claude Code, its tools, and the page browser are unchanged. The
+owner has $200 of promotional API credit to use and chose Sonnet 5.5 for this
+Mac's reporters; no further reason was stated. The key is used
+only by this worker and is kept in the checkout's gitignored `.env`, as other
+single-project keys are. When an attempt on the key fails because the key is
+rejected, its credit balance is too low, or it reaches its usage limits, the
+worker reruns that attempt on the subscription login with no manual step, so
+the daily batch keeps running once the credit is gone. Other failures behave
+as before, and without a key research uses the subscription. The tradeoff is
+per-token billing while the key works and a fallback that depends on how
+Claude Code reports API errors, which can change between releases.
+[Worker operations](worker-operations.md#api-key-and-subscription-fallback)
+records the mechanism and its evidence.
+
 Accepted on October 19, 2026: reporters read web pages through the worker's
 own [page browser](worker-operations.md#page-browser) instead of Claude Code's
 WebFetch. The owner asked for Haiku to load pages however possible and get

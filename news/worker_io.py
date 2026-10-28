@@ -29,6 +29,23 @@ def read_json(path):
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
+def read_env(path):
+    """KEY=value lines as dotenv reads the simple ones: blank lines and comments
+    skipped, an `export ` prefix dropped, and one pair of matching quotes removed."""
+    values = {}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        key, separator, value = line.removeprefix("export ").partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if separator:
+            values[key.strip()] = value
+    return values
+
+
 def save_json(path, value):
     path = Path(path)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
