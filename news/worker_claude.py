@@ -173,7 +173,7 @@ def validate_result(value):
     return result
 
 
-MODEL = "claude-sonnet-5-5"
+MODEL = "claude-haiku-5-5"
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 # The worker's own Anthropic API key, read from the checkout's gitignored .env
 # under a name that other Anthropic clients do not pick up.

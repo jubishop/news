@@ -9,7 +9,7 @@
   ],
   "state_dir": "/Users/REPLACE_ME/.local/state/news-worker",
   "terminal_notifier": "/opt/homebrew/bin/terminal-notifier",
-  "model": "claude-sonnet-5-5",
+  "model": "claude-haiku-5-5",
   "effort": "high",
   "concurrency": 8,
   "attempt_timeout_seconds": 1800

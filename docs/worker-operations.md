@@ -4,9 +4,10 @@ status: current
 
 # Reporting worker operations
 
-The Mac worker runs the Claude Code CLI with Claude Sonnet 5.5, Claude Code's
-built-in web search, and the worker's own [page browser](#page-browser) in
-place of Claude Code's WebFetch. Python handles the News API, eight
+The Mac worker runs the Claude Code CLI with Claude Code's built-in web search
+and the worker's own [page browser](#page-browser) in place of Claude Code's
+WebFetch. Its model is Claude Haiku 5.5 unless the private config selects
+another; this Mac's selects Claude Sonnet 5.5. Python handles the News API, eight
 concurrent reporters, durable results, and retries. A private QMD MCP
 connection provides [semantic article history search](article-history-search.md).
 There are no Claude Code plugins or paid search API keys. The
@@ -45,10 +46,10 @@ its child. Research bills only the worker's own
 Preflight requires the `claude.ai` subscription login method, which research
 uses without a key and falls back to with one.
 
-The shared defaults are `claude-sonnet-5-5` and high effort, following the
+The shared defaults are `claude-haiku-5-5` and high effort, following the
 [model decision](reporting-worker.md#model-engine). `model` and `effort` in the
-private config override them; a config that still sets `model` to
-`claude-haiku-5-5` keeps Haiku, so remove the key or set the new default; `effort` accepts `low`, `medium`, `high`,
+private config override them; this Mac's config sets `model` to
+`claude-sonnet-5-5`. `effort` accepts `low`, `medium`, `high`,
 `xhigh`, or `max`. Use a documented model identifier when changing models.
 The worker does not invent aliases or select a fallback model. It rejects a
 config that still contains the Codex-era `codex` or `reasoning_effort` keys.
@@ -527,7 +528,7 @@ An existing installation keeps its service token, server monitoring, history
 snapshot, and pending results. After the Claude Code change merges, perform
 steps 1, 3, 4, and 5 above. Before step 3, edit the mode-0600 private config:
 replace `codex` with the absolute `claude` path (`~/.local/bin/claude` from
-the official installer), set `model` to `claude-sonnet-5-5`, and replace
+the official installer), set `model` to `claude-haiku-5-5`, and replace
 `reasoning_effort` with `effort`. Step 5 retires the cron entry. Delete the
 old `cron.log` only after it is no longer needed. Observing the next 06:00
 batch is separate from this immediate migration.

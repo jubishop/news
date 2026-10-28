@@ -43,10 +43,10 @@ class WorkerTests(WorkerFixture):
         self.assertNotIn("test-secret", json.dumps(capture))
         argv = capture["argv"]
         option = lambda name: argv[argv.index(name) + 1]
-        self.assertEqual(option("--model"), "claude-sonnet-5-5")
+        self.assertEqual(option("--model"), "claude-haiku-5-5")
         self.assertEqual(option("--effort"), "high")
         invocation = json.loads((Path(capture["cwd"]) / "invocation.json").read_text())
-        self.assertEqual(invocation["model"], "claude-sonnet-5-5")
+        self.assertEqual(invocation["model"], "claude-haiku-5-5")
         self.assertEqual(invocation["auth"], "subscription")
         self.assertNotIn("ANTHROPIC_API_KEY", capture["env"])
         for flag in ("--print", "--restricted", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"):
