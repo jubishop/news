@@ -4,7 +4,7 @@ status: current
 
 # Reporting worker operations
 
-The Mac worker runs the Claude Code CLI with Claude Haiku 5.5, Claude Code's
+The Mac worker runs the Claude Code CLI with Claude Sonnet 5.5, Claude Code's
 built-in web search, and the worker's own [page browser](#page-browser) in
 place of Claude Code's WebFetch. Python handles the News API, eight
 concurrent reporters, durable results, and retries. A private QMD MCP
@@ -20,7 +20,8 @@ delivery adds no server polling and leaves server email alerts unchanged.
 ## Runtime and configuration
 
 Use Python 3.14 or later and Claude Code 2.1.296 or later. The worker checks the CLI
-version and the Claude subscription login before starting research. Install
+version, the Claude subscription login, and its [API key file](#api-key-and-subscription-fallback)
+before starting research. Install
 Claude Code with its official installer; the native Mac binary needs no Node
 runtime. QMD has its own [runtime and model setup](article-history-search.md#installation-and-checks).
 Install from a permanent checkout with `bin/setup` and `bin/app-setup`.
@@ -37,14 +38,17 @@ in the LaunchAgent.
 Claude Code uses the owner's existing subscription login, which it keeps in
 the macOS keychain. The worker must therefore run in the owner's login
 session. On October 9, 2026, the CLI reported "Not logged in" under cron and
-completed a model call from a LaunchAgent. News strips API keys, OAuth tokens,
-service credentials, and unrelated environment variables from its child, so
-research cannot silently switch to API billing. Preflight requires the
-`claude.ai` subscription login method.
+completed a model call from a LaunchAgent. News strips inherited API keys,
+OAuth tokens, service credentials, and unrelated environment variables from
+its child. Research bills only the worker's own
+[API key](#api-key-and-subscription-fallback), and only when one is configured.
+Preflight requires the `claude.ai` subscription login method, which research
+uses without a key and falls back to with one.
 
-The shared defaults are `claude-haiku-5-5` and high effort, following the
+The shared defaults are `claude-sonnet-5-5` and high effort, following the
 [model decision](reporting-worker.md#model-engine). `model` and `effort` in the
-private config override them; `effort` accepts `low`, `medium`, `high`,
+private config override them; a config that still sets `model` to
+`claude-haiku-5-5` keeps Haiku, so remove the key or set the new default; `effort` accepts `low`, `medium`, `high`,
 `xhigh`, or `max`. Use a documented model identifier when changing models.
 The worker does not invent aliases or select a fallback model. It rejects a
 config that still contains the Codex-era `codex` or `reasoning_effort` keys.
@@ -76,6 +80,63 @@ in a parent directory reached the model only with both restricted mode and
 the instruction-file switch removed. The News credential is never included in
 the prompt, archive, child environment, or diagnostic log. The supervisor
 alone authenticates to the News API.
+
+## API key and subscription fallback
+
+Accepted on October 28, 2026 under the [model decision](reporting-worker.md#model-engine):
+research bills the worker's own Anthropic API key first and falls back to the
+subscription login. Keep the key in the permanent checkout's gitignored `.env`,
+mode 0600, as `NEWS_ANTHROPIC_API_KEY=<key>`. The key belongs to this worker
+alone; its distinct name keeps other Anthropic clients from picking it up.
+The worker reads it only from that file, never from its own environment, so a
+shell that loaded the key changes nothing. `env_file` in the private config can
+name another file; it defaults to the `.env` beside the running `news`
+package, which is the permanent checkout's for the LaunchAgent and
+`bin/worker`. Without a key, or with a blank one, research uses the
+subscription login as before. A key in a file that other users can read, or a
+value with spaces, fails preflight and `--check`.
+
+Each attempt passes the key to Claude Code as `ANTHROPIC_API_KEY`, which it
+bills instead of the subscription. Claude Code hands that variable to stdio MCP
+servers too, so the page browser starts through `env -u ANTHROPIC_API_KEY`
+and never receives it; History search runs outside Claude Code. The key never
+reaches the prompt, attempt files, or logs; `invocation.json` records only
+`"auth": "api_key"` or `"subscription"`.
+
+When a run on the key ends with one of these API errors, the worker reruns the
+same attempt on the subscription login, in the same directory and within the
+attempt's original 30-minute deadline:
+
+| Trigger | Matches |
+| --- | --- |
+| `key_rejected` | HTTP 401 or 403, Claude Code's `authentication_failed` error, its typed key errors such as a disabled organization, or text such as "Invalid API key". |
+| `credit_balance` | Claude Code's `billing_error`, or text such as its "Credit balance is too low" and the API's "Your credit balance is too low to access the Anthropic API". |
+| `usage_limit` | Text containing "usage limits", such as the API's "You have reached your specified API usage limits". |
+
+Only events that Claude Code marks as API errors, and the final result when it
+reports an error, are matched. The key run's `api-key-events.jsonl` and
+`api-key-stderr.txt` stay beside the rerun's logs, `fallback.json` records the
+trigger, and the batch output (`scheduled.log` for the LaunchAgent) names the
+attempt and trigger. Rate limits, overload, server errors, other invalid
+requests, crashes, timeouts, and finished research that merely mentions these
+errors fail as they would on the subscription. Every attempt tries the key
+first, so new credit resumes API billing without a config change; an
+exhausted key costs each attempt a few seconds before its rerun.
+
+On October 28, 2026, Claude Code 2.1.312 with a bogus key showed this
+behavior. `claude auth status` reported the `api_key` method from
+`ANTHROPIC_API_KEY` over the owner's subscription login. A print run exited 1
+within a second. Its assistant event carried `"error": "authentication_failed"`,
+`"is_api_error_message": true`, and `"api_error_status": 401`, and its result
+event carried `"subtype": "success"`, `"is_error": true`, and the text
+"Invalid API key · Fix external API key". A stdio MCP server that run started
+received `ANTHROPIC_API_KEY`. The CLI maps any API error containing "credit
+balance is too low" to "Credit balance is too low" with `billing_error`, and
+it has no typed form for the spend limit, whose API message reaches the result
+text. The owner confirmed that day that a print run on the real key billed
+its promotional credit. The low-credit and spend-limit cases are tested only
+with recorded event shapes; a later Claude Code release can change their
+wording or fields.
 
 ## Page browser
 
@@ -147,10 +208,11 @@ guardian's group kill.
 ## Daily batch and recovery
 
 Run `bin/worker --config ~/.config/news/worker.json` to process a batch.
-`--check` verifies the CLI and QMD versions, Claude subscription login, that
-the page browser starts, and authenticated API access without claiming jobs or
-calling a model. It does not establish that the
-subscription has enough remaining allowance for research.
+`--check` verifies the CLI and QMD versions, Claude subscription login, the API
+key file, that the page browser starts, and authenticated API access without
+claiming jobs or calling a model. It reports whether research uses the API key
+first. It does not establish that the key works or that the key or
+subscription has enough remaining credit or allowance for research.
 
 The worker first acquires an OS file lock. A duplicate start exits without
 claiming work. Each research slot starts an independent Python guardian in its
@@ -273,8 +335,8 @@ recurring reporter, the worker's next discovery folds a reopened run from an
 earlier day into a
 [catch-up](server-contract.md#calendar-pause-and-deletion-behavior) run due
 today, marks the original `superseded`, and researches the catch-up instead.
-Fix the cause first: `--check` does not establish that the subscription has
-remaining allowance.
+Fix the cause first: `--check` does not establish that the API key or the
+subscription has remaining credit or allowance.
 
 From the permanent checkout on the Mac, run this while no batch is running:
 
@@ -370,8 +432,11 @@ The default state directory is `~/.local/state/news-worker`, mode 0700:
 - `pending/`: mode-0600 claim requests, ownership tokens, and completed results.
   These are durable delivery state and are never removed by log retention.
 - `attempts/`: prompts, the MCP configuration, Claude Code stream-JSON
-  events, stderr, the structured draft in `result.json`, and receipts. Startup removes logs older than seven
-  days, including abandoned attempts. The API receipt remains authoritative.
+  events, stderr, the structured draft in `result.json`, and receipts. After a
+  [fallback](#api-key-and-subscription-fallback), the API key run's
+  `api-key-events.jsonl` and `api-key-stderr.txt` and its `fallback.json`
+  trigger. Startup removes logs older than seven days, including abandoned
+  attempts. The API receipt remains authoritative.
 - `worker.lock`: the process lock. Do not remove it to bypass an active worker.
 - `history/`: the latest shared article snapshot, QMD index, and search logs.
   This derived state can be rebuilt; see [history recovery](article-history-search.md#private-state-and-recovery).
@@ -462,7 +527,7 @@ An existing installation keeps its service token, server monitoring, history
 snapshot, and pending results. After the Claude Code change merges, perform
 steps 1, 3, 4, and 5 above. Before step 3, edit the mode-0600 private config:
 replace `codex` with the absolute `claude` path (`~/.local/bin/claude` from
-the official installer), set `model` to `claude-haiku-5-5`, and replace
+the official installer), set `model` to `claude-sonnet-5-5`, and replace
 `reasoning_effort` with `effort`. Step 5 retires the cron entry. Delete the
 old `cron.log` only after it is no longer needed. Observing the next 06:00
 batch is separate from this immediate migration.
@@ -486,6 +551,12 @@ LaunchAgents or cron entries.
 The crash regression kills a real batch supervisor with SIGKILL while a fake
 researcher and its descendant remain alive. It verifies deadline cleanup,
 duplicate-start exclusion, unchanged pending state, and a later replacement.
+
+API key tests write a temporary `.env`, never the checkout's. They replay
+recorded Claude Code error events for a rejected key, low credit, and the spend
+limit, and check that other failures and finished research do not fall back,
+that the page browser never receives the key, and that no attempt file holds
+it.
 
 Retry tests cover owner and worker eligibility, repeated requests, the
 newsroom controls, the `--retry-failed` command with and without the batch

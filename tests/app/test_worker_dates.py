@@ -5,7 +5,7 @@ import unittest
 
 from news.errors import Problem
 from news.worker_claude import validate_result
-from test_worker import RESULT
+from worker_support import RESULT
 
 
 class WorkerDateTests(unittest.TestCase):

@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 from . import validation as v
 from .desktop_alerts import notify
 from .errors import Problem
-from .worker_claude import browser_preflight, preflight, remove_saved_files, research
+from .worker_claude import API_KEY, ENV_FILE, browser_preflight, preflight, remove_saved_files, research
 from .worker_history import History, preflight as history_preflight
 from .worker_images import remove_broken
 from .worker_io import APIError, NewsAPI, WorkerError, read_json, remove_file, save_json
@@ -267,7 +267,7 @@ def run(settings, retry_failed=False):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=Path.home() / ".config/news/worker.json")
-    parser.add_argument("--check", action="store_true", help="Check Claude Code login and API access without claiming work or invoking a model.")
+    parser.add_argument("--check", action="store_true", help="Check Claude Code login, the worker's API key file, and API access without claiming work or invoking a model.")
     parser.add_argument("--prepare-history", action="store_true", help="Refresh and verify local history search without claiming or publishing work.")
     parser.add_argument("--retry-failed", action="store_true", help="Reopen each reporter's failed latest run with three new attempts, then run a batch now.")
     args = parser.parse_args()
@@ -277,6 +277,7 @@ def main():
             raise WorkerError("Worker config contains credentials: set its permissions to 0600.")
         settings = read_json(args.config)
         settings.setdefault("state_dir", str(Path.home() / ".local/state/news-worker"))
+        settings.setdefault("env_file", str(ENV_FILE))
         if args.prepare_history:
             root = Path(settings["state_dir"]).expanduser().resolve()
             root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -294,11 +295,14 @@ def main():
             return 0
         if args.check:
             settings.setdefault("claude", shutil.which("claude") or "claude")
-            preflight(settings)
+            uses_key = preflight(settings)
             history_preflight(settings)
             browser_preflight()
             NewsAPI(settings).call("/articles/search?limit=1")
             print("Claude Code subscription login, QMD version, page browser, and News API access verified. No model was called.")
+            print(f'Research bills {API_KEY} from {settings["env_file"]} first. An attempt reruns on the subscription '
+                  "login when the key is rejected or out of credit or usage limits; the key itself was not tested."
+                  if uses_key else "No API key is configured; research uses the Claude subscription login.")
             return 0
         return run(settings, retry_failed=args.retry_failed)
     except (WorkerError, OSError, ValueError, KeyError, Problem) as exc:

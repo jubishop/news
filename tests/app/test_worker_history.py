@@ -14,7 +14,7 @@ from unittest.mock import patch
 from news.worker_history import History
 from news.worker_io import WorkerError
 from history_support import Archive, fake_qmd
-from test_worker import ARTICLE
+from worker_support import ARTICLE
 
 
 class HistoryTests(unittest.TestCase):
