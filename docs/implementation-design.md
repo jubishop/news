@@ -326,7 +326,11 @@ private deployment configuration. Use it for the accepted
 [backup storage warnings](backups.md) as well.
 
 Email originates from the VPS monitoring service. The later research worker
-does not need email credentials. Keep email sending outside article and run
+does not need email credentials. The
+[daily newsletter](product-design.md#daily-newsletter) uses the same sender,
+recipient, and delivery path: maintenance saves its HTML and plain-text
+payload in a per-day `newsletters` row, then sends it outside the transaction
+with the alerts' retry window. Templates escape all article text. Keep email sending outside article and run
 transactions, and retain visible incidents if sending fails. The
 [operations guide](server-operations.md#monitoring-and-email) defines delivery
 retry rules. Sender verification and a production delivery check remain

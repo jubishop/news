@@ -7,6 +7,10 @@ import urllib.request
 from . import clock, validation as v
 from .db import many, one, transaction
 
+# Resend keeps idempotency keys for 24 hours; stop retrying an unconfirmed send before then.
+SAFE_WINDOW = 23 * 3600
+UNCERTAIN = "Delivery uncertain; reconcile with Resend before retrying"
+
 
 def deliver(config):
     if not config.get("RESEND_API_KEY") or not config.get("ALERT_TO"):
@@ -24,14 +28,14 @@ def deliver(config):
             AND (kind NOT IN ('run_overdue','run_failed') OR NOT EXISTS
                 (SELECT 1 FROM incidents outage WHERE outage.kind='worker_missing' AND outage.resolved_at IS NULL))
             ORDER BY first_seen_at LIMIT 20""",
-                (clock.now(), clock.now() - 23 * 3600),
+                (clock.now(), clock.now() - SAFE_WINDOW),
             )
         ]
     with transaction(config["DATABASE"], write=True) as connection:
         connection.execute(
-            """UPDATE incidents SET notification_error='Delivery uncertain; reconcile with Resend before retrying'
+            """UPDATE incidents SET notification_error=?
             WHERE resolved_at IS NULL AND notification_sent_at IS NULL AND notification_started_at<=?""",
-            (clock.now() - 23 * 3600,),
+            (UNCERTAIN, clock.now() - SAFE_WINDOW),
         )
     for identity in ids:
         with transaction(config["DATABASE"], write=True) as connection:
@@ -57,11 +61,11 @@ def deliver(config):
                 continue
             if (
                 incident["notification_started_at"] is not None
-                and clock.now() - incident["notification_started_at"] >= 23 * 3600
+                and clock.now() - incident["notification_started_at"] >= SAFE_WINDOW
             ):
                 connection.execute(
-                    "UPDATE incidents SET notification_error='Delivery uncertain; reconcile with Resend before retrying' WHERE id=?",
-                    (identity,),
+                    "UPDATE incidents SET notification_error=? WHERE id=?",
+                    (UNCERTAIN, identity),
                 )
                 continue
             payload = incident["notification_payload_json"] or v.canonical(
@@ -81,36 +85,11 @@ def deliver(config):
                 notification_retry_at=? WHERE id=?""",
                 (payload, clock.now(), clock.now() + 300, identity),
             )
-        request = urllib.request.Request(
-            "https://api.resend.com/emails",
-            data=payload.encode(),
-            headers={
-                "Authorization": "Bearer " + config["RESEND_API_KEY"],
-                "Content-Type": "application/json",
-                "Idempotency-Key": "news-incident/" + identity,
-                "User-Agent": "News/1",
-            },
-            method="POST",
+        receipt, error_message, refused = post(
+            config, payload, "news-incident/" + identity
         )
-        error_message, receipt, rejected = None, None, False
-        try:
-            with urllib.request.urlopen(request, timeout=20) as response:
-                receipt = json.load(response)
-            if (
-                not isinstance(receipt, dict)
-                or not isinstance(receipt.get("id"), str)
-                or not receipt["id"]
-            ):
-                raise ValueError("Missing receipt")
-        except urllib.error.HTTPError as error:
-            error_message = f"Resend HTTP {error.code}"
-            rejected = (
-                error.code in (400, 401, 403, 404, 422, 429)
-                and incident["notification_started_at"] is None
-            )
-            error.close()
-        except (OSError, ValueError):
-            error_message = "Email delivery failed; pending safe retry"
+        # A first attempt that Resend refused sent nothing, so its window restarts.
+        rejected = refused and incident["notification_started_at"] is None
         with transaction(config["DATABASE"], write=True) as connection:
             if error_message:
                 connection.execute(
@@ -122,7 +101,41 @@ def deliver(config):
                 connection.execute(
                     """UPDATE incidents SET notification_sent_at=?,notification_receipt_id=?,
                     notification_error=NULL,notification_retry_at=NULL WHERE id=?""",
-                    (clock.now(), receipt["id"], identity),
+                    (clock.now(), receipt, identity),
                 )
                 sent += 1
     return sent
+
+
+def post(config, payload, key):
+    """Send one saved payload outside any transaction.
+
+    Returns the receipt ID, an error message, and whether Resend refused the
+    request outright, which means it did not accept the email.
+    """
+    request = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=payload.encode(),
+        headers={
+            "Authorization": "Bearer " + config["RESEND_API_KEY"],
+            "Content-Type": "application/json",
+            "Idempotency-Key": key,
+            "User-Agent": "News/1",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            receipt = json.load(response)
+        if (
+            not isinstance(receipt, dict)
+            or not isinstance(receipt.get("id"), str)
+            or not receipt["id"]
+        ):
+            raise ValueError("Missing receipt")
+        return receipt["id"], None, False
+    except urllib.error.HTTPError as error:
+        error.close()
+        return None, f"Resend HTTP {error.code}", error.code in (400, 401, 403, 404, 422, 429)
+    except (OSError, ValueError):
+        return None, "Email delivery failed; pending safe retry", False

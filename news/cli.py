@@ -6,7 +6,7 @@ import click
 from flask import current_app
 
 from .db import migrate, transaction
-from . import backups, incidents
+from . import backups, incidents, newsletters
 from .maintenance import maintain
 
 
@@ -22,6 +22,7 @@ def register(app):
         from .notifications import deliver
 
         result["notifications"] = deliver(current_app.config)
+        result["newsletters"] = newsletters.deliver(current_app.config)
         click.echo(json.dumps(result))
 
     def backup_command(operation, key):

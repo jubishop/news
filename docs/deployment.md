@@ -230,7 +230,7 @@ the installed host, Cloudflare scope, and private recovery-copy locations.
 
 `news.cli init-db` is the migration entry point and runs on every release.
 It uses SQLite's `user_version` to apply schema work once and rejects a newer
-database rather than downgrading it. Current schema version 3 applies the
+database rather than downgrading it. Current schema version 4 applies the
 initial schema and then each [numbered migration](../news/migrations) in order;
 rerunning it preserves existing data.
 
@@ -243,7 +243,7 @@ safe: data changes still require review and automated tests.
 Add other required release tasks to the installer at the appropriate stage,
 with explicit failure handling and tests. Tasks must tolerate a repeated release.
 Current post-start maintenance materializes schedules, purges expired Trash,
-and processes queued notices. Regular maintenance and backups then continue
+assembles a due newsletter, and processes queued notices and newsletters. Regular maintenance and backups then continue
 through their systemd timers. The separate research worker is not installed
 or started by this workflow.
 

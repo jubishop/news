@@ -214,8 +214,9 @@ stories and reporters are never installed by the release script.
 ## Monitoring and email
 
 `maintain` runs every five minutes. It materializes scheduled dates, identifies
-missing signals, purges expired Trash, and delivers queued notices. Neither
-page views nor the external worker drive this timer.
+missing signals, purges expired Trash, assembles the daily newsletter, and
+delivers queued notices and newsletters. Neither page views nor the external
+worker drive this timer.
 
 Leave `NEWS_MONITOR_WORKER=false` during the server-only phase. Once the real
 worker is ready, set it true and set `NEWS_MONITOR_START_DATE` to its first
@@ -244,6 +245,22 @@ record a confirmed receipt or resolve the incident with a documented operator
 DB update. Do not simply clear the first-attempt timestamp when delivery is
 unknown. Missing credentials disable delivery, so check configuration at rollout.
 
+The [daily newsletter](product-design.md#daily-newsletter) goes out on the
+first pass after that Pacific day's worker check-in once no run due on or
+before the day is pending, running, or waiting to retry. Runs of removed
+reporters do not count, as for overdue alerts. That pass saves one
+`newsletters` row for the day, holding the covered article IDs and the frozen
+payload, and moves `newsletter_state.covered_through` to the current time.
+A day without new articles saves a row without a payload and sends nothing.
+Delivery follows the rules above with the idempotency key
+`news-newsletter/<date>`, retries on later passes, and records the Resend
+receipt in `receipt_id`. After 23 hours of uncertain delivery, the row's
+`error` asks for reconciliation; check the Resend log for that key, then
+record the receipt or leave the row unsent. The newsroom does not show
+newsletter state. Without a Resend key and alert recipient, no newsletter is
+assembled, so the next one covers everything since the last. Rows older than
+30 days are deleted.
+
 ## Backups and recovery
 
 The [backup policy](backups.md) retains seven daily and four weekly snapshots.
@@ -261,8 +278,8 @@ Temporary plaintext snapshots are removed even on handled failure.
 `restore-check` reads and validates all Restic data, restores the latest News
 snapshot into a private temporary directory, then checks SQLite integrity,
 foreign keys, schema version, and all six application table queries. It accepts
-schema 1, 2, or 3; schema 2 also checks the archive metadata table and revision column,
-and schema 3 checks the lead photo column. It removes this test
+schema 1, 2, 3, or 4; schema 2 also checks the archive metadata table and revision column,
+schema 3 checks the lead photo column, and schema 4 checks the newsletter tables. It removes this test
 restore without touching the running database. Successful state is saved in
 `/var/lib/news-backup/restore.json`. A backup or restore failure opens an email
 incident; abrupt host/process failures still require checking systemd status.

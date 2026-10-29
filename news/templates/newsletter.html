@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>News · {{ date }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f6f3ec;color:#252d2c;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:15px;line-height:1.6;">
+<div style="max-width:600px;margin:0 auto;padding:28px 20px;">
+<p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:40px;font-weight:700;line-height:1;letter-spacing:-0.05em;"><a href="{{ base }}/" style="color:#252d2c;text-decoration:none;">News<span style="color:#9e452e;">.</span></a></p>
+<p style="margin:8px 0 28px;padding-bottom:14px;border-bottom:3px double #252d2c;color:#626b66;">{{ date }}</p>
+{% for article in articles %}
+<div style="margin:0 0 30px;">
+{% if article.lead_image %}<a href="{{ article.url }}"><img src="{{ article.lead_image.url }}" alt="{{ article.lead_image.alt }}" width="560" style="display:block;width:100%;max-width:560px;height:auto;border:0;margin:0 0 12px;"></a>
+{% endif %}<p style="margin:0;color:#626b66;font-size:13px;">{{ article.reporter_name }}</p>
+<h2 style="margin:4px 0 8px;font-family:Georgia,'Times New Roman',serif;font-size:24px;font-weight:400;line-height:1.2;"><a href="{{ article.url }}" style="color:#252d2c;text-decoration:none;">{{ article.title }}</a></h2>
+<p style="margin:0;">{{ article.summary }}</p>
+</div>
+{% endfor %}
+{% if failed %}<p style="margin:0 0 20px;color:#9e452e;">A reporting assignment failed today. <a href="{{ base }}/newsroom" style="color:#9e452e;">Check the newsroom</a>.</p>
+{% endif %}<p style="margin:0;padding-top:14px;border-top:1px solid #d3d3c6;"><a href="{{ base }}/" style="color:#9e452e;">Read the front page →</a></p>
+</div>
+</body>
+</html>
