@@ -114,8 +114,15 @@ Result counts and read lengths remain agent instructions; the output token cap
 is the enforced context bound. Clamping `limit` and `maxLines` would need a
 proxy in front of QMD's separate MCP server. In four of the five affected
 attempts, reporters searched again with a smaller limit even without an
-instruction. Reconsider enforcement if later batches still show
-rejected history results. Reporters are instructed to return a retryable
+instruction. The first eight attempts with the restored limits, from
+October 24 to 28, 2026, had no rejected history results
+([issue #53](https://github.com/jubishop/news/issues/53)). All 13 searches
+used `limit` 5 and returned at most 3,618 characters; the one read used 40
+lines. QMD's `get` gives no sign that more lines remain, and that read of a
+72-line article stopped at line 40. Every article's summary ends within its
+first 14 lines, so the first read always includes it. In the 116-article
+archive, 40 lines still stay under 8,300 characters. Reconsider enforcement if
+rejected history results return. Reporters are instructed to return a retryable
 failure for explicit tool errors. QMD can also hide embedding, expansion, or
 reranker failures behind ordinary results. Before accepting each research result,
 the supervisor checks the search process and its known model-failure diagnostics.
