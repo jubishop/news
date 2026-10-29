@@ -466,6 +466,41 @@ the background, or replay notices for old result receipts. The owner's reason
 for this scope was not stated. This is an accepted worker design; it does not
 change the server alert policy above.
 
+### Daily newsletter
+
+Accepted on October 28, 2026: once the morning's reporting finishes, the
+server emails the owner a newsletter of the articles published since the
+previous newsletter. New articles otherwise appear with nothing to prompt a
+visit, and the only News emails were failure and storage alerts. The
+newsletter is a daily reminder to read the news and a quick way to scan it.
+[Issue #62](https://github.com/jubishop/news/issues/62) records the decisions.
+
+The day has finished once the worker has checked in that Pacific day and no
+run due on or before it is pending, running, or waiting to retry. Published,
+nothing to publish, skipped while paused, failed after its retries,
+superseded, and cancelled runs all count as finished. There is no clock cutoff
+or fixed send time. Today's runs exist as pending work only once they are
+materialized, so requiring that day's check-in keeps a newsletter from going
+out around midnight, before the 06:00 Pacific batch has run.
+
+At most one newsletter covers each Pacific day. Each one covers every article
+published since the previous newsletter that is not in Trash. An article
+published later in the day, such as from an explicit retry, waits for the next
+morning's newsletter. A day with no new articles sends no email, and a later
+article that day also waits for the next morning. The first newsletter starts
+from the release that added this feature, not from the whole archive.
+
+For each article, the email shows its lead photo when it has one, the
+headline, the reporter's name, and the stored summary, and links to the
+article's page. It ends with a link to the front page. When one of the day's
+runs failed, one short line points to the newsroom; failure alerts keep their
+own emails. A worker outage or a run that stays unfinished holds the
+newsletter back, and the existing outage and overdue alerts cover those
+cases; the articles roll into the next newsletter. The server sends it from
+`News <news@jubishop.com>` to the owner's alert recipient through the
+[alert delivery rules](server-operations.md#monitoring-and-email). The tradeoff
+is one more daily email and a morning that never finishes sending none.
+
 ### Structured article storage
 
 Accepted on September 24, 2026: stories are stored as structured records in a

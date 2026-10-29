@@ -1,0 +1,14 @@
+News · {{ date }}
+{% for article in articles %}
+
+{{ article.title }}
+{{ article.reporter_name }}
+{{ article.summary }}
+{{ article.url }}
+{% endfor %}
+{% if failed %}
+
+A reporting assignment failed today. Check the newsroom: {{ base }}/newsroom
+{% endif %}
+
+Read the front page: {{ base }}/

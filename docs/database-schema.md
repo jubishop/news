@@ -19,6 +19,8 @@ single-row `archive_state` metadata table. Transactional triggers update these
 tokens for the [archive synchronization protocol](server-contract.md#archive-manifest-protocol).
 [Migration 3](../news/migrations/003-lead-image.sql) adds the nullable
 `lead_image_json` article column; changing it also changes the archive version.
+[Migration 4](../news/migrations/004-newsletters.sql) adds the
+[newsletter tables](#7-newsletters).
 The [server contract](server-contract.md) specifies the implemented calendar,
 claims, retry bounds, HTTP operations, and result payloads.
 
@@ -289,6 +291,26 @@ Email is sent outside database transactions through the selected
 [Resend delivery](implementation-design.md#email-delivery). The [operations guide](server-operations.md#monitoring-and-email) specifies
 incident resolution and the bounded retry window after an ambiguous send.
 The SQL includes frozen payloads, first-attempt times, and provider receipts.
+
+## 7. Newsletters
+
+`newsletters` holds one row per Pacific date on which the
+[daily newsletter](product-design.md#daily-newsletter) was decided.
+
+| Column | Purpose |
+| --- | --- |
+| `newsletter_date` | Pacific date; the primary key allows one newsletter per day. |
+| `article_ids_json` | IDs of the covered articles; empty on a day with none. |
+| `payload_json` | Frozen Resend payload, or null when no email is due. |
+| `created_at` | When maintenance decided the day. |
+| `attempts`, `started_at`, `retry_at`, `error` | Delivery retry state, as for incidents. |
+| `sent_at`, `receipt_id` | Acceptance time and Resend receipt. |
+
+Article IDs are not foreign keys, so Trash purges still work. Maintenance
+deletes rows older than 30 days. The single-row `newsletter_state` table holds
+`covered_through`, the time the last newsletter was decided; the next one
+covers articles published after it. Migration 4 starts it at the newest
+existing article, so the first newsletter skips the earlier archive.
 
 ## Relationships and indexes
 

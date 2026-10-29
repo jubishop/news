@@ -2,7 +2,7 @@
 
 from datetime import timedelta
 
-from . import clock, content, incidents, reporters
+from . import clock, content, incidents, newsletters, reporters
 from .db import one, many, transaction
 
 
@@ -49,4 +49,9 @@ def maintain(config):
                 run_id=run["id"],
                 worker_id=worker,
             )
-    return {"purged_articles": purged, "worker_outage": bool(outage)}
+        newsletter = newsletters.prepare(connection, config)
+    return {
+        "purged_articles": purged,
+        "worker_outage": bool(outage),
+        "newsletter_articles": newsletter,
+    }

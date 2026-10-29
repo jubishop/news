@@ -20,7 +20,8 @@ class MonitoringTests(ServerFixture):
         messages = []
 
         def send(request, **kwargs):
-            messages.append(json.loads(request.data))
+            if request.get_header("Idempotency-key").startswith("news-incident/"):
+                messages.append(json.loads(request.data))
             return io.BytesIO(b'{"id":"accepted"}')
 
         self.http.side_effect = send

@@ -23,7 +23,7 @@ class ManifestTests(ServerFixture):
         self.assertEqual(manifest["articles"][0]["id"], identity)
         self.assertEqual(len(manifest["articles"][0]["revision"]), 32)
         with sqlite3.connect(old) as connection:
-            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 3)
+            self.assertEqual(connection.execute("PRAGMA user_version").fetchone()[0], 4)
         upgraded = self.client.get(f"/api/v1/worker/articles/{identity}", headers=self.worker).json
         self.assertEqual(upgraded["title"], "This week in research")
         self.assertIsNone(upgraded["lead_image"])
