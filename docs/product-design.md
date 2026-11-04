@@ -317,7 +317,7 @@ different models.
 This supersedes the earlier September 24, 2026 decisions to support
 per-reporter model selection, multiple providers at launch, and saving a model
 alongside each run's prompt. The [worker design](reporting-worker.md#model-engine)
-records the selected Claude Code CLI with Claude Haiku 5.5, high effort, and built-in web
+records the selected Claude Code CLI with Claude Sonnet 5.5, high effort, and built-in web
 research, which supersedes the earlier Qwen/Pi and Codex choices.
 
 ### Recurring reporters and one-time contractors
