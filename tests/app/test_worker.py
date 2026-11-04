@@ -43,10 +43,10 @@ class WorkerTests(WorkerFixture):
         self.assertNotIn("test-secret", json.dumps(capture))
         argv = capture["argv"]
         option = lambda name: argv[argv.index(name) + 1]
-        self.assertEqual(option("--model"), "claude-haiku-5-5")
+        self.assertEqual(option("--model"), "claude-sonnet-5-5")
         self.assertEqual(option("--effort"), "high")
         invocation = json.loads((Path(capture["cwd"]) / "invocation.json").read_text())
-        self.assertEqual(invocation["model"], "claude-haiku-5-5")
+        self.assertEqual(invocation["model"], "claude-sonnet-5-5")
         self.assertEqual(invocation["auth"], "subscription")
         self.assertNotIn("ANTHROPIC_API_KEY", capture["env"])
         for flag in ("--print", "--restricted", "--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"):
@@ -128,14 +128,14 @@ class WorkerTests(WorkerFixture):
         self.assertIn("https://example.com/story", capture["article"]["content"][0]["resource"]["text"])
 
     def test_explicit_model_and_effort_override_defaults(self):
-        self.settings.update(model="claude-sonnet-5-5", effort="medium")
+        self.settings.update(model="claude-haiku-5-5", effort="medium")
         self.server.add()
         self.assertEqual(self.execute(), 0)
         capture, = self.captures()
-        self.assertEqual(capture["argv"][capture["argv"].index("--model") + 1], "claude-sonnet-5-5")
+        self.assertEqual(capture["argv"][capture["argv"].index("--model") + 1], "claude-haiku-5-5")
         self.assertEqual(capture["argv"][capture["argv"].index("--effort") + 1], "medium")
         invocation = json.loads((Path(capture["cwd"]) / "invocation.json").read_text())
-        self.assertEqual(invocation["model"], "claude-sonnet-5-5")
+        self.assertEqual(invocation["model"], "claude-haiku-5-5")
 
     def test_paused_job_is_acknowledged_without_claude(self):
         self.server.add(paused=True)
