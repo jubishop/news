@@ -21,8 +21,8 @@ and acceptance criteria.
 
 ## Development
 
-Run `bin/setup` after cloning. It requires Git and Python 3.9 or later.
-QMD and direnv are optional; setup reports skipped features.
+Run `bin/setup` after cloning. It requires Git, Python 3, and QMD, plus direnv
+when the project has an `.envrc`.
 
 The application requires Python 3.14 or later. Install ShellCheck and Restic, then
 run `bin/app-setup` to create the local environment and browser test dependency.
