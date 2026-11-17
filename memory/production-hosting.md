@@ -71,7 +71,7 @@ The owner's Mac keeps mode-0600 recovery files under the mode-0700 directory
 
 | File | Purpose |
 | --- | --- |
-| `app.env` | Private application settings and the approved Resend key. |
+| `app.env` | Private application settings, the approved Resend key, and the alert address. |
 | `backup.env` | R2 endpoint, bucket-scoped S3 credentials, and Restic password. |
 | `restic-password` | Standalone copy of the stable backup encryption password. |
 | `app-secret` | Stable application session secret. |
@@ -80,7 +80,12 @@ The owner's Mac keeps mode-0600 recovery files under the mode-0700 directory
 | `news.key` and `news.pem` | Origin TLS recovery files. |
 
 Keep these paths private and out of Git. Update the relevant copies together
-when rotating credentials. Losing both copies of the Restic password makes
+when rotating credentials, except `app.env`'s `RESEND_API_KEY` and
+`NEWS_ALERT_TO`: change those in `~/.env` only, and vps-infra's
+[alert settings sync](https://github.com/jubishop/vps-infra/blob/main/docs/alert-env-sync.md)
+carries them to both `app.env` copies and restarts `news.service`, as
+[setup step 4](../docs/server-operations.md#provisioning-prerequisites)
+describes. Losing both copies of the Restic password makes
 the encrypted backups unusable. Temporary transfer files such as
 `~/.news-backup.env` are not recovery locations; remove them after a verified
 transfer.

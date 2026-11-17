@@ -305,8 +305,11 @@ outside the public repository. The sender is
 The owner accepted the recommendation; no further reason was stated. Screenr's
 `docs/deployment.md` and `.env.example`, reviewed on September 25, 2026, already
 describe Resend with a `jubishop.com` sender. This reuses an existing service.
-The tradeoff is that alert delivery depends on Resend and its account limits,
-and key rotation must be coordinated with other consumers. The existing key
+The tradeoff is that alert delivery depends on Resend and its account limits.
+Since November 16, 2026, vps-infra's alert settings sync carries a key
+rotation in `~/.env` to News's copies, as
+[setup step 4](server-operations.md#provisioning-prerequisites) describes.
+The existing key
 can send email but cannot create a separate key. No further reason for the
 reuse decision was stated. Production configuration contains the approved key;
 a real delivery check is still required before email is treated as commissioned.

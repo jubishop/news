@@ -145,8 +145,15 @@ found port 3070 free; confirm this before rollout.
    The owner authorized reuse of the existing sending-only key on September 25,
    2026; see the [email decision](implementation-design.md#email-delivery).
    Set the sender to `News <news@jubishop.com>` and put the privately selected
-   owner recipient in configuration. Coordinate rotation with other consumers
-   of the shared key.
+   owner recipient in configuration. Change the key and the alert address in
+   the Mac's `~/.env` only: vps-infra's
+   [alert settings sync](https://github.com/jubishop/vps-infra/blob/main/docs/alert-env-sync.md)
+   keeps `app.env`'s `RESEND_API_KEY`, and `NEWS_ALERT_TO` from `EMAIL_TO`, in
+   step with it, both in `/etc/news/app.env` and in the Mac's recovery copy
+   `~/.config/news/app.env`. After changing the server file it restarts
+   `news.service`; the one-shot `news-backup`, `news-maintain`, and
+   `news-restore-check` units read `app.env` at each start and need no
+   restart. It leaves `NEWS_OWNER_EMAIL`, the owner's login, alone.
 5. Install `restic` and `curl`, and confirm the [shared Python runtime](#production-python).
    Create root-owned `/etc/news/app.env` and `/etc/news/backup.env`, mode 0600. Copy the shapes from
    [.env.example](../.env.example) and [backup example](../ops/backup.env.example).
