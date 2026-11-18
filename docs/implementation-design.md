@@ -7,8 +7,10 @@ status: current
 This document develops the technical approach for the accepted
 [product requirements](product-design.md). Python, Flask, and SQLite are
 selected. Accepted choices, deployment observations, and recommendations are
-identified separately. Server v1 now has an implementation and local validation;
-production rollout and the external worker remain separate milestones.
+identified separately. Server v1 runs at `news.jubishop.com`, released from
+`main` by the [deployment workflow](deployment.md), and the Claude Code
+reporting worker runs on the owner's Mac, as
+[worker operations](worker-operations.md) describes.
 
 The implemented [server contract](server-contract.md) defines records, article
 payloads, browser routes, and worker API operations for the first phase.
@@ -39,19 +41,19 @@ After server v1 merged, the owner requested [automatic deployment](deployment.md
 from `main`, including migrations and required maintenance. That release work
 supersedes the earlier PR-only task boundary.
 
-The owner requested this sequence; no further reason was stated. It allows
+The owner requested this sequence; no further reason was stated. It allowed
 the reading experience, reporter management, storage, and API to be evaluated
-before adding real AI reporting. The tradeoff is that server acceptance cannot
-establish research quality or prove the eventual worker integration.
+before adding real AI reporting. The tradeoff was that server acceptance could
+not establish research quality or prove the later worker integration.
 
-The first phase includes the server side of the worker API and its job
-lifecycle. Define that interface now so the later worker can use it. Model
-integration, research tools, and local worker deployment belong to the second
-phase and must not become prerequisites for completing the server.
+The first phase included the server side of the worker API and its job
+lifecycle, defined then so the later worker could use it. Model integration,
+research tools, and local worker deployment belonged to the second phase and
+were not prerequisites for completing the server.
 
 ### Proposed server acceptance approach
 
-These are engineering recommendations for making server v1 reviewable without
+These were engineering recommendations for making server v1 reviewable without
 a production worker:
 
 - Verify the [backup policy](backups.md) with an isolated database restore,
@@ -119,7 +121,7 @@ a production worker:
   replacement within the retry limit and reject new results from the replaced
   attempt. Simulate losing an acknowledgment after a successful submission;
   replay the saved result and verify that it returns the original receipt
-  without duplicate publication. Local result storage belongs to the later
+  without duplicate publication. Local result storage belonged to the later
   worker phase; server v1 tests use deterministic saved payloads.
 - Verify automatic article availability, feed filtering, historical
   attribution, and recoverable article deletion through the reading UI and
@@ -149,9 +151,9 @@ a production worker:
 
 Automated tests must run real server logic with fakes only at external-system
 boundaries, following the [testing workflow](foundation/engineering-policy.md#test-driven-development).
-The deployed server and representative fixtures give the owner a concrete v1
-to assess. Worker implementation starts after the owner is satisfied with that
-server milestone. The [server contract](server-contract.md) now specifies the
+The deployed server and representative fixtures gave the owner a concrete v1
+to assess, and worker implementation followed that server milestone. The
+[server contract](server-contract.md) now specifies the
 API, bounds, and recovery choices; the [operations guide](server-operations.md)
 records runtime, validation, and rollout steps.
 
@@ -181,8 +183,10 @@ Reviewed on September 24, 2026:
 
 A read-only host check on September 24, 2026 found two logical CPUs, 1,920 MiB
 of RAM, no swap, and about 37 GiB of disk capacity. This is deployment context,
-not a measurement of News resource use or a capacity guarantee. Recheck the
-host and measure representative News workloads before deployment.
+not a measurement of News resource use or a capacity guarantee. The
+[operations guide](server-operations.md#release-and-first-rollout) sets the
+deployed service's resource limits and calls for measuring its actual use
+alongside the host's other applications.
 
 ## Loose workload estimate
 
@@ -205,7 +209,7 @@ neighboring projects.
 | Flask and Jinja | Render the reading feed, article pages, and newsroom forms from database records. | The agreed UI is mainly reading, filtering, and editing settings. Templates support this directly. A richer browser application remains possible but would require additional interface work. |
 | SQLite through Python's `sqlite3` | Store reporters, articles, run state, and pending work. | Local structured data and short writes fit the starting application. It needs no separate database server, but concurrent writers must keep transactions short. |
 | Separate Python worker | Claim reporting work, call research services, and submit results or errors. | Research continues independently of a browser request and can run on a different host. The application must own durable job state and recovery rules. |
-| Existing Caddy and systemd | Route HTTPS traffic and supervise VPS application processes. | Fits the shared host's deployment model. Service settings and resource limits still require validation. Worker supervision depends on its eventual host. |
+| Existing Caddy and systemd | Route HTTPS traffic and supervise VPS application processes. | Fits the shared host's deployment model. Service settings and resource limits should track measured use. The Mac worker runs under its own LaunchAgent instead. |
 
 Article content stays in the database using the
 [selected article format](product-design.md#structured-article-storage).
@@ -223,9 +227,11 @@ Run durable research outside web handlers, consistent with Flask's
 Python's documented [SQLite interface](https://docs.python.org/3/library/sqlite3.html)
 provides the local database connection. Sources checked on September 24, 2026.
 
-The selected stack still requires concrete choices for request validation,
-request protection, migrations, research tools, and job recovery. A small web
-framework does not remove those responsibilities. No performance comparison
+The selected stack left concrete choices for request validation, request
+protection, migrations, research tools, and job recovery; a small web framework
+does not remove those responsibilities. The [server contract](server-contract.md),
+[deployment workflow](deployment.md#migrations-and-other-release-work), and
+[worker operations](worker-operations.md) record them. No performance comparison
 or capacity benchmark has been run. Reconsider the framework if the desired
 browser interactions materially change the balance.
 
@@ -300,7 +306,7 @@ on the same date, the owner explicitly authorized reuse of the existing
 sending-only key from `~/.env`. This supersedes the earlier dedicated-key
 requirement. Keep the alert recipient and credentials in deployment configuration,
 outside the public repository. The sender is
-`News <news@jubishop.com>`; confirm its domain configuration during deployment.
+`News <news@jubishop.com>`.
 
 The owner accepted the recommendation; no further reason was stated. Screenr's
 `docs/deployment.md` and `.env.example`, reviewed on September 25, 2026, already
@@ -311,8 +317,7 @@ rotation in `~/.env` to News's copies, as
 [setup step 4](server-operations.md#provisioning-prerequisites) describes.
 The existing key
 can send email but cannot create a separate key. No further reason for the
-reuse decision was stated. Production configuration contains the approved key;
-a real delivery check is still required before email is treated as commissioned.
+reuse decision was stated. Production configuration contains the approved key.
 
 Resend's [API-key documentation](https://resend.com/docs/dashboard/api-keys/introduction)
 describes sending-only keys and domain restrictions. Its
@@ -328,16 +333,21 @@ The owner selected the recipient on September 25, 2026; keep the address in
 private deployment configuration. Use it for the accepted
 [backup storage warnings](backups.md) as well.
 
-Email originates from the VPS monitoring service. The later research worker
-does not need email credentials. The
+Email originates from the VPS monitoring service. The research worker does
+not need email credentials. The
 [daily newsletter](product-design.md#daily-newsletter) uses the same sender,
 recipient, and delivery path: maintenance saves its HTML and plain-text
 payload in a per-day `newsletters` row, then sends it outside the transaction
 with the alerts' retry window. Templates escape all article text. Keep email sending outside article and run
 transactions, and retain visible incidents if sending fails. The
 [operations guide](server-operations.md#monitoring-and-email) defines delivery
-retry rules. Sender verification and a production delivery check remain
-commissioning work.
+retry rules.
+
+Production email is commissioned. Resend accepted the first incident email on
+October 1, 2026, and [issue #64](https://github.com/jubishop/news/issues/64)
+confirmed the first production newsletter's inbox delivery and Resend receipt,
+closing on October 29, 2026. Resend rejects sends from an unverified domain, so
+those receipts also show the sender's domain is verified.
 
 ## Implemented server choices and remaining work
 
@@ -351,8 +361,10 @@ do not select the research worker's model or tools.
 The [deployment workflow](deployment.md) automates releases after one-time
 provisioning. The [production hosting reference](../memory/production-hosting.md)
 records the installed infrastructure and private recovery locations. Track
-remaining live acceptance and email commissioning in the project issue tracker.
+remaining production work in the
+[project issue tracker](https://github.com/jubishop/news/issues).
 
-The shared model, local execution host, provider integration, research tools,
-and persistent local result storage remain worker-phase decisions. Server
-acceptance cannot establish research quality or the eventual model behavior.
+The [reporting worker](reporting-worker.md) design and
+[worker operations](worker-operations.md) record the worker's model, host,
+provider integration, research tools, and local result storage. Server
+acceptance alone could not establish research quality or model behavior.
