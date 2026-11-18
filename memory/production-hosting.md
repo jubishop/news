@@ -12,7 +12,7 @@ Since October 15, 2026, the VPS answers SSH only on its tailnet address,
 `100.91.85.40`; see vps-infra `docs/tailscale.md`.
 Use the [deployment guide](../docs/deployment.md) for release behavior and the
 [operations guide](../docs/server-operations.md) for backup and recovery commands.
-Track rollout progress and remaining acceptance work in GitHub Issues.
+Track remaining production work in GitHub Issues.
 
 ## Host and Cloudflare boundaries
 

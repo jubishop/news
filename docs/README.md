@@ -63,7 +63,7 @@ hand-written pages to bypass failed checks.
 - [Upcoming reporting calendar](newsroom-calendar.md): unified newsroom dates,
   Pacific month navigation, lifecycle rules, and accessible layouts.
 - [Implementation design](implementation-design.md): server-first implementation
-  sequence, selected stack, deployment context, and remaining technical choices.
+  sequence, selected stack, deployment context, and access and email choices.
 - [Backups](backups.md): encrypted recovery snapshots, retention, restore
   checks, and email warnings when backup storage exceeds 1 GB.
 - [Server contract](server-contract.md): implemented records, Markdown article
