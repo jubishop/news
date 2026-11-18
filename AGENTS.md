@@ -31,24 +31,17 @@ take precedence over this block and the foundation pages wherever they differ.
 
 ## Project
 
-Read the [concept](docs/concept.md) for the project's direction and the
-[implementation design](docs/implementation-design.md) for the selected
-Python, Flask, and SQLite stack. Read the [server contract](docs/server-contract.md)
-and [operations guide](docs/server-operations.md) for server v1. Read
+Read the [concept](docs/concept.md) for the project's direction, the
+[implementation design](docs/implementation-design.md) for its Python, Flask,
+and SQLite stack, the [server contract](docs/server-contract.md) and
+[operations guide](docs/server-operations.md) for server v1, and
 [worker operations](docs/worker-operations.md) for the Claude Code worker and
 its required after-merge commissioning.
 
-Use [GitHub Issues](https://github.com/jubishop/news/issues) for shared work
-and acceptance criteria.
-
-`bin/check --full` runs `bin/check-application`: the package import check,
-application tests, the browser test, and ShellCheck for the operations and
-worker scripts. Run relevant application checks explicitly for code edits.
-CI does not enforce branch protection, so run `bin/check --full` locally
-before delivering any code change, including tests and CI. Text-only changes
-need only `bin/check --documents-only` before they are pushed.
+No CI gate is enforced, so run `bin/check --full` locally before delivering
+any code change, tests and CI included.
 
 Before pushing or merging to `main`, assess the complete delivery under the
-[deployment policy](docs/deployment.md#deployment-decisions). Record a skip
-decision only for functionally immaterial changes with no outstanding material
-release. Full CI checks still run.
+[deployment policy](docs/deployment.md#deployment-decisions), and record a
+skip decision only for a functionally immaterial delivery with no outstanding
+material release.
