@@ -1,6 +1,6 @@
 ---
 name: production-hosting
-description: Installed News infrastructure, credential locations, and recovery constraints.
+description: "Installed News infrastructure, credential locations, and recovery constraints."
 type: reference
 ---
 
@@ -45,6 +45,14 @@ Track rollout progress and remaining acceptance work in GitHub Issues.
   Worker monitoring is enabled: `/etc/news/app.env` sets
   `NEWS_MONITOR_WORKER="true"` and `NEWS_MONITOR_START_DATE="2026-09-27"`.
   The policy, the 403, and these settings were verified October 23, 2026.
+- The worker's service token expires September 26, 2027, at 11:59 PM PDT
+  (2027-09-27 06:59:52 UTC), according to
+  [#55](https://github.com/jubishop/news/issues/55). After that the worker's
+  API requests fail Access with 403 and reporting stops. Renew it between
+  August 27 and September 26, 2027; #55 is open and holds the renewal steps.
+  Refreshing the token keeps its client ID and secret, so the Access policy
+  and worker configuration stay unchanged. Do not create a new token unless
+  the policy is updated to select it.
 - The worker application's `allowed_idps` list is empty, which Cloudflare
   treats as every identity provider in the account, including one-time PIN.
   That is harmless while Service Auth is its only policy. Restrict its
