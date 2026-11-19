@@ -24,15 +24,19 @@ Restic 0.16 or later is supported for backup operations (Ubuntu 24.04 packages
 
 ```sh
 bin/setup
-bin/app-setup
 bin/check-application
 bin/preview
 ```
 
-`bin/app-setup` uses `python3` by default; set `NEWS_PYTHON` to another
+`bin/setup` runs `bin/setup-application`; run that alone to rebuild the
+environment. It uses `python3` by default; set `NEWS_PYTHON` to another
 Python 3.14 or later executable if needed. It recreates the checkout-local `.venv`,
 installs the hash-locked production and test requirements, and installs Chromium.
-Stop any worker using that environment before running setup.
+In the checkout the installed [worker](worker-operations.md) runs from, it
+exits nonzero and leaves `.venv` unchanged while a batch holds the worker lock;
+run setup again after the batch finishes. It checks the lock only when it
+starts, so avoid running `bin/setup` or `bin/setup-application` there near the
+06:00 start.
 On Linux, install Chromium system packages with
 `.venv/bin/python -m playwright install --with-deps chromium`.
 

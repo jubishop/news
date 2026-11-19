@@ -65,7 +65,7 @@ else:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "bin").mkdir()
-            shutil.copy2(ROOT / "bin/app-setup", root / "bin/app-setup")
+            shutil.copy2(ROOT / "bin/setup-application", root / "bin/setup-application")
             marker = root / ".venv/old-runtime"
             # The default interpreter is python3; its runtime check sees the simulated version.
             shim = root / "bin/python3"
@@ -86,7 +86,7 @@ fi
                 with self.subTest(version=version):
                     marker.parent.mkdir(parents=True, exist_ok=True)
                     marker.touch()
-                    result = subprocess.run(["sh", str(root / "bin/app-setup")],
+                    result = subprocess.run(["sh", str(root / "bin/setup-application")],
                                             env=env | {"TEST_VERSION": version}, capture_output=True, text=True)
                     if accepted:
                         self.assertEqual(result.returncode, 0, result.stderr)

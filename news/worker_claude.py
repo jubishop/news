@@ -274,7 +274,7 @@ def browser_preflight():
         subprocess.run([sys.executable, "-B", str(FETCH_SERVER), "--check"], capture_output=True, timeout=120,
                        env=claude_environment(), check=True)
     except (OSError, subprocess.SubprocessError):
-        raise WorkerError("The News page browser could not start. Run bin/app-setup to install Playwright's Chromium.") from None
+        raise WorkerError("The News page browser could not start. Run bin/setup-application to install Playwright's Chromium.") from None
 
 
 def remove_saved_files(attempts):
