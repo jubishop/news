@@ -4,6 +4,8 @@ root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$root"
 python_bin=${NEWS_PYTHON:-python3}
 "$python_bin" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 14) else "News requires Python 3.14 or later; found " + sys.version.split()[0] + ". Set NEWS_PYTHON to a newer interpreter.")'
+# Replacing .venv under a running batch would fail its next attempt.
+"$python_bin" -B -I news/setup_guard.py "$root"
 "$python_bin" -m venv --clear .venv
 .venv/bin/python -m pip install --require-hashes -r requirements.txt -r requirements-dev.txt
 .venv/bin/python -m playwright install chromium

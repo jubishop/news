@@ -10,9 +10,9 @@ import subprocess
 import sys
 import tempfile
 
+from .setup_guard import LABEL
 from .worker_io import WorkerError, read_json
 
-LABEL = "com.jubishop.news.worker"
 # The worker was scheduled by cron before launchd; installation removes that entry.
 LEGACY_CRON_MARKER = "# news-reporting-worker"
 
@@ -85,7 +85,7 @@ def install(config, checkout, *, apply=False):
     settings = read_json(config)
     python = checkout / ".venv/bin/python"
     if not python.is_file():
-        raise WorkerError("Run bin/app-setup in the permanent checkout first.")
+        raise WorkerError("Run bin/setup-application in the permanent checkout first.")
     state = Path(settings.get("state_dir", Path.home() / ".local/state/news-worker")).expanduser().resolve()
     content = definition(config, checkout, state)
     if not apply:

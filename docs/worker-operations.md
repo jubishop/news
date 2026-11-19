@@ -25,8 +25,8 @@ version, the Claude subscription login, and its [API key file](#api-key-and-subs
 before starting research. Install
 Claude Code with its official installer; the native Mac binary needs no Node
 runtime. QMD has its own [runtime and model setup](article-history-search.md#installation-and-checks).
-Install from a permanent checkout with `bin/setup` and `bin/app-setup`.
-The page browser uses Playwright and its Chromium, which `bin/app-setup`
+Install from a permanent checkout with `bin/setup`.
+The page browser uses Playwright and its Chromium, which `bin/setup-application`
 installs from the development dependency group. The server does not install
 them.
 
@@ -478,8 +478,8 @@ After the PR is merged and its full checks pass:
 
 1. Confirm the merged commit and successful server deployment. Update the
    permanent `/Users/jubi/projects/news` checkout to that reviewed `main`
-   revision without disturbing unrelated work. Run `bin/app-setup` there if
-   its environment is missing or dependencies changed.
+   revision without disturbing unrelated work. Run `bin/setup-application`
+   there if its environment is missing or dependencies changed.
 2. Commission the dedicated Cloudflare **Service Auth** token for the News API
    application, replacing the policy that denies all API access during the
    server-only phase. Keep the owner application's audience and policy

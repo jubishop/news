@@ -25,8 +25,9 @@ Setup needs Git, Python 3, and QMD, plus direnv when the project has an
 Create `.envrc` only when the project needs environment settings, and review
 it before running `direnv allow`; search does not need it.
 
-Run `bin/app-setup` before application checks, as described in
-[local setup](server-operations.md#runtime-and-local-setup).
+`bin/setup`, and the `post-checkout` hook in a new worktree, run
+`bin/setup-application`, which creates the `.venv` that application checks
+use, as described in [local setup](server-operations.md#runtime-and-local-setup).
 
 ## Checks
 
@@ -50,7 +51,7 @@ commit. Text-only changes need neither.
 ## Runtime and toolchain versions
 
 The application and the worker require Python 3.14 or later, declared in
-`pyproject.toml` and checked by `bin/app-setup`, `ops/install-server`, and the
+`pyproject.toml` and checked by `bin/setup-application`, `ops/install-server`, and the
 `news` package. `.python-version` requests the newest available Python that
 meets that minimum. Production runs the shared VPS Python, which updates to the
 newest final release once its minor series is 14 days old; CI tests 3.14 and the

@@ -24,8 +24,10 @@ and acceptance criteria.
 Run `bin/setup` after cloning. It requires Git, Python 3, and QMD, plus direnv
 when the project has an `.envrc`.
 
-The application requires Python 3.14 or later. Install ShellCheck and Restic, then
-run `bin/app-setup` to create the local environment and browser test dependency.
+The application requires Python 3.14 or later. `bin/setup` runs
+`bin/setup-application`, which creates the local environment and browser test
+dependency; a new worktree gets them from the `post-checkout` hook. Install
+ShellCheck and Restic for checks.
 Run `bin/check-application` for application checks and `bin/preview` for a disposable
 local edition at `http://127.0.0.1:3071`. The preview uses test data and fixture
 Access credentials; it does not contact a production worker. See
