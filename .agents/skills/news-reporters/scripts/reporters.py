@@ -1,5 +1,12 @@
 #!/usr/bin/env python3
-"""Run reporter administration over SSH using the deployed News application."""
+"""Administer News reporters on the VPS through the deployed application.
+
+Each command runs over SSH as the news user and prints a JSON object. A change
+first backs up the database, replacing the previous helper backup at
+BACKUP_DIR/reporters-before-change.sqlite3, then commits in one transaction
+and reads the reporter back. Its result has before, after, backup_path, and
+verified.
+"""
 
 import argparse
 import json
@@ -8,23 +15,46 @@ import shlex
 import subprocess
 import sys
 
+DETAILS = """\
+reporter data:
+  A JSON object in a file, or - for stdin. create needs name, prompt, and
+  cadence, plus that cadence's field; update sends only the fields it changes.
+    daily     no other field
+    weekly    weekdays: list of mon, tue, wed, thu, fri, sat, sun
+    monthly   day_of_month: 1 to 31; shorter months use their last day
+    once      dates: distinct YYYY-MM-DD contractor dates
+  A list replaces the saved one, so keep contractor dates already due. New
+  schedules take effect tomorrow, Pacific Time, and new contractor dates must be
+  after today. A reporter can't change between once and the recurring cadences.
+
+errors:
+  A failure exits 1 with an error code and message. stale_version: show the
+  reporter again and reconcile. outcome_unknown: SSH lost the reply, so the
+  change may have committed; check list and show before retrying. The helper
+  never retries a change.
+"""
+
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=__doc__, epilog=DETAILS,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
     if sys.version_info < (3, 14):
         parser.error("News reporter administration requires Python 3.14 or later.")
-    parser.add_argument("--host", default="root@100.91.85.40")
-    parser.add_argument("--release", default="/opt/news/current")
-    parser.add_argument("--database", default="/var/lib/news/news.sqlite3")
-    parser.add_argument("--backup-dir", default="/var/lib/news/reporter-backups")
+    parser.add_argument("--host", default="root@100.91.85.40", help="SSH destination (default: %(default)s)")
+    parser.add_argument("--release", default="/opt/news/current",
+                        help="deployed release directory (default: %(default)s)")
+    parser.add_argument("--database", default="/var/lib/news/news.sqlite3", help="(default: %(default)s)")
+    parser.add_argument("--backup-dir", default="/var/lib/news/reporter-backups", help="(default: %(default)s)")
     commands = parser.add_subparsers(dest="action", required=True)
     listing = commands.add_parser("list", help="List active reporters without instructions")
-    listing.add_argument("--all", action="store_true", help="Include retired reporters")
-    commands.add_parser("show", help="Read a reporter and its configuration version").add_argument("id")
-    create = commands.add_parser("create", help="Create a reporter from a JSON object")
+    listing.add_argument("--all", action="store_true", help="Include completed and deleted reporters")
+    commands.add_parser("show", help="Read a reporter with its instructions and config_version").add_argument("id")
+    create = commands.add_parser("create", help="Create a reporter")
     create.add_argument("--data", required=True, help="JSON file, or - for stdin")
-    for action in ("update", "pause", "resume", "delete"):
-        command = commands.add_parser(action)
+    for action, summary in (("update", "Change a reporter's fields"), ("pause", "Pause a reporter"),
+                            ("resume", "Resume a paused reporter"),
+                            ("delete", "Retire a reporter, cancelling its unstarted work")):
+        command = commands.add_parser(action, help=summary)
         command.add_argument("id")
         command.add_argument("--if-version", required=True, type=int,
                              help="config_version from the last show result")

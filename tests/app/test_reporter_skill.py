@@ -60,6 +60,16 @@ sys.exit(result.returncode)
         self.assertEqual(result.returncode, status, result.stdout + result.stderr)
         return json.loads(result.stdout)
 
+    def test_help_documents_what_the_skill_leaves_to_it(self):
+        result = subprocess.run([sys.executable, "-B", str(self.helper), "--help"],
+                                text=True, capture_output=True, check=True)
+        text = " ".join(result.stdout.split())
+        for action in ("list", "show", "create", "update", "pause", "resume", "delete"):
+            self.assertRegex(text, rf" {action} [A-Z]")
+        self.assertEqual(text.count("(default: "), 4)
+        for term in ("cadence", "weekdays", "day_of_month", "dates", "stale_version", "outcome_unknown"):
+            self.assertIn(term, text)
+
     def create(self, **extra):
         return self.run_helper("create", values={
             "name": "Seahawks", "prompt": "Report on the latest completed game.",
