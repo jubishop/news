@@ -164,7 +164,11 @@ class WorkerFixture(unittest.TestCase):
         self.addCleanup(self.http.shutdown)
         self.fake = self.root / "claude"
         self.fake.write_text(f"#!{sys.executable}\n" + '''
-import fcntl, json, os, pathlib, re, signal, subprocess, sys, time, urllib.request
+import os, sys
+if "--print" in sys.argv:
+    # Record each research launch first, so tests that race a deadline wait on interpreter startup alone.
+    os.close(os.open(os.path.join(os.path.dirname(__file__), "started-" + str(os.getpid())), os.O_WRONLY | os.O_CREAT))
+import fcntl, json, pathlib, re, signal, subprocess, time, urllib.request
 root = pathlib.Path(__file__).parent
 if "--version" in sys.argv:
     print("2.1.296 (Claude Code)")
@@ -176,7 +180,6 @@ if sys.argv[1:3] == ["auth", "status"]:
     sys.exit(0 if logged_in else 1)
 config = json.loads((root / "fake.json").read_text())
 prompt = sys.stdin.read()
-time.sleep(config.get("startup_delay", 0))
 endpoint = json.loads(pathlib.Path(sys.argv[sys.argv.index("--mcp-config") + 1]).read_text())["mcpServers"]["news_history"]["url"]
 print(json.dumps({"type": "system", "subtype": "init", "mcp_servers": [
     {"name": "news_history", "status": config.get("history_status", "connected")},
@@ -261,3 +264,7 @@ print(json.dumps(final))
 
     def captures(self):
         return [json.loads(p.read_text()) for p in self.root.glob("capture-*.json")]
+
+    def launches(self):
+        """Return the PID of each fake Claude research run that started."""
+        return [int(p.name.removeprefix("started-")) for p in self.root.glob("started-*")]

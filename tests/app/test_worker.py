@@ -332,19 +332,20 @@ class WorkerTests(WorkerFixture):
 
     def test_timeout_kills_claude_and_reports_failure(self):
         self.server.add()
-        self.settings["attempt_timeout_seconds"] = .5
-        self.fake_config["startup_delay"] = .2
+        # Only the guardian's and the fake's interpreter startups race this deadline.
+        timeout = self.settings["attempt_timeout_seconds"] = 1
         self.fake_config["delay"] = 30
         started = time.monotonic()
         self.assertEqual(self.execute(), 1)
         elapsed = time.monotonic() - started
-        self.assertGreaterEqual(elapsed, 3 * self.settings["attempt_timeout_seconds"])
-        self.assertLess(elapsed, 5)
-        self.assertEqual(len(self.captures()), 3)
+        self.assertGreaterEqual(elapsed, 3 * timeout)
+        # Each attempt ends soon after its deadline, long before the fake's delay would.
+        self.assertLess(elapsed, 3 * (timeout + 5))
         self.assertEqual(len(self.server.results), 3)
         self.assertTrue(all(r["error"]["code"] == "research_timeout" for r in self.server.results))
-        for capture_path in self.root.glob("capture-*.json"):
-            pid = int(capture_path.stem.split("-")[1])
+        launches = self.launches()
+        self.assertEqual(len(launches), 3)
+        for pid in launches:
             with self.assertRaises(ProcessLookupError):
                 os.kill(pid, 0)
 
