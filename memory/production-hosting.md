@@ -21,9 +21,9 @@ Track remaining production work in GitHub Issues.
 - Since October 9, 2026 (Pacific), News runs on the shared runtime
   `/opt/python/current/bin/python3`, then CPython 3.14.8. Release 26ce865 was
   the first built from it, and `news-rebuild-environment` then moved it to
-  `.venv-3.14.8`. News is registered in the host's `/etc/python-update.json`.
-  Live checks on October 11, 2026 confirmed that registration and the
-  `current` 3.14.8 update status. Ubuntu's `/usr/bin/python3` remains 3.12.3.
+  `.venv-3.14.8`. The runtime updates automatically; it was 3.15.2 on
+  November 24, 2026. News is registered in the host's `/etc/python-update.json`,
+  as confirmed that day. Ubuntu's `/usr/bin/python3` remains 3.12.3.
   See the [runtime procedure](../docs/server-operations.md#production-python).
 - The retired dedicated CPython 3.14.7 under `/opt/news/python`, with
   `/opt/news/python3.14` and uv in `/opt/news/tools`, was removed on
@@ -116,10 +116,7 @@ release's installer as root.
 The owner installs the receiver and kit with `bin/install-deploy-kit`,
 separately from application releases. The selected release is
 `/opt/news/current`; its `REVISION` file records the deployed commit. The
-receiver uses the shared Python runtime. Its prior versions are retained in
-`/opt/news/receiver-backups`, owned by root with mode 0600, for operator-led
-recovery: `receive-release-before-python314` (system Python 3.12),
-`receive-release-before-shared-python` (dedicated 3.14 interpreter), and
-`receive-release-before-deploy-kit` with `rebuild-environment-before-deploy-kit`
-(the release-run installer design).
+receiver uses the shared Python runtime. The old receiver backups that
+once sat in `/opt/news/receiver-backups` are gone (checked November 24, 2026);
+`ops/receive-release` and the deploy kit in Git are the recovery source.
 Keep provider credentials out of GitHub deployment logs and release archives.
